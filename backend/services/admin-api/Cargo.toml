@@ -22,7 +22,7 @@ rushwind-bootstrap = { git = "https://github.com/tx7do/rushwind", rev = "2bc3a96
 rushwind-http-binding = { git = "https://github.com/tx7do/rushwind", rev = "2bc3a96c742539a195b608b995be1c3bcc1545a3" }
 rushwind-transport = { git = "https://github.com/tx7do/rushwind", rev = "2bc3a96c742539a195b608b995be1c3bcc1545a3" }
 rushwind-transport-axum = { git = "https://github.com/tx7do/rushwind", rev = "2bc3a96c742539a195b608b995be1c3bcc1545a3" }
-axum = { version = "0.8", default-features = false, features = ["http1", "tokio", "query", "json", "matched-path"] }
+axum = { version = "0.8", default-features = false, features = ["http1", "tokio", "query", "json", "matched-path", "multipart"] }
 tokio = { workspace = true }
 redis = { workspace = true }
 serde = { workspace = true, features = ["derive"] }
@@ -40,3 +40,4 @@ base64 = "0.22"
 rand = "0.9"
 hex = "0.4"
 captcha = "0.0.9"
+serde_urlencoded = "0.7"

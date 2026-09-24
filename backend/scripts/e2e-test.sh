@@ -264,7 +264,56 @@ check "portal initial context" '"permissions"' "$CTX"
 APPUID=$(curl -s -H "Authorization: Bearer $APPTOKEN2" "$APP/app/v1/me" 2>/dev/null)
 check "app user profile" '"username"' "$APPUID"
 
-echo "── 9. SSE 与 CORS ──────────────────────"
+echo "── 9. multipart 文件上传与下载 ──────────────────────"
+# 造一个小测试文件
+echo "e2e-upload-content-rushwind" > /tmp/e2e-upload.txt
+UP=$(curl -s -w "\n%{http_code}" -X POST -H "$AUTH" \
+  -F "file=@/tmp/e2e-upload.txt;type=text/plain" \
+  -F "storageObject={\"bucketName\":\"images\",\"fileDirectory\":\"e2e\"}" \
+  -F "sourceFileName=e2e-upload.txt" -F "mime=text/plain" -F "size=$(wc -c < /tmp/e2e-upload.txt)" -F "method=post" \
+  "$ADMIN/admin/v1/file/upload")
+UP_BODY=$(echo "$UP" | head -n -1); UP_CODE=$(echo "$UP" | tail -1)
+check "multipart upload → 200" "200" "$UP_CODE"
+check "upload answers contract objectName" '"objectName"' "$UP_BODY"
+F_GUID=$(echo "$UP_BODY" | python3 -c "import json,sys; print(json.load(sys.stdin).get('objectName','').split('fileGuid=')[-1])" 2>/dev/null)
+
+# 媒体库变体（reference 的 UploadMediaAsset）：文件行 + media_assets 行
+AUP=$(curl -s -w "\n%{http_code}" -X POST -H "$AUTH" \
+  -F "file=@/tmp/e2e-upload.txt;type=text/plain" \
+  "$ADMIN/admin/v1/file/asset/upload")
+AUP_BODY=$(echo "$AUP" | head -n -1); AUP_CODE=$(echo "$AUP" | tail -1)
+check "asset upload → 200" "200" "$AUP_CODE"
+check "asset upload answers contract objectName" '"objectName"' "$AUP_BODY"
+A_GUID=$(echo "$AUP_BODY" | python3 -c "import json,sys; print(json.load(sys.stdin).get('objectName','').split('fileGuid=')[-1])" 2>/dev/null)
+
+# 两条文件行都入列
+FLIST=$(curl -s -H "$AUTH" "$ADMIN/admin/v1/files?page=1&pageSize=100")
+check "uploaded file row visible" "\"fileGuid\":\"$F_GUID\"" "$FLIST"
+check "asset-flow file row visible" "\"fileGuid\":\"$A_GUID\"" "$FLIST"
+ALIST=$(curl -s -H "$AUTH" "$ADMIN/admin/v1/media-assets?page=1&pageSize=100")
+check "asset row visible in media library" '"filename":"e2e-upload.txt"' "$ALIST"
+
+DOWN=$(curl -s -H "$AUTH" -w "|%{http_code}|%{content_type}" "$ADMIN/admin/v1/file/download?fileGuid=$F_GUID")
+check "download by guid streams bytes" "|200|text/plain" "$DOWN"
+check "download roundtrip content (guid)" 'e2e-upload-content-rushwind' "$DOWN"
+F_ID=$(echo "$FLIST" | python3 -c "
+import json,sys
+d=json.load(sys.stdin)
+print(next((i.get('id',0) for i in d.get('items',[]) if i.get('fileGuid')=='$F_GUID'),0))" 2>/dev/null)
+DOWN2=$(curl -s -H "$AUTH" -w "|%{http_code}|%{content_type}" "$ADMIN/admin/v1/file/download?fileId=$F_ID")
+check "download by id streams bytes" "|200|text/plain" "$DOWN2"
+check "download roundtrip content (id)" 'e2e-upload-content-rushwind' "$DOWN2"
+
+# 清理：两条文件行连同磁盘对象（media_assets 行留作演示数据，删面为桩）
+A_ID=$(echo "$FLIST" | python3 -c "
+import json,sys
+d=json.load(sys.stdin)
+print(next((i.get('id',0) for i in d.get('items',[]) if i.get('fileGuid')=='$A_GUID'),0))" 2>/dev/null)
+[ -n "$F_ID" ] && [ "$F_ID" != "0" ] && curl -s -o /dev/null -X DELETE -H "$AUTH" "$ADMIN/admin/v1/files/$F_ID"
+[ -n "$A_ID" ] && [ "$A_ID" != "0" ] && curl -s -o /dev/null -X DELETE -H "$AUTH" "$ADMIN/admin/v1/files/$A_ID"
+rm -f /tmp/e2e-upload.txt
+
+echo "── 10. SSE 与 CORS ──────────────────────"
 R=$(curl -s -o /dev/null -w "%{http_code}" -X OPTIONS "http://127.0.0.1:6601/events")
 check "SSE preflight 204" "204" "$R"
 R=$(curl -s -i -X OPTIONS -H "Origin: http://localhost:5999" -H "Access-Control-Request-Method: POST" "$ADMIN/admin/v1/login" 2>&1 | grep -i "access-control-allow-origin" | head -1)

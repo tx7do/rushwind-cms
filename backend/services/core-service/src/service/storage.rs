@@ -55,13 +55,6 @@ fn operator_of<T>(request: &tonic::Request<T>) -> Result<i64, Status> {
         .ok_or_else(|| Status::unauthenticated("user identity required"))
 }
 
-/// A stored object: the metadata row id + the local path + the bytes.
-pub struct StoredObject {
-    pub file_id: i64,
-    pub path: std::path::PathBuf,
-    pub bytes: Vec<u8>,
-}
-
 impl FileServiceImpl {
     /// Writes an object to the local store + the metadata row (the
     /// upload transport bridge calls this; JSON/base64 for now).
@@ -71,44 +64,29 @@ impl FileServiceImpl {
         file_name: &str,
         _mime_type: &str,
         bytes: Vec<u8>,
-    ) -> Result<StoredObject, Status> {
-        let ext = file_name.rsplit('.').next().unwrap_or("bin");
-        let key = format!(
-            "{}/{}.{}",
-            chrono::Utc::now().format("%Y%m%d"),
-            uuid::Uuid::now_v7().simple(),
-            ext
-        );
+    ) -> Result<files::Model, Status> {
+        let (stem, ext) = file_name
+            .rsplit_once('.')
+            .map(|(s, e)| (s.to_string(), e.to_string()))
+            .unwrap_or((file_name.to_string(), "bin".to_string()));
         let dir = std::path::Path::new(STORAGE_ROOT)
             .join(chrono::Utc::now().format("%Y%m%d").to_string());
         tokio::fs::create_dir_all(&dir)
             .await
             .map_err(|e| Status::internal(format!("storage dir: {e}")))?;
-        let _ = key;
-        let path = dir.join(format!(
-            "{}.{}",
-            uuid::Uuid::now_v7().simple(),
-            file_name.rsplit('.').next().unwrap_or("bin")
-        ));
+        // One guid names both the on-disk object and the row's
+        // save_file_name — the download resolves the pair.
+        let guid = uuid::Uuid::now_v7().simple().to_string();
+        let save_name = format!("{guid}.{ext}");
+        let path = dir.join(&save_name);
         tokio::fs::write(&path, &bytes)
             .await
             .map_err(|e| Status::internal(format!("storage write: {e}")))?;
 
         let now = store::now();
-        let guid = uuid::Uuid::now_v7().simple().to_string();
-        let (stem, ext) = file_name
-            .rsplit_once('.')
-            .map(|(s, e)| (s.to_string(), e.to_string()))
-            .unwrap_or((file_name.to_string(), "bin".to_string()));
-        let save_name = format!("{}.{}", guid, ext);
         let row = files::ActiveModel {
             provider: Set(Some("LOCAL".to_string())),
-            file_directory: Set(Some(
-                path.parent()
-                    .unwrap_or(std::path::Path::new(""))
-                    .to_string_lossy()
-                    .to_string(),
-            )),
+            file_directory: Set(Some(dir.to_string_lossy().to_string())),
             file_guid: Set(Some(guid.clone())),
             save_file_name: Set(Some(save_name)),
             file_name: Set(Some(stem)),
@@ -128,12 +106,7 @@ impl FileServiceImpl {
         .insert(&self.state.db)
         .await
         .map_err(db_status)?;
-
-        Ok(StoredObject {
-            file_id: row.id,
-            path,
-            bytes,
-        })
+        Ok(row)
     }
 
     /// Reads an object back (the download bridge).
@@ -174,6 +147,41 @@ impl storagev1::file_service_server::FileService for FileServiceImpl {
             _ => return Err(bad("query_by required")),
         };
         let row = repo::files_by_id(&self.state.db, id).await?;
+        Ok(Response::new(file_proto(row)))
+    }
+
+    async fn create(
+        &self,
+        request: Request<storagev1::CreateFileRequest>,
+    ) -> Result<Response<storagev1::File>, Status> {
+        let uploader = operator_of(&request)?;
+        let req = request.into_inner();
+        let Some(data) = req.data else {
+            return Err(bad("data required"));
+        };
+        // The upload transport bridge, interim shape: the BFF ships the
+        // object bytes base64-coded in `bucket_name` (the File message
+        // carries no byte field) through this unary metadata RPC; the
+        // proto's streaming channels land with the transport phase and
+        // replace the coding.
+        let payload = data.bucket_name.clone().unwrap_or_default();
+        let Ok(bytes) = base64::Engine::decode(
+            &base64::engine::general_purpose::STANDARD,
+            payload.as_bytes(),
+        ) else {
+            return Err(bad("payload decode failed"));
+        };
+        if bytes.is_empty() {
+            return Err(bad("empty payload"));
+        }
+        let row = self
+            .put(
+                uploader,
+                &data.file_name.clone().unwrap_or_default(),
+                "",
+                bytes,
+            )
+            .await?;
         Ok(Response::new(file_proto(row)))
     }
 
@@ -317,10 +325,4 @@ impl permissionv1::api_service_server::ApiService for ApiSyncServiceImpl {
         }
         Ok(Response::new(pbjson_types::Empty {}))
     }
-}
-
-// operator helper retained for the upload bridge callers.
-#[allow(dead_code)]
-fn _op<T>(r: &tonic::Request<T>) -> Result<i64, Status> {
-    operator_of(r)
 }

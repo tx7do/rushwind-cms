@@ -24,6 +24,11 @@ use std::sync::Arc;
 use async_trait::async_trait;
 use rushwind_authn::{Authenticator, AuthnError};
 
+/// The claim bag the gate injects into the request extensions on
+/// success — re-exported for the hand-mounted faces, which read it off
+/// the extensions the way the binding glue does.
+pub use rushwind_authn::AuthClaims;
+
 /// The server-side session checks (Redis whitelist/blacklist), split out
 /// of the engine so the storage stays service-side.
 #[async_trait]

@@ -4,7 +4,7 @@
 
 use std::sync::Arc;
 
-use sea_orm::{EntityTrait, PaginatorTrait};
+use sea_orm::{EntityTrait, PaginatorTrait, Set};
 use tonic::{Request, Response, Status};
 
 use crate::data::misc_repo as repo;
@@ -265,6 +265,34 @@ impl contentv1::content_model_service_server::ContentModelService for ContentMod
 
 // ── MediaAsset ───────────────────────────────────────────────────────
 
+fn asset_type_name(v: i32) -> Option<String> {
+    Some(
+        match v {
+            1 => "ASSET_TYPE_IMAGE",
+            2 => "ASSET_TYPE_VIDEO",
+            3 => "ASSET_TYPE_DOCUMENT",
+            4 => "ASSET_TYPE_AUDIO",
+            5 => "ASSET_TYPE_ARCHIVE",
+            100 => "ASSET_TYPE_OTHER",
+            _ => return None,
+        }
+        .to_string(),
+    )
+}
+
+fn processing_status_name(v: i32) -> Option<String> {
+    Some(
+        match v {
+            1 => "PROCESSING_STATUS_UPLOADING",
+            2 => "PROCESSING_STATUS_PROCESSING",
+            3 => "PROCESSING_STATUS_COMPLETED",
+            4 => "PROCESSING_STATUS_FAILED",
+            _ => return None,
+        }
+        .to_string(),
+    )
+}
+
 fn media_asset_proto(r: media_assets::Model) -> mediav1::MediaAsset {
     mediav1::MediaAsset {
         id: Some(r.id as u32),
@@ -322,6 +350,44 @@ impl mediav1::media_asset_service_server::MediaAssetService for MediaAssetServic
         let req = request.into_inner();
         let id = req.id;
         let row = repo::media_assets_by_id(&self.state.db, id as i64).await?;
+        Ok(Response::new(media_asset_proto(row)))
+    }
+
+    async fn create(
+        &self,
+        request: Request<mediav1::CreateMediaAssetRequest>,
+    ) -> Result<Response<mediav1::MediaAsset>, Status> {
+        let req = request.into_inner();
+        let Some(data) = req.data else {
+            return Err(bad("data required"));
+        };
+        let row = repo::insert_media_assets(
+            &self.state.db,
+            media_assets::ActiveModel {
+                filename: Set(data.filename),
+                r#type: Set(data.r#type.and_then(asset_type_name)),
+                mime_type: Set(data.mime_type),
+                size: Set(data.size.map(|v| v as i64)),
+                storage_path: Set(data.storage_path),
+                url: Set(data.url),
+                width: Set(data.width.map(|v| v as i64)),
+                height: Set(data.height.map(|v| v as i64)),
+                duration: Set(data.duration.map(|v| v as i64)),
+                alt_text: Set(data.alt_text),
+                title: Set(data.title),
+                caption: Set(data.caption),
+                processing_status: Set(data.processing_status.and_then(processing_status_name)),
+                processing_error: Set(data.processing_error),
+                file_hash: Set(data.file_hash),
+                file_id: Set(data.file_id.map(|v| v as i64)),
+                folder_id: Set(data.folder_id.map(|v| v as i64)),
+                is_private: Set(data.is_private),
+                created_by: Set(data.created_by.map(|v| v as i64)),
+                created_at: Set(Some(store::now())),
+                ..Default::default()
+            },
+        )
+        .await?;
         Ok(Response::new(media_asset_proto(row)))
     }
 }

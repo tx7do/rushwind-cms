@@ -4,6 +4,7 @@
 pub mod admin_portal;
 pub mod authentication;
 pub mod file;
+pub mod file_transfer;
 pub mod internal_message;
 pub mod proxies;
 
@@ -48,4 +49,18 @@ pub fn with_operator<T>(
         }
     }
     req
+}
+
+/// The claims-direct variant of [`with_operator`] — the hand-mounted
+/// faces (file transfer, outside the bind layer) carry the operator
+/// the same way the proxies do.
+pub fn with_operator_claims<T>(
+    claims: &Option<serde_json::Map<String, serde_json::Value>>,
+    msg: T,
+) -> tonic::Request<T> {
+    let ctx = rushwind_http_binding::ctx::RequestContext {
+        claims: claims.clone(),
+        ..Default::default()
+    };
+    with_operator(&ctx, msg)
 }

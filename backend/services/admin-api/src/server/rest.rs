@@ -164,7 +164,6 @@ pub fn build_router(state: Arc<AppState>) -> axum::Router {
         mount_dict_entry_service => std::sync::Arc::new(crate::services::proxies::DictEntryProxy { state: std::sync::Arc::clone(&state) }),
         mount_dict_type_service => std::sync::Arc::new(crate::services::proxies::DictTypeProxy { state: std::sync::Arc::clone(&state) }),
         mount_file_service => std::sync::Arc::new(crate::services::proxies::FileProxy { state: std::sync::Arc::clone(&state) }),
-        mount_file_transfer_service => proto::gen_admin::nulls::null_file_transfer_service(),
         mount_interaction_admin_service => std::sync::Arc::new(crate::services::proxies::InteractionAdminProxy { state: std::sync::Arc::clone(&state) }),
         mount_internal_message_category_service => null!(
             null_internal_message_category_service
@@ -201,7 +200,26 @@ pub fn build_router(state: Arc<AppState>) -> axum::Router {
         mount_user_service => std::sync::Arc::new(crate::services::proxies::UserProxy { state: std::sync::Arc::clone(&state) }),
     );
 
-    let app = router_pub.merge(router_gate);
+    let mut app = router_pub.merge(router_gate);
+
+    // The file-transfer face: multipart upload + streaming download,
+    // hand-mounted (the bind layer parses protojson, not multipart —
+    // the same reason the reference registers these by hand, and its
+    // generated registration for the face is skipped above). Every
+    // route of the face is gated: the same auth gate the generated
+    // protected subtree rides — the reference's hand registration sits
+    // inside the same server middleware chain.
+    let hand_gate = axum::middleware::from_fn({
+        let auth = Arc::clone(&authenticator);
+        let checker = Arc::clone(&checker);
+        move |req, next| {
+            let auth = Arc::clone(&auth);
+            let checker = Arc::clone(&checker);
+            async move { auth::auth_gate(auth, checker, PACKAGE, req, next).await }
+        }
+    });
+    let hand = crate::services::file_transfer::router(Arc::clone(&state)).layer(hand_gate);
+    app = app.merge(hand);
 
     // The audit-write layer: post-handler persistence (api + operation
     // logs), outermost so it sees final statuses.
