@@ -1,0 +1,33 @@
+[package]
+name = "proto"
+description = "The CMS API contract crate: the synced api/protos tree compiled to prost types with pbjson protojson serde, the buf-produced annotated descriptor pool, and the rushwind-gen-http-generated route/binding/trait/mount surface (the deployments' auth-free union rides here as AUTH_FREE)."
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+publish = false
+
+[lints]
+workspace = true
+
+[dependencies]
+prost = { workspace = true }
+prost-reflect = { workspace = true }
+pbjson = { workspace = true }
+pbjson-types = { workspace = true }
+serde = { workspace = true }
+async-trait = { workspace = true }
+axum = { version = "0.8", default-features = false }
+tonic = { version = "0.14", default-features = false, features = ["codegen", "channel", "server", "transport"] }
+tonic-prost = "0.14"
+rushwind-http-binding = { git = "https://github.com/tx7do/rushwind", rev = "2bc3a96c742539a195b608b995be1c3bcc1545a3" }
+
+[build-dependencies]
+prost-build = { workspace = true }
+protox = { workspace = true }
+pbjson-build = { workspace = true }
+tonic-prost-build = "0.14"
+rushwind-gen-http = { git = "https://github.com/tx7do/rushwind", rev = "2bc3a96c742539a195b608b995be1c3bcc1545a3" }
+
+[dev-dependencies]
+tokio = { version = "1", features = ["macros", "rt"] }

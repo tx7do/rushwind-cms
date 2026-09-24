@@ -1,0 +1,36 @@
+[package]
+name = "app-api"
+description = "The app (C-side) BFF service of the CMS: config, state, the token store, and the REST (:6700) + SSE (:6701) transports over the shared proto and auth crates."
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+publish = false
+
+[lints]
+workspace = true
+
+[dependencies]
+proto = { path = "../../crates/proto" }
+store = { path = "../../crates/store" }
+auth = { path = "../../crates/auth" }
+tonic = { version = "0.14", default-features = false, features = ["codegen", "channel", "router", "transport"] }
+tonic-prost = "0.14"
+prost-reflect = { workspace = true }
+rushwind-authn = { git = "https://github.com/tx7do/rushwind", rev = "2bc3a96c742539a195b608b995be1c3bcc1545a3" }
+rushwind-authn-jwt = { git = "https://github.com/tx7do/rushwind", rev = "2bc3a96c742539a195b608b995be1c3bcc1545a3" }
+rushwind-bootstrap = { git = "https://github.com/tx7do/rushwind", rev = "2bc3a96c742539a195b608b995be1c3bcc1545a3" }
+rushwind-http-binding = { git = "https://github.com/tx7do/rushwind", rev = "2bc3a96c742539a195b608b995be1c3bcc1545a3" }
+rushwind-transport = { git = "https://github.com/tx7do/rushwind", rev = "2bc3a96c742539a195b608b995be1c3bcc1545a3" }
+rushwind-transport-axum = { git = "https://github.com/tx7do/rushwind", rev = "2bc3a96c742539a195b608b995be1c3bcc1545a3" }
+axum = { version = "0.8", default-features = false, features = ["http1", "tokio", "query", "json", "matched-path"] }
+tokio = { workspace = true }
+redis = { workspace = true }
+serde = { workspace = true, features = ["derive"] }
+serde_json = { workspace = true }
+serde_yaml = { workspace = true }
+chrono = { workspace = true }
+uuid = { workspace = true }
+futures-util = "0.3"
+pbjson-types = { workspace = true }
+async-trait = { workspace = true }

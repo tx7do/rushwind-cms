@@ -1,0 +1,22 @@
+# 脚本一律 LF。
+*.sh text eol=lf
+# proto 契约与 manifest 必须字节精确（checksum 门依赖），禁止任何 EOL 转换。
+*.proto -text
+backend/api/MANIFEST.sha256 -text
+# 前端零改动快照与 manifest 同理：字节精确，禁止 EOL 转换（含快照内 husky 脚本，
+# 规则置后以覆盖上面的 *.sh 规则）。
+frontend/admin/admin-react/** -text
+frontend/admin/admin-react.MANIFEST.sha256 -text
+frontend/admin/admin-react.UPSTREAM.sha256 -text
+frontend/app/react/** -text
+frontend/app/react.MANIFEST.sha256 -text
+frontend/app/react.UPSTREAM.sha256 -text
+frontend/app/vue/** -text
+frontend/app/vue.MANIFEST.sha256 -text
+frontend/app/vue.UPSTREAM.sha256 -text
+frontend/app/taro/** -text
+frontend/app/taro.MANIFEST.sha256 -text
+frontend/app/taro.UPSTREAM.sha256 -text
+frontend/app/flutter_app/** -text
+frontend/app/flutter_app.MANIFEST.sha256 -text
+frontend/app/flutter_app.UPSTREAM.sha256 -text

@@ -1,0 +1,4 @@
+# rustfmt configuration — the codebase is formatted with the default
+# style (100-column width); the edition pins the parser to the
+# workspace's.
+edition = "2021"

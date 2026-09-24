@@ -1,0 +1,67 @@
+'use client';
+
+import React from 'react';
+import PageHero from './PageHero';
+import {cn} from '@/lib/utils';
+
+interface LegalPageProps {
+    icon: string;
+    title: string;
+    description: string;
+    items: string[];
+}
+
+/**
+ * 法定/静态信息页面通用模板
+ * 用于 privacy / terms / disclaimer 等结构一致的页面
+ *
+ * 居中单栏文档流布局，消除宽屏右侧视觉死角
+ * 序号采用电能绿，悬浮时卡片边框亮起
+ */
+export default function LegalPage({icon, title, description, items}: LegalPageProps) {
+    return (
+        <div className="w-full">
+            <PageHero
+                title={title}
+                description={description}
+                icon={icon}
+                size="sm"
+            />
+
+            {/* 居中单栏文档流容器 */}
+            <section className="w-full py-12 max-md:py-8">
+                <div className="mx-auto max-w-4xl px-4">
+                    <div
+                        className={cn(
+                            'rounded-2xl border border-border bg-card p-8 md:p-10',
+                            'shadow-[0_20px_50px_rgba(0,0,0,0.15)]',
+                            'transition-all duration-300',
+                            'hover:border-primary/20',
+                        )}
+                    >
+                        <ul className="space-y-5">
+                            {items.map((item, index) => (
+                                <li
+                                    key={index}
+                                    className="flex items-start gap-4 text-base leading-relaxed text-foreground max-md:text-sm"
+                                >
+                                    {/* 绿色数字序号 */}
+                                    <span
+                                        className={cn(
+                                            'shrink-0 font-mono text-sm font-bold tabular-nums',
+                                            'text-primary',
+                                            'mt-0.5 min-w-[2rem]',
+                                        )}
+                                    >
+                                        {String(index + 1).padStart(2, '0')}.
+                                    </span>
+                                    <span>{item}</span>
+                                </li>
+                            ))}
+                        </ul>
+                    </div>
+                </div>
+            </section>
+        </div>
+    );
+}

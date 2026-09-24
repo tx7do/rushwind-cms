@@ -1,0 +1,41 @@
+# The admin BFF server assembly document: one lifecycle, two transports.
+# The http server carries the admin route surface behind its edge (the
+# CORS policy and the request budget); the SSE notification server is a
+# factory transport. Origins mirror the reference admin server.yaml.
+app:
+  name: admin-api
+  version: 0.1.0
+servers:
+  - kind: http
+    bind: ":6600"
+    edge:
+      timeout: 10s
+      cors:
+        # 前端 refresh token 走 HttpOnly Cookie（withCredentials=true），
+        # 预检响应必须带 Access-Control-Allow-Credentials: true
+        credentials: true
+        # compat 选择 gorilla 兼容层（发射规则与参照系逐字节一致）。
+        compat: true
+        headers:
+          - "X-Requested-With"
+          - "X-Request-ID"
+          - "Content-Type"
+          - "Authorization"
+          - "X-Captcha-Id"
+          - "X-Captcha-Value"
+        methods:
+          - "GET"
+          - "POST"
+          - "PUT"
+          - "DELETE"
+          - "HEAD"
+          - "OPTIONS"
+        origins:
+          # 本地开发端口（admin-react dev :5999）
+          - "http://localhost:5999"
+          - "http://127.0.0.1:5999"
+    route_packs:
+      - name: admin-surface
+  - kind: admin-sse
+    addr: ":6601"
+    path: "/events"

@@ -1,0 +1,403 @@
+'use client';
+
+import {useState, useMemo} from 'react';
+import {useTranslations, useLocale} from 'next-intl';
+import {Switch} from '@/components/ui/switch';
+import {Select, SelectContent, SelectItem, SelectTrigger, SelectValue} from '@/components/ui/select';
+import {Button} from '@/components/ui/button';
+import SettingRow from '@/components/ui/setting-row';
+import XIcon from '@/plugins/xicon';
+
+import {usePreferences} from '@/core/preferences';
+import {useApiError, useI18n} from '@/i18n';
+import type {ThemeModeType, SupportedLanguagesType} from '@/core/preferences';
+import {requestApi} from '@/core/transport/rest/request-api';
+import {encryptByAES} from '@/utils';
+import {useAccessStore} from '@/store/core/access/store';
+
+interface MenuItem {
+    key: string;
+    icon: string;
+    label: string;
+}
+
+export default function SettingsPage() {
+    const t = useTranslations('settings');
+    const locale = useLocale();
+    const resolveApiError = useApiError();
+
+    const {
+        theme: themePref,
+        content: contentPref,
+        setThemeMode,
+        updateContent,
+        setLanguage,
+        resetPreferences,
+    } = usePreferences();
+    const {changeLocale} = useI18n();
+
+    const [activeMenu, setActiveMenu] = useState<'account' | 'message' | 'preference'>('account');
+
+    // ── 修改密码 ──
+    const [pwdEditing, setPwdEditing] = useState(false);
+    const [pwdLoading, setPwdLoading] = useState(false);
+    const [pwdError, setPwdError] = useState('');
+    const [pwdSuccess, setPwdSuccess] = useState(false);
+    const [oldPassword, setOldPassword] = useState('');
+    const [newPassword, setNewPassword] = useState('');
+    const [confirmPassword, setConfirmPassword] = useState('');
+
+    const pwdFormValid = useMemo(() => (
+        oldPassword.length > 0
+        && newPassword.length >= 6
+        && newPassword === confirmPassword
+    ), [oldPassword, newPassword, confirmPassword]);
+
+    const openPwdForm = () => {
+        setPwdEditing(true);
+        setPwdError('');
+        setPwdSuccess(false);
+        setOldPassword('');
+        setNewPassword('');
+        setConfirmPassword('');
+    };
+
+    const cancelPwdForm = () => {
+        setPwdEditing(false);
+        setPwdError('');
+    };
+
+    const submitChangePassword = async () => {
+        setPwdError('');
+        setPwdSuccess(false);
+        const accessToken = useAccessStore.getState().accessToken;
+        if (!accessToken?.value) {
+            setPwdError(t('account.login_required'));
+            return;
+        }
+        if (newPassword.length < 6) {
+            setPwdError(t('account.password_too_short'));
+            return;
+        }
+        if (newPassword !== confirmPassword) {
+            setPwdError(t('account.password_mismatch'));
+            return;
+        }
+
+        setPwdLoading(true);
+        try {
+            // 与登录/注册口径一致:新旧密码均 AES 加密后提交,服务端解密校验/入库
+            await requestApi({
+                path: '/app/v1/me/password',
+                method: 'POST',
+                body: JSON.stringify({
+                    oldPassword: encryptByAES(oldPassword, process.env.NEXT_PUBLIC_AES_KEY || ''),
+                    newPassword: encryptByAES(newPassword, process.env.NEXT_PUBLIC_AES_KEY || ''),
+                }),
+            });
+            setPwdSuccess(true);
+            setPwdEditing(false);
+            setOldPassword('');
+            setNewPassword('');
+            setConfirmPassword('');
+        } catch (e: any) {
+            setPwdError(resolveApiError(e));
+        } finally {
+            setPwdLoading(false);
+        }
+    };
+
+    const menuItems: MenuItem[] = useMemo(() => [
+        {key: 'account', icon: 'carbon:user', label: t('menu.account')},
+        {key: 'message', icon: 'carbon:email', label: t('menu.message')},
+        {key: 'preference', icon: 'carbon:settings', label: t('menu.preference')}
+    ], [t]);
+
+    const themeOptions = useMemo(() => [
+        {value: 'light' as ThemeModeType, label: t('preference.theme_light')},
+        {value: 'dark' as ThemeModeType, label: t('preference.theme_dark')},
+        {value: 'auto' as ThemeModeType, label: t('preference.theme_auto')},
+    ], [t]);
+
+    const languageOptions = useMemo(() => [
+        {value: 'zh-CN' as SupportedLanguagesType, label: t('preference.language_chinese')},
+        {value: 'en-US' as SupportedLanguagesType, label: t('preference.language_english')},
+    ], [t]);
+
+    const handleThemeChange = (mode: ThemeModeType) => {
+        setThemeMode(mode);
+    };
+
+    const handleLanguageChange = (newLocale: SupportedLanguagesType) => {
+        setLanguage(newLocale);
+        if (newLocale !== locale) {
+            changeLocale(newLocale);
+        }
+    };
+
+    return (
+        <div className="w-full py-8 max-md:py-4">
+            <div className="w-full max-w-[1200px] mx-auto grid grid-cols-[220px_1fr_280px] gap-6 px-8 max-md:grid-cols-1 max-md:px-4">
+                {/* 左侧导航 */}
+                <aside className="max-md:hidden">
+                    <nav className="space-y-1">
+                        {menuItems.map((item) => (
+                            <div
+                                key={item.key}
+                                className={`flex cursor-pointer items-center gap-3 rounded-lg border border-transparent px-3 py-2.5 text-sm font-medium transition-all ${
+                                    activeMenu === item.key
+                                        ? 'border-primary/20 bg-primary/5 text-primary'
+                                        : 'text-muted-foreground hover:bg-muted hover:text-foreground'
+                                }`}
+                                onClick={() => setActiveMenu(item.key as 'account' | 'message' | 'preference')}
+                            >
+                                <div className="flex h-8 w-8 items-center justify-center rounded-md bg-primary/10 text-primary">
+                                    <XIcon name={item.icon} size={18}/>
+                                </div>
+                                <span>{item.label}</span>
+                            </div>
+                        ))}
+                    </nav>
+                </aside>
+
+                {/* 中间内容区 */}
+                <main className="min-w-0">
+                    {/* 账号设置 */}
+                    {activeMenu === 'account' && (
+                        <>
+                            <div className="mb-8">
+                                <h1 className="mb-2 text-2xl font-bold text-foreground">{t('account.title')}</h1>
+                                <p className="text-sm text-muted-foreground">{t('account.subtitle')}</p>
+                            </div>
+                            <div className="mb-8">
+                                <h2 className="mb-2 text-lg font-semibold text-foreground">{t('account.section_title')}</h2>
+                                <p className="mb-4 text-sm text-muted-foreground">{t('account.section_desc')}</p>
+                                <div className="space-y-3">
+                                    <div className="rounded-lg border border-border bg-cardBg">
+                                        <SettingRow label={t('account.password')} description={t('account.password_not_set')}>
+                                            {!pwdEditing ? (
+                                                <Button variant="outline" size="sm" onClick={openPwdForm}>{t('account.edit')}</Button>
+                                            ) : (
+                                                <Button variant="outline" size="sm" onClick={cancelPwdForm}>{t('account.cancel')}</Button>
+                                            )}
+                                        </SettingRow>
+                                        {pwdEditing && (
+                                            <div className="space-y-3 border-t border-border px-4 py-4">
+                                                <input
+                                                    type="password"
+                                                    value={oldPassword}
+                                                    onChange={(e) => setOldPassword(e.target.value)}
+                                                    placeholder={t('account.input_old_password')}
+                                                    autoComplete="current-password"
+                                                    className="w-full rounded-lg border border-border bg-background px-4 py-2.5 text-sm text-foreground transition-colors hover:border-primary focus:border-primary focus:outline-none focus:ring-[3px] focus:ring-primary/15"
+                                                />
+                                                <input
+                                                    type="password"
+                                                    value={newPassword}
+                                                    onChange={(e) => setNewPassword(e.target.value)}
+                                                    placeholder={t('account.input_new_password')}
+                                                    autoComplete="new-password"
+                                                    className="w-full rounded-lg border border-border bg-background px-4 py-2.5 text-sm text-foreground transition-colors hover:border-primary focus:border-primary focus:outline-none focus:ring-[3px] focus:ring-primary/15"
+                                                />
+                                                <input
+                                                    type="password"
+                                                    value={confirmPassword}
+                                                    onChange={(e) => setConfirmPassword(e.target.value)}
+                                                    placeholder={t('account.input_confirm_new_password')}
+                                                    autoComplete="new-password"
+                                                    className="w-full rounded-lg border border-border bg-background px-4 py-2.5 text-sm text-foreground transition-colors hover:border-primary focus:border-primary focus:outline-none focus:ring-[3px] focus:ring-primary/15"
+                                                />
+                                                {pwdError && <p className="text-sm text-destructive">{pwdError}</p>}
+                                                <div className="flex justify-end gap-2">
+                                                    <Button variant="outline" size="sm" onClick={cancelPwdForm}>{t('account.cancel')}</Button>
+                                                    <Button size="sm" disabled={!pwdFormValid || pwdLoading} onClick={submitChangePassword}>
+                                                        {pwdLoading ? t('account.saving') : t('account.save')}
+                                                    </Button>
+                                                </div>
+                                            </div>
+                                        )}
+                                    </div>
+                                    <SettingRow label={t('account.bind_phone')} description={t('account.password_not_set')}>
+                                        <Button variant="outline" size="sm" disabled title={t('account.not_available')}>{t('account.not_available')}</Button>
+                                    </SettingRow>
+                                    <SettingRow label={t('account.bind_email')} description={t('account.email_not_bound')}>
+                                        <Button variant="outline" size="sm" disabled title={t('account.not_available')}>{t('account.not_available')}</Button>
+                                    </SettingRow>
+                                    {pwdSuccess && (
+                                        <p className="rounded-lg border border-primary/20 bg-primary/5 px-4 py-3 text-sm text-primary">
+                                            {t('account.change_success')}
+                                        </p>
+                                    )}
+                                </div>
+                            </div>
+                            <div>
+                                <h2 className="mb-4 text-lg font-semibold text-foreground">{t('account.third_party_title')}</h2>
+                                <div className="grid grid-cols-3 gap-3 max-md:grid-cols-1">
+                                    <div className="flex items-center gap-3 rounded-lg border border-border bg-card p-4">
+                                        <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-green-500">
+                                            <XIcon name="fa:wechat" size={24} className="text-white"/>
+                                        </div>
+                                        <span className="text-sm font-medium text-foreground">
+                                            {t('account.bind_wechat')}
+                                        </span>
+                                    </div>
+                                    <div className="flex items-center gap-3 rounded-lg border border-border bg-card p-4">
+                                        <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-red-500">
+                                            <XIcon name="fa:weibo" size={24} className="text-white"/>
+                                        </div>
+                                        <span className="text-sm font-medium text-foreground">
+                                            {t('account.bind_weibo')}
+                                        </span>
+                                    </div>
+                                    <div className="flex items-center gap-3 rounded-lg border border-border bg-card p-4">
+                                        <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-blue-500">
+                                            <XIcon name="fa:qq" size={24} className="text-white"/>
+                                        </div>
+                                        <span className="text-sm font-medium text-foreground">
+                                            {t('account.bind_qq')}
+                                        </span>
+                                    </div>
+                                </div>
+                            </div>
+                        </>
+                    )}
+
+                    {/* 消息设置 */}
+                    {activeMenu === 'message' && (
+                        <>
+                            <div className="mb-8">
+                                <h1 className="mb-2 text-2xl font-bold text-foreground">{t('message.title')}</h1>
+                                <p className="text-sm text-muted-foreground">{t('message.subtitle')}</p>
+                            </div>
+                            <div className="mb-8">
+                                <h2 className="mb-2 text-lg font-semibold text-foreground">{t('message.email_notifications')}</h2>
+                                <p className="mb-4 text-sm text-muted-foreground">{t('message.email_notifications_desc')}</p>
+                                <div className="space-y-3">
+                                    <SettingRow label={t('message.system_messages')}>
+                                        <Switch defaultChecked/>
+                                    </SettingRow>
+                                    <SettingRow label={t('message.comment_notifications')}>
+                                        <Switch defaultChecked/>
+                                    </SettingRow>
+                                    <SettingRow label={t('message.activity_updates')}>
+                                        <Switch defaultChecked/>
+                                    </SettingRow>
+                                    <SettingRow label={t('message.recommended_content')}>
+                                        <Switch defaultChecked/>
+                                    </SettingRow>
+                                </div>
+                            </div>
+                            <div>
+                                <h2 className="mb-4 text-lg font-semibold text-foreground">{t('message.email_frequency')}</h2>
+                                <SettingRow label={t('message.frequency_desc')}>
+                                    <Select defaultValue="immediately">
+                                        <SelectTrigger className="w-[180px] h-8">
+                                            <SelectValue/>
+                                        </SelectTrigger>
+                                        <SelectContent>
+                                            <SelectItem value="immediately">{t('message.frequency_immediately')}</SelectItem>
+                                            <SelectItem value="daily">{t('message.frequency_daily')}</SelectItem>
+                                            <SelectItem value="weekly">{t('message.frequency_weekly')}</SelectItem>
+                                            <SelectItem value="monthly">{t('message.frequency_monthly')}</SelectItem>
+                                        </SelectContent>
+                                    </Select>
+                                </SettingRow>
+                            </div>
+                        </>
+                    )}
+
+                    {/* 偏好设置 */}
+                    {activeMenu === 'preference' && (
+                        <>
+                            <div className="mb-8">
+                                <h1 className="mb-2 text-2xl font-bold text-foreground">{t('preference.title')}</h1>
+                                <p className="text-sm text-muted-foreground">{t('preference.subtitle')}</p>
+                            </div>
+                            <div className="mb-8">
+                                <h2 className="mb-2 text-lg font-semibold text-foreground">{t('preference.theme_settings')}</h2>
+                                <p className="mb-4 text-sm text-muted-foreground">{t('preference.theme_desc')}</p>
+                                <SettingRow label={t('preference.theme')}>
+                                    <Select value={themePref.mode} onValueChange={(v) => handleThemeChange(v as ThemeModeType)}>
+                                        <SelectTrigger className="w-[180px] h-8">
+                                            <SelectValue/>
+                                        </SelectTrigger>
+                                        <SelectContent>
+                                            {themeOptions.map(opt => (
+                                                <SelectItem key={opt.value} value={opt.value}>{opt.label}</SelectItem>
+                                            ))}
+                                        </SelectContent>
+                                    </Select>
+                                </SettingRow>
+                            </div>
+                            <div className="mb-8">
+                                <h2 className="mb-2 text-lg font-semibold text-foreground">{t('preference.language_settings')}</h2>
+                                <p className="mb-4 text-sm text-muted-foreground">{t('preference.language_desc')}</p>
+                                <SettingRow label={t('preference.language')}>
+                                    <Select value={locale as SupportedLanguagesType} onValueChange={(v) => handleLanguageChange(v as SupportedLanguagesType)}>
+                                        <SelectTrigger className="w-[180px] h-8">
+                                            <SelectValue/>
+                                        </SelectTrigger>
+                                        <SelectContent>
+                                            {languageOptions.map(opt => (
+                                                <SelectItem key={opt.value} value={opt.value}>{opt.label}</SelectItem>
+                                            ))}
+                                        </SelectContent>
+                                    </Select>
+                                </SettingRow>
+                            </div>
+                            <div className="mb-8">
+                                <h2 className="mb-2 text-lg font-semibold text-foreground">{t('preference.content_preferences')}</h2>
+                                <p className="mb-4 text-sm text-muted-foreground">{t('preference.content_desc')}</p>
+                                <div className="space-y-3">
+                                    <SettingRow label={t('preference.hide_sensitive_content')}>
+                                        <Switch
+                                            checked={contentPref.hideSensitiveContent}
+                                            onCheckedChange={(checked) => updateContent({hideSensitiveContent: checked})}
+                                        />
+                                    </SettingRow>
+                                    <SettingRow label={t('preference.compact_mode')}>
+                                        <Switch
+                                            checked={contentPref.compactMode}
+                                            onCheckedChange={(checked) => updateContent({compactMode: checked})}
+                                        />
+                                    </SettingRow>
+                                    <SettingRow label={t('preference.show_recommendations')}>
+                                        <Switch
+                                            checked={contentPref.showRecommendations}
+                                            onCheckedChange={(checked) => updateContent({showRecommendations: checked})}
+                                        />
+                                    </SettingRow>
+                                </div>
+                            </div>
+                            <SettingRow label={t('preference.reset_defaults')}>
+                                <Button variant="destructive" size="sm" onClick={() => resetPreferences()}>
+                                    {t('preference.reset')}
+                                </Button>
+                            </SettingRow>
+                        </>
+                    )}
+                </main>
+
+                {/* 右侧帮助区 */}
+                <aside className="max-md:hidden">
+                    <div className="sticky top-24 rounded-lg border border-border bg-card p-5">
+                        <h3 className="mb-3 text-base font-bold text-foreground">{t('help.title')}</h3>
+                        <h4 className="mb-2 text-sm font-semibold text-foreground">{t('help.account_password')}</h4>
+                        <ul className="mb-4 space-y-2 text-xs">
+                            <li className="text-muted-foreground transition-colors hover:text-foreground">1. {t('help.q1')}</li>
+                            <li className="text-muted-foreground transition-colors hover:text-foreground">2. {t('help.q2')}</li>
+                            <li className="text-muted-foreground transition-colors hover:text-foreground">3. {t('help.q3')}</li>
+                            <li className="text-muted-foreground transition-colors hover:text-foreground">4. {t('help.q4')}</li>
+                            <li className="text-muted-foreground transition-colors hover:text-foreground">5. {t('help.q5')}</li>
+                        </ul>
+                        <h4 className="mb-2 text-sm font-semibold text-foreground">{t('help.other_issues')}</h4>
+                        <ul className="space-y-2 text-xs">
+                            <li className="text-muted-foreground transition-colors hover:text-foreground">6. <a href="#" className="text-primary hover:underline">{t('help.q6')} {t('help.q6_link')}</a></li>
+                            <li className="text-muted-foreground transition-colors hover:text-foreground">7. <a href="#" className="text-primary hover:underline">{t('help.q7')} {t('help.q7_link')}</a></li>
+                        </ul>
+                    </div>
+                </aside>
+            </div>
+        </div>
+    );
+}

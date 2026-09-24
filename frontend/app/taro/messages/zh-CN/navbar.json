@@ -1,0 +1,27 @@
+{
+  "top": {
+    "home": "首页",
+    "mine": "我的",
+    "about": "关于",
+    "search_placeholder": "请输入关键字搜索",
+    "dark_mode": "暗",
+    "light_mode": "亮",
+    "system_mode": "系统",
+    "language": "语言"
+  },
+  "user": {
+    "register": "注册",
+    "login": "登录"
+  },
+  "theme": {
+    "title": "主题模式",
+    "dark": "暗色",
+    "light": "亮色",
+    "system": "跟随系统"
+  },
+  "language": {
+    "title": "语言",
+    "zh-CN": "简体中文",
+    "en-US": "English"
+  }
+}

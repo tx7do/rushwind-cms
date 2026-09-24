@@ -1,0 +1,354 @@
+import 'package:flutter/material.dart';
+import 'package:flutter_screenutil/flutter_screenutil.dart';
+
+import 'package:flutter_app/generated/api/app/service/v1/index.dart'
+    show CommentServiceV1Comment, ContentServiceV1Post,
+        ContentServiceV1Category, ContentServiceV1Tag,
+        InteractionServiceV1TargetType, InteractionServiceV1CounterMetric;
+import 'package:flutter_app/generated/l10n.dart';
+import 'package:flutter_app/src/features/cms/services/interaction_service.dart';
+import 'package:flutter_app/src/features/cms/services/post_service.dart';
+import 'package:flutter_app/src/features/cms/services/category_service.dart';
+import 'package:flutter_app/src/features/cms/services/tag_service.dart';
+import 'package:flutter_app/src/features/cms/services/comment_service.dart';
+import 'package:flutter_app/src/core/constants/breakpoints.dart';
+import 'package:flutter_app/src/core/widgets/responsive_layout.dart';
+import 'package:flutter_app/src/core/widgets/app_back_button.dart';
+import 'package:flutter_app/src/core/services/pagination_query.dart';
+import 'package:flutter_app/src/core/transport/http/api_error_messages.dart';
+import 'package:flutter_app/src/core/transport/http/status.dart';
+import 'package:flutter_app/src/features/cms/pages/post_detail/widgets/comment_tree_utils.dart';
+import 'package:flutter_app/src/features/cms/pages/post_detail/widgets/post_header.dart';
+import 'package:flutter_app/src/features/cms/pages/post_detail/widgets/post_content.dart';
+import 'package:flutter_app/src/features/cms/pages/post_detail/widgets/interaction_bar.dart';
+import 'package:flutter_app/src/features/cms/pages/post_detail/widgets/post_tags.dart';
+import 'package:flutter_app/src/features/cms/pages/post_detail/widgets/comment_section.dart';
+import 'package:flutter_app/src/features/cms/pages/post_detail/widgets/comment_input_bar.dart';
+
+typedef Post = ContentServiceV1Post;
+typedef Category = ContentServiceV1Category;
+
+/// 文章详情页
+class PostDetailPage extends StatefulWidget {
+  final int postId;
+
+  const PostDetailPage({super.key, required this.postId});
+
+  @override
+  State<PostDetailPage> createState() => _PostDetailPageState();
+}
+
+class _PostDetailPageState extends State<PostDetailPage> {
+  final _postService = PostService();
+  final _categoryService = CategoryService();
+  final _tagService = TagService();
+  final _commentService = CommentService();
+
+  Post? _post;
+  List<Category> _categories = [];
+  List<ContentServiceV1Tag> _tags = [];
+  List<CommentServiceV1Comment> _comments = [];
+  List<CommentServiceV1Comment> _commentTree = [];
+  CommentServiceV1Comment? _replyTo;
+  bool _isLoading = true;
+
+  // 评论点赞计数缓存：key 为 comment.id。计数来自 interaction_counter 表
+  // （comment.like_count 列已移除），由 InteractionService.GetCounts 批量查询。
+  Map<int, int> _commentLikeCounts = {};
+
+  final _interactionService = InteractionService();
+
+  @override
+  void initState() {
+    super.initState();
+    _loadData();
+  }
+
+  Future<void> _loadData() async {
+    final results = await Future.wait([
+      _postService.get(widget.postId),
+      _categoryService.list(),
+      _tagService.list(),
+      _commentService.list(
+        PaginationQuery(
+          skipLocale: true,
+          formValues: {'object_id': widget.postId},
+        ),
+      ),
+    ]);
+
+    if (!mounted) return;
+
+    final post = results[0] as Post?;
+    final categories = (results[1] as ListCategoryResponse?)?.items ?? [];
+    final tags = (results[2] as ListTagResponse?)?.items ?? [];
+    final comments = (results[3] as ListCommentResponse?)?.items ?? [];
+    final cids = comments
+        .where((c) => c.id != null)
+        .map((c) => c.id!)
+        .toList(growable: false);
+    Map<int, int> ccounts = {};
+    if (cids.isNotEmpty) {
+      final cresp = await _interactionService.getCounts(
+          InteractionServiceV1TargetType.targetTypeComment,
+          cids,
+          [InteractionServiceV1CounterMetric.counterMetricLike]);
+      ccounts = InteractionService.extractCountMap(
+          cresp,
+          cids,
+          InteractionServiceV1CounterMetric.counterMetricLike);
+    }
+    if (!mounted) return;
+
+    setState(() {
+      _post = post;
+      _categories = categories;
+      _tags = tags;
+      _comments = comments;
+      _commentLikeCounts = ccounts;
+      _commentTree = buildCommentTree(comments);
+      _isLoading = false;
+    });
+  }
+
+  /// 发送评论
+  Future<void> _sendComment(
+    String content, {
+    int? parentId,
+    int? replyToId,
+  }) async {
+    final newComment = CommentServiceV1Comment(
+      objectId: widget.postId,
+      content: content,
+      parentId: parentId,
+      replyToId: replyToId,
+    );
+    final result = await _commentService.create(newComment);
+    if (result is Status) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(localizedApiErrorMessage(S.of(context), result)),
+          ),
+        );
+      }
+      return;
+    }
+    await _refreshComments();
+  }
+
+  /// 仅刷新评论
+  Future<void> _refreshComments() async {
+    final result = await _commentService.list(
+      PaginationQuery(
+        skipLocale: true,
+        formValues: {'object_id': widget.postId},
+      ),
+    );
+    if (!mounted) return;
+    if (result is ListCommentResponse) {
+      final comments = result.items ?? [];
+      final cids = comments
+          .where((c) => c.id != null)
+          .map((c) => c.id!)
+          .toList(growable: false);
+      Map<int, int> ccounts = {};
+      if (cids.isNotEmpty) {
+        final cresp = await _interactionService.getCounts(
+            InteractionServiceV1TargetType.targetTypeComment,
+            cids,
+            [InteractionServiceV1CounterMetric.counterMetricLike]);
+        ccounts = InteractionService.extractCountMap(
+            cresp,
+            cids,
+            InteractionServiceV1CounterMetric.counterMetricLike);
+      }
+      if (!mounted) return;
+      setState(() {
+        _comments = comments;
+        _commentLikeCounts = ccounts;
+        _commentTree = buildCommentTree(comments);
+      });
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    if (_isLoading) {
+      return const Center(child: CircularProgressIndicator());
+    }
+
+    return ResponsiveLayout(
+      mobileBody: _buildView(context, isMobile: true),
+      webBody: _buildView(context, isMobile: false),
+    );
+  }
+
+  Widget _buildView(BuildContext context, {required bool isMobile}) {
+    final theme = Theme.of(context);
+    final post = _post!;
+    final commentCount = _comments.length;
+
+    final appBar = AppBar(
+      backgroundColor: theme.colorScheme.surface,
+      surfaceTintColor: Colors.transparent,
+      elevation: 0,
+      leading: const AppBackButton(),
+      actions: [
+        IconButton(
+          icon: const Icon(Icons.share_outlined, size: 22),
+          onPressed: () {},
+        ),
+        const SizedBox(width: 4),
+      ],
+    );
+
+    final body = Column(
+      children: [
+        Expanded(
+          child: isMobile
+              ? _buildMobileBody(post, commentCount)
+              : _buildWebBody(post, commentCount),
+        ),
+        CommentInputBar(
+          isMobile: isMobile,
+          replyTo: _replyTo,
+          onReplyChanged: (c) => setState(() => _replyTo = c),
+          onSend: _sendComment,
+        ),
+      ],
+    );
+
+    // Web 端：在内容顶部嵌入操作栏（返回 + 分享 + 收藏）
+    if (!isMobile) {
+      return Column(
+        children: [
+          // Web 端轻量操作栏
+          Container(
+            decoration: BoxDecoration(
+              color: theme.colorScheme.surface,
+              border: Border(
+                bottom: BorderSide(
+                  color: theme.colorScheme.onSurface.withAlpha(15),
+                  width: 1,
+                ),
+              ),
+            ),
+            child: Center(
+              child: ConstrainedBox(
+                constraints: const BoxConstraints(maxWidth: Breakpoints.webContentMaxWidth),
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 24),
+                  child: Row(
+                    children: [
+                      AppBackButton(color: theme.colorScheme.onSurface),
+                      const Spacer(),
+                      IconButton(
+                        icon: Icon(Icons.share_outlined, size: 20, color: theme.colorScheme.onSurface.withAlpha(150)),
+                        onPressed: () {},
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+          ),
+          Expanded(child: _buildWebBody(post, commentCount)),
+          CommentInputBar(
+            isMobile: false,
+            replyTo: _replyTo,
+            onReplyChanged: (c) => setState(() => _replyTo = c),
+            onSend: _sendComment,
+          ),
+        ],
+      );
+    }
+
+    return Scaffold(
+      backgroundColor: theme.scaffoldBackgroundColor,
+      appBar: appBar,
+      body: body,
+    );
+  }
+
+  // =================== 手机端 ===================
+
+  Widget _buildMobileBody(Post post, int commentCount) {
+    return CustomScrollView(
+      slivers: [
+        SliverToBoxAdapter(
+          child: PostHeader(
+            post: post,
+            isMobile: true,
+            categories: _categories,
+          ),
+        ),
+        SliverToBoxAdapter(child: PostContent(post: post, isMobile: true)),
+        PostTags(
+          allTags: _tags,
+          tagIds: post.tagIds,
+          isMobile: true,
+          asSliver: true,
+        ),
+        SliverToBoxAdapter(child: InteractionBar(post: post, isMobile: true)),
+        CommentSection(
+          commentCount: commentCount,
+          commentTree: _commentTree,
+          allComments: _comments,
+          isMobile: true,
+          asSliver: true,
+          onReply: (c) => setState(() => _replyTo = c),
+          commentLikeCounts: _commentLikeCounts,
+        ),
+        SliverToBoxAdapter(child: SizedBox(height: 16.h)),
+      ],
+    );
+  }
+
+  // =================== Web 端 ===================
+
+  Widget _buildWebBody(Post post, int commentCount) {
+    return CustomScrollView(
+      slivers: [
+        SliverToBoxAdapter(
+          child: Center(
+            child: ConstrainedBox(
+              constraints: const BoxConstraints(
+                maxWidth: Breakpoints.webContentMaxWidth,
+              ),
+              child: Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 24),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    PostHeader(
+                      post: post,
+                      isMobile: false,
+                      categories: _categories,
+                    ),
+                    PostContent(post: post, isMobile: false),
+                    PostTags(
+                      allTags: _tags,
+                      tagIds: post.tagIds,
+                      isMobile: false,
+                    ),
+                    InteractionBar(post: post, isMobile: false),
+                    CommentSection(
+                      commentCount: commentCount,
+                      commentTree: _commentTree,
+                      allComments: _comments,
+                      isMobile: false,
+                      onReply: (c) => setState(() => _replyTo = c),
+                      commentLikeCounts: _commentLikeCounts,
+                    ),
+                    const SizedBox(height: 16),
+                  ],
+                ),
+              ),
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+}

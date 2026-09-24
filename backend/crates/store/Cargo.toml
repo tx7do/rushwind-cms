@@ -1,0 +1,29 @@
+[package]
+name = "store"
+description = "The shared data layer of the two CMS deployments: the generated sea-orm entity tree (from the golden DDL), the PagingRequest select assembly, and the token/session store primitives."
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+publish = false
+
+[lints]
+workspace = true
+
+[dependencies]
+proto = { path = "../proto" }
+sea-orm = { workspace = true }
+redis = { workspace = true }
+rust-utils = { workspace = true }
+serde = { workspace = true, features = ["derive"] }
+serde_json = { workspace = true }
+chrono = { workspace = true }
+rushwind-authn = { git = "https://github.com/tx7do/rushwind", rev = "2bc3a96c742539a195b608b995be1c3bcc1545a3" }
+rushwind-http-binding = { git = "https://github.com/tx7do/rushwind", rev = "2bc3a96c742539a195b608b995be1c3bcc1545a3" }
+bcrypt = "0.15"
+aes = "0.8"
+cbc = "0.1"
+base64 = "0.22"
+
+[dev-dependencies]
+tokio = { version = "1", features = ["macros", "rt"] }

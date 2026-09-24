@@ -1,0 +1,35 @@
+[package]
+name = "core-service"
+description = "The internal core domain service of the CMS (never public-facing — the BFFs dial it over gRPC): owns the database and Redis exclusively, implements the domain gRPC services (tonic) the two BFF deployments dial."
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+publish = false
+
+[lints]
+workspace = true
+
+[dependencies]
+proto = { path = "../../crates/proto" }
+store = { path = "../../crates/store" }
+rushwind-authn = { git = "https://github.com/tx7do/rushwind", rev = "2bc3a96c742539a195b608b995be1c3bcc1545a3" }
+rushwind-bootstrap = { git = "https://github.com/tx7do/rushwind", rev = "2bc3a96c742539a195b608b995be1c3bcc1545a3" }
+rushwind-authn-jwt = { git = "https://github.com/tx7do/rushwind", rev = "2bc3a96c742539a195b608b995be1c3bcc1545a3" }
+rushwind-http-binding = { git = "https://github.com/tx7do/rushwind", rev = "2bc3a96c742539a195b608b995be1c3bcc1545a3" }
+tonic = { version = "0.14", default-features = false, features = ["codegen", "channel", "router", "server", "transport"] }
+tonic-prost = "0.14"
+tokio = { workspace = true }
+sea-orm = { workspace = true }
+redis = { workspace = true }
+serde = { workspace = true, features = ["derive"] }
+serde_yaml = { workspace = true }
+serde_json = { workspace = true }
+chrono = { workspace = true }
+uuid = { workspace = true }
+rand = "0.9"
+hex = "0.4"
+pbjson-types = { workspace = true }
+async-trait = { workspace = true }
+tokio-stream = "0.1"
+prost = { workspace = true }

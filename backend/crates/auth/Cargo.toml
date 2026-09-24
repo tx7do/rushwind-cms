@@ -1,0 +1,18 @@
+[package]
+name = "auth"
+description = "The auth gate for the protected subtrees of both CMS deployments: credential verification, the server-side session checks, and the claim-bag injection, rendering the four-field status envelope on failure."
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+publish = false
+
+[lints]
+workspace = true
+
+[dependencies]
+proto = { path = "../proto" }
+async-trait = { workspace = true }
+rushwind-authn = { git = "https://github.com/tx7do/rushwind", rev = "2bc3a96c742539a195b608b995be1c3bcc1545a3" }
+rushwind-http-binding = { git = "https://github.com/tx7do/rushwind", rev = "2bc3a96c742539a195b608b995be1c3bcc1545a3" }
+axum = { version = "0.8", default-features = false, features = ["matched-path"] }

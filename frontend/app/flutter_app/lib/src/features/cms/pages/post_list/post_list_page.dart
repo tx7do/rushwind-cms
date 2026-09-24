@@ -1,0 +1,295 @@
+import 'package:flutter/material.dart';
+import 'package:flutter_screenutil/flutter_screenutil.dart';
+
+import 'package:flutter_app/generated/l10n.dart';
+import 'package:flutter_app/generated/api/app/service/v1/index.dart'
+    show ContentServiceV1Post, ContentServiceV1Category,
+        ContentServiceV1Tag, ContentServiceV1ListPostResponse,
+        ContentServiceV1ListCategoryResponse, ContentServiceV1ListTagResponse,
+        InteractionServiceV1TargetType, InteractionServiceV1CounterMetric;
+import 'package:flutter_app/src/features/cms/services/post_service.dart';
+import 'package:flutter_app/src/features/cms/services/category_service.dart';
+import 'package:flutter_app/src/features/cms/services/tag_service.dart';
+import 'package:flutter_app/src/features/cms/services/interaction_service.dart';
+import 'package:flutter_app/src/features/cms/widgets/post_card.dart';
+import 'package:flutter_app/src/core/constants/breakpoints.dart';
+import 'package:flutter_app/src/core/widgets/app_back_button.dart';
+import 'package:flutter_app/src/core/widgets/responsive_layout.dart';
+import 'package:flutter_app/src/core/utils/translation_helpers.dart';
+import 'package:flutter_app/src/core/services/pagination_query.dart';
+
+typedef Post = ContentServiceV1Post;
+typedef Category = ContentServiceV1Category;
+
+/// 文章列表页
+///
+/// 支持按分类、标签过滤，从 API 服务端获取数据。
+class PostListPage extends StatefulWidget {
+  /// 可选：按分类 ID 过滤
+  final int? categoryId;
+
+  /// 可选：按标签 ID 过滤
+  final int? tagId;
+
+  const PostListPage({super.key, this.categoryId, this.tagId});
+
+  @override
+  State<PostListPage> createState() => _PostListPageState();
+}
+
+class _PostListPageState extends State<PostListPage> {
+  final _postService = PostService();
+  final _categoryService = CategoryService();
+  final _tagService = TagService();
+
+  List<Post> _posts = [];
+  List<Category> _categories = [];
+  List<ContentServiceV1Tag> _tags = [];
+  bool _isLoading = true;
+
+  // 点赞计数缓存：key 为 post.id。计数来自 interaction_counter 表
+  // （post.likes 列已移除），由 InteractionService.GetCounts 批量查询。
+  Map<int, int> _likeCounts = {};
+
+  final _interactionService = InteractionService();
+
+  /// 当前选中的分类（可为 null 表示全部）
+  int? _selectedCategoryId;
+
+  @override
+  void initState() {
+    super.initState();
+    _selectedCategoryId = widget.categoryId;
+    _loadData();
+  }
+
+  Future<void> _loadData() async {
+    final filterValues = <String, dynamic>{};
+    if (_selectedCategoryId != null) {
+      filterValues['category_id'] = _selectedCategoryId;
+    }
+    if (widget.tagId != null) {
+      filterValues['tag_id'] = widget.tagId;
+    }
+
+    final results = await Future.wait([
+      _postService.list(PaginationQuery(formValues: filterValues)),
+      _categoryService.list(),
+      _tagService.list(),
+    ]);
+
+    if (!mounted) return;
+
+    final posts = (results[0] as ContentServiceV1ListPostResponse?)?.items ?? [];
+    final ids = posts
+        .where((p) => p.id != null)
+        .map((p) => p.id!)
+        .toList(growable: false);
+    Map<int, int> likeCounts = {};
+    if (ids.isNotEmpty) {
+      final countsResp = await _interactionService.getCounts(
+          InteractionServiceV1TargetType.targetTypePost,
+          ids,
+          [InteractionServiceV1CounterMetric.counterMetricLike]);
+      likeCounts = InteractionService.extractCountMap(
+          countsResp,
+          ids,
+          InteractionServiceV1CounterMetric.counterMetricLike);
+    }
+    if (!mounted) return;
+
+    setState(() {
+      _posts = posts;
+      _likeCounts = likeCounts;
+      _categories =
+          (results[1] as ContentServiceV1ListCategoryResponse?)?.items ?? [];
+      // 按 sortOrder 排序
+      _categories.sort((a, b) => (a.sortOrder ?? 0).compareTo(b.sortOrder ?? 0));
+      
+      _tags = (results[2] as ContentServiceV1ListTagResponse?)?.items ?? [];
+      _isLoading = false;
+    });
+  }
+
+  String get _pageTitle {
+    if (widget.tagId != null) {
+      final tag = _tags.where((t) => t.id == widget.tagId);
+      if (tag.isNotEmpty) return getTagName(tag.first);
+    }
+    if (_selectedCategoryId != null) {
+      final cat = _categories.where((c) => c.id == _selectedCategoryId);
+      if (cat.isNotEmpty) return getCategoryName(cat.first);
+    }
+    return S.of(context).allPosts;
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    if (_isLoading) {
+      return const Center(child: CircularProgressIndicator());
+    }
+
+    return ResponsiveLayout(
+      mobileBody: _buildView(isMobile: true),
+      webBody: _buildView(isMobile: false),
+    );
+  }
+
+  Widget _buildView({required bool isMobile}) {
+    final theme = Theme.of(context);
+    final loc = S.of(context);
+
+    final appBar = AppBar(
+      backgroundColor: theme.colorScheme.surface,
+      surfaceTintColor: Colors.transparent,
+      elevation: 0,
+      leading: const AppBackButton(),
+      title: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(
+            Icons.article_outlined,
+            size: isMobile ? 20.sp : 20,
+            color: theme.colorScheme.primary,
+          ),
+          SizedBox(width: isMobile ? 6.w : 6),
+          Flexible(
+            child: Text(
+              _pageTitle,
+              style: TextStyle(
+                fontSize: isMobile ? 18.sp : 18,
+                fontWeight: FontWeight.bold,
+              ),
+              overflow: TextOverflow.ellipsis,
+            ),
+          ),
+        ],
+      ),
+      centerTitle: true,
+      bottom: PreferredSize(
+        preferredSize: Size.fromHeight(isMobile ? 28.h : 28),
+        child: Padding(
+          padding: EdgeInsets.only(bottom: isMobile ? 10.h : 10),
+          child: Text(
+            loc.postsCountFull(_posts.length),
+            style: TextStyle(
+              fontSize: isMobile ? 13.sp : 13,
+              color: theme.colorScheme.onSurface.withAlpha(120),
+            ),
+          ),
+        ),
+      ),
+    );
+
+    final body = _posts.isEmpty
+        ? Center(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Icon(
+                  Icons.article_outlined,
+                  size: 56,
+                  color: theme.colorScheme.onSurface.withAlpha(60),
+                ),
+                const SizedBox(height: 14),
+                Text(
+                  loc.noRelatedPosts,
+                  style: TextStyle(
+                    fontSize: 15,
+                    color: theme.colorScheme.onSurface.withAlpha(120),
+                  ),
+                ),
+              ],
+            ),
+          )
+        : _buildBody(isMobile);
+
+    // Web 端由 WebShellLayout 提供 Scaffold，不再嵌套 Scaffold
+    if (!isMobile) return body;
+
+    return Scaffold(
+      backgroundColor: theme.scaffoldBackgroundColor,
+      appBar: appBar,
+      body: body,
+    );
+  }
+
+  Widget _buildBody(bool isMobile) {
+    if (!isMobile) {
+      return CustomScrollView(
+        slivers: [
+          SliverToBoxAdapter(
+            child: Center(
+              child: ConstrainedBox(
+                constraints: const BoxConstraints(
+                  maxWidth: Breakpoints.webContentMaxWidth,
+                ),
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 24),
+                  child: Row(
+                    children: [
+                      Text(
+                        _pageTitle,
+                        style: TextStyle(
+                          fontSize: 16,
+                          fontWeight: FontWeight.w600,
+                          color: Theme.of(context).colorScheme.onSurface,
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      Text(
+                        S.of(context).postsCountFull(_posts.length),
+                        style: TextStyle(
+                          fontSize: 13,
+                          color: Theme.of(context).colorScheme.onSurface.withAlpha(120),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+          ),
+          SliverPadding(
+            padding: const EdgeInsets.symmetric(horizontal: 24),
+            sliver: SliverToBoxAdapter(
+              child: Center(
+                child: ConstrainedBox(
+                  constraints: const BoxConstraints(
+                    maxWidth: Breakpoints.webContentMaxWidth,
+                  ),
+                  child: Column(
+                    children: _posts.map((post) => Padding(
+                      padding: const EdgeInsets.only(bottom: 12),
+                      child: PostCard(
+                        post: post,
+                        likeCount: _likeCounts[post.id] ?? 0,
+                        categories: _categories,
+                        tags: _tags,
+                      ),
+                    )).toList(),
+                  ),
+                ),
+              ),
+            ),
+          ),
+          const SliverToBoxAdapter(child: SizedBox(height: 32)),
+        ],
+      );
+    }
+
+    return ListView.builder(
+      padding: EdgeInsets.symmetric(horizontal: 16.w, vertical: 8.h),
+      itemCount: _posts.length,
+      itemBuilder: (context, index) => Padding(
+        padding: EdgeInsets.only(bottom: 12.h),
+        child: PostCard(
+          post: _posts[index],
+          likeCount: _likeCounts[_posts[index].id] ?? 0,
+          categories: _categories,
+          tags: _tags,
+        ),
+      ),
+    );
+  }
+}

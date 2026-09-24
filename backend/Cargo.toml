@@ -1,0 +1,52 @@
+[workspace]
+resolver = "2"
+members = ["crates/*", "services/*"]
+
+[workspace.package]
+version = "0.0.1"
+edition = "2021"
+rust-version = "1.81"
+license = "MIT"
+
+# Workspace-wide lint baseline; member crates opt in via
+# `[lints] workspace = true.
+[workspace.lints.clippy]
+all = "warn"
+undocumented_unsafe_blocks = "warn"
+
+[workspace.dependencies]
+# proto 类型链——版本与 rushwind 工作区保持一致（prost 0.14 / pbjson 0.9 / protox 0.9）。
+prost = "0.14"
+prost-build = "0.14"
+pbjson = "0.9"
+pbjson-types = "0.9"
+pbjson-build = "0.9"
+protox = "0.9"
+serde = "1"
+serde_json = "1"
+# 生成器与运行时 schema 面：prost-reflect（描述符池 + 动态消息 + 扩展选项解码）。
+prost-reflect = { version = "0.16", features = ["serde"] }
+# 生成器产物中的服务 trait 用 async-trait 保证 dyn 兼容。
+async-trait = "0.1"
+# 服务侧直用的工具链。
+rust-utils = { git = "https://github.com/tx7do/rust-utils", rev = "8c24baf4e6ab419621a299a5f18e349562382fca", features = ["json"] }
+chrono = { version = "0.4", default-features = false, features = ["std", "clock"] }
+sea-orm = { version = "2.0", default-features = false, features = [
+    "runtime-tokio-rustls",
+    "sqlx-postgres",
+    "macros",
+    "with-chrono",
+    "with-json",
+] }
+redis = { version = "1", default-features = false, features = ["tokio-comp", "connection-manager", "script"] }
+tokio = { version = "1", features = ["rt-multi-thread", "macros", "signal", "time", "net"] }
+uuid = { version = "1", features = ["v4", "v7"] }
+serde_yaml = "0.9"
+
+[profile.release]
+lto = "thin"
+
+# Windows MSVC 的 PDB 有 4GB 上限：debug 全量调试信息链接即爆（LNK1140）。
+# 行号表保留回溯能力，类型级调试信息让给 release/需要时手动开。
+[profile.dev]
+debug = "line-tables-only"

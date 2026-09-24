@@ -1,0 +1,497 @@
+/* ========== Content Viewer Component ========== */
+.contentViewer {
+    color: hsl(var(--foreground));
+    line-height: 1.9;
+    word-wrap: break-word;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+
+    /* Typography - Headings */
+    :global(h1), :global(h2), :global(h3), :global(h4), :global(h5), :global(h6) {
+        margin-top: 1.5em;
+        margin-bottom: 0.75em;
+        font-weight: 600;
+        line-height: 1.35;
+        color: hsl(var(--foreground));
+
+        &:first-child {
+            margin-top: 0;
+        }
+    }
+
+    :global(h1) {
+        font-size: 2rem;
+        border-bottom: 2px solid hsl(var(--border));
+        padding-bottom: 0.5rem;
+    }
+
+    :global(h2) {
+        font-size: 1.625rem;
+        border-bottom: 2px solid hsl(var(--border));
+        padding-bottom: 0.5rem;
+        margin: 48px 0 24px;
+    }
+
+    :global(h3) {
+        font-size: 1.375rem;
+        margin: 36px 0 20px;
+    }
+
+    :global(h4) {
+        font-size: 1.125rem;
+    }
+
+    :global(h5), :global(h6) {
+        font-size: 1rem;
+    }
+
+    /* Paragraphs */
+    :global(p) {
+        margin: 22px 0;
+        line-height: 2.0;
+        letter-spacing: 0.25px;
+        word-spacing: 0.05em;
+        text-align: justify;
+
+        &:first-child {
+            margin-top: 0;
+        }
+
+        &:last-child {
+            margin-bottom: 0;
+        }
+
+        & + p {
+            margin-top: 20px;
+        }
+    }
+
+    /* Links */
+    :global(a.markdown-link) {
+        color: hsl(var(--primary));
+        text-decoration: none;
+        border-bottom: 1.5px solid hsl(var(--primary) /  0.3);
+        transition: all 0.25s ease;
+        font-weight: 500;
+
+        &:hover {
+            text-decoration: none;
+            border-bottom-color: hsl(var(--primary));
+            background: hsl(var(--primary) /  0.08);
+            padding: 2px 4px;
+            margin: -2px -4px;
+            border-radius: 4px;
+        }
+    }
+
+    /* Strong and emphasis */
+    :global(strong), :global(b) {
+        font-weight: 700;
+        color: hsl(var(--primary));
+        letter-spacing: 0.2px;
+    }
+
+    :global(em), :global(i) {
+        font-style: italic;
+        color: hsl(var(--muted-foreground));
+        letter-spacing: 0.15px;
+    }
+
+    /* Inline code */
+    :global(code.inline-code) {
+        background: rgba(150, 150, 150, 0.12);
+        padding: 3px 8px;
+        border-radius: 5px;
+        font-family: 'Monaco', 'Menlo', 'Ubuntu Mono', 'Consolas', 'source-code-pro', monospace;
+        font-size: 0.88em;
+        color: hsl(var(--primary));
+        border: 1px solid hsl(var(--primary) /  0.18);
+        letter-spacing: 0.1px;
+        white-space: nowrap;
+    }
+
+    /* ========== Code blocks (Shiki 高亮 + 纯文本回退) ========== */
+
+    /* 共享容器样式 */
+    :global(pre.code-block) {
+        padding: 32px 24px 20px;
+        border-radius: 12px;
+        overflow-x: auto;
+        margin: 32px 0;
+        position: relative;
+        font-family: 'Monaco', 'Menlo', 'Ubuntu Mono', 'Consolas', 'source-code-pro', monospace;
+        font-size: 13.5px;
+        line-height: 1.7;
+        letter-spacing: 0.15px;
+        box-shadow: 0 6px 24px rgba(0, 0, 0, 0.16);
+        white-space: pre;
+        word-wrap: normal;
+        overflow-wrap: normal;
+        tab-size: 2;
+        -moz-tab-size: 2;
+
+        /* 语言标签（右上角） */
+        &::before {
+            content: attr(data-lang);
+            position: absolute;
+            top: 10px;
+            inset-inline-end: 14px;
+            font-size: 11px;
+            font-weight: 600;
+            color: rgba(255, 255, 255, 0.4);
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            pointer-events: none;
+            z-index: 1;
+        }
+
+        :global(code) {
+            background: none;
+            padding: 0;
+            border-radius: 0;
+            font-size: inherit;
+            line-height: inherit;
+            color: inherit;
+            font-family: inherit;
+            white-space: inherit;
+            word-wrap: inherit;
+            overflow-wrap: inherit;
+        }
+    }
+
+    /* 纯文本/未高亮回退块：沿用 One Dark 风格 */
+    :global(pre.code-block.shiki-pending),
+    :global(pre.code-block.shiki-container) {
+        background: #282c34;
+        color: #abb2bf;
+        border: 1px solid rgba(255, 255, 255, 0.08);
+    }
+
+    /* Shiki 高亮块：背景与文字颜色交给 Shiki 内联样式控制 */
+    :global(pre.shiki.code-block) {
+        border: 1px solid hsl(var(--border));
+
+        /* Shiki 可能会加上 padding，确保统一 */
+        padding: 32px 24px 20px;
+        margin: 32px 0;
+
+        :global(code) {
+            display: block;
+            background: transparent !important;
+        }
+
+        /* 行号容器：Shiki 默认输出 <span class="line"> */
+        :global(.line) {
+            display: block;
+        }
+
+        /* 语言标签颜色随主题适配 */
+        &::before {
+            color: rgba(0, 0, 0, 0.35);
+        }
+    }
+
+    /* Dark mode：切换到 Shiki 的 dark 主题变量 */
+    :global(.dark) :global(pre.shiki.code-block),
+    :global(.dark) :global(pre.shiki.code-block) :global(span) {
+        color: var(--shiki-dark, inherit) !important;
+        background-color: var(--shiki-dark-bg, transparent) !important;
+        font-style: var(--shiki-dark-font-style, normal) !important;
+        font-weight: var(--shiki-dark-font-weight, normal) !important;
+        text-decoration: var(--shiki-dark-text-decoration, none) !important;
+    }
+
+    /* Dark mode 下语言标签颜色调亮 */
+    :global(.dark) :global(pre.shiki.code-block)::before {
+        color: rgba(255, 255, 255, 0.4);
+    }
+
+    /* Dark mode 下 Shiki <pre> 背景手动覆盖（inline style 会被 !important 覆盖） */
+    :global(.dark) :global(pre.shiki.code-block) {
+        background-color: #0d1117 !important;
+        border-color: rgba(255, 255, 255, 0.08);
+    }
+
+    /* Dark mode 下纯文本回退块 */
+    :global(.dark) :global(pre.code-block.shiki-pending),
+    :global(.dark) :global(pre.code-block.shiki-container) {
+        background: #0d1117;
+        border-color: rgba(255, 255, 255, 0.08);
+    }
+
+    /* Light mode 下 Shiki <pre> 背景手动覆盖（保持与 GitHub-light 一致） */
+    :global(pre.shiki.code-block) {
+        background-color: #ffffff;
+    }
+
+    /* Plain text blocks */
+    :global(pre.plain-text-block) {
+        background: rgba(150, 150, 150, 0.1);
+        color: hsl(var(--foreground));
+        padding: 1rem;
+        border-radius: 8px;
+        overflow-x: auto;
+        margin: 1.5em 0;
+        border: 1px solid hsl(var(--border));
+        font-family: 'Monaco', 'Menlo', 'Ubuntu Mono', 'Consolas', 'source-code-pro', monospace;
+        font-size: 0.875rem;
+        line-height: 1.6;
+    }
+
+    /* Blockquotes */
+    :global(blockquote) {
+        border-inline-start: 4px solid hsl(var(--primary));
+        padding: 20px 24px;
+        margin: 32px 0;
+        background: hsl(var(--primary) /  0.06);
+        color: hsl(var(--muted-foreground));
+        border-start-start-radius: 0;
+        border-end-start-radius: 0;
+        border-start-end-radius: 8px;
+        border-end-end-radius: 8px;
+        font-style: italic;
+        position: relative;
+        letter-spacing: 0.2px;
+        line-height: 1.85;
+
+        &::before {
+            content: '"';
+            position: absolute;
+            top: -10px;
+            inset-inline-start: 12px;
+            font-size: 56px;
+            color: hsl(var(--primary));
+            opacity: 0.2;
+            font-family: Georgia, serif;
+            line-height: 1;
+        }
+
+        :global(p) {
+            margin: 14px 0;
+            text-indent: 0;
+            text-align: start;
+
+            &:first-child {
+                margin-top: 0;
+            }
+
+            &:last-child {
+                margin-bottom: 0;
+            }
+        }
+    }
+
+    /* Lists */
+    :global(ul), :global(ol) {
+        padding-inline-start: 2em;
+        margin: 28px 0;
+
+        :global(li) {
+            margin: 12px 0;
+            line-height: 1.95;
+            letter-spacing: 0.2px;
+            position: relative;
+
+            :global(p) {
+                margin: 10px 0;
+            }
+        }
+    }
+
+    :global(ul) {
+        list-style-type: disc;
+
+        :global(li)::marker {
+            color: hsl(var(--primary));
+            font-weight: 600;
+        }
+
+        :global(ul) {
+            list-style-type: circle;
+
+            :global(ul) {
+                list-style-type: square;
+            }
+        }
+    }
+
+    :global(ol) {
+        list-style-type: decimal;
+
+        :global(li)::marker {
+            color: hsl(var(--primary));
+            font-weight: 600;
+        }
+    }
+
+    /* Images */
+    :global(figure.markdown-image) {
+        margin: 1.5em 0;
+        text-align: center;
+
+        :global(img.md-img) {
+            max-width: 100%;
+            height: auto;
+            border-radius: 8px;
+            display: inline-block;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+        }
+
+        :global(figcaption) {
+            margin-top: 0.5em;
+            font-size: 0.875rem;
+            color: hsl(var(--muted-foreground));
+            text-align: center;
+        }
+    }
+
+    /* Tables */
+    :global(.table-wrapper) {
+        overflow-x: auto;
+        margin: 32px 0;
+        border-radius: 8px;
+        border: 1px solid hsl(var(--border));
+        box-shadow: 0 2px 12px rgba(0, 0, 0, 0.08);
+    }
+
+    :global(table.markdown-table) {
+        width: 100%;
+        border-collapse: collapse;
+        background: hsl(var(--card));
+        font-size: 15px;
+        letter-spacing: 0.15px;
+
+        :global(th), :global(td) {
+            padding: 14px 16px;
+            border: 1px solid hsl(var(--border));
+            text-align: start;
+        }
+
+        :global(th) {
+            background: hsl(var(--primary));
+            color: white;
+            font-weight: 600;
+            line-height: 1.5;
+            letter-spacing: 0.3px;
+        }
+
+        :global(td) {
+            line-height: 1.7;
+        }
+
+        :global(tr:nth-child(even)) {
+            background: rgba(150, 150, 150, 0.05);
+        }
+
+        :global(tr:hover) {
+            background: hsl(var(--primary) /  0.06);
+        }
+    }
+
+    /* Horizontal rule */
+    :global(hr) {
+        border: none;
+        border-top: 2px solid hsl(var(--border));
+        margin: 48px 0;
+    }
+
+    /* Video */
+    :global(video) {
+        max-width: 100%;
+        height: auto;
+        border-radius: 8px;
+        margin: 1.5em 0;
+        display: block;
+    }
+
+    /* Iframe */
+    :global(iframe) {
+        max-width: 100%;
+        border: 1px solid hsl(var(--border));
+        border-radius: 8px;
+        margin: 1.5em 0;
+    }
+
+    /* Error state */
+    :global(.content-error) {
+        color: #ff6b6b;
+        padding: 1em;
+        background: rgba(255, 107, 107, 0.1);
+        border: 1px solid #ff6b6b;
+        border-radius: 8px;
+        margin: 1.5em 0;
+    }
+
+    /* Math formulas */
+    :global(.math-block) {
+        display: flex;
+        justify-content: center;
+        margin: 1.5em 0;
+        padding: 1em;
+        background: rgba(150, 150, 150, 0.05);
+        border-radius: 8px;
+        overflow-x: auto;
+    }
+
+    :global(.math-inline) {
+        display: inline;
+        font-size: 0.95em;
+    }
+
+    :global(.math-error) {
+        color: #ff6b6b;
+        background: rgba(255, 107, 107, 0.1);
+        padding: 0.25em 0.5em;
+        border-radius: 4px;
+    }
+
+    /* Mermaid diagrams */
+    :global(.mermaid) {
+        display: flex;
+        justify-content: center;
+        margin: 1.5em 0;
+        padding: 1em;
+        background: rgba(150, 150, 150, 0.05);
+        border-radius: 8px;
+        border: 1px solid hsl(var(--border));
+        overflow-x: auto;
+
+        :global(svg) {
+            max-width: 100%;
+            height: auto;
+        }
+    }
+
+    :global(.mermaid-error) {
+        color: #ff6b6b;
+        background: rgba(255, 107, 107, 0.1);
+        border-color: #ff6b6b;
+    }
+
+    /* KaTeX CSS */
+    :global(.katex) {
+        font: normal 1.21em KaTeX_Main, 'Times New Roman', serif;
+        line-height: 1.2;
+        text-indent: 0;
+    }
+
+    :global(.katex-display) {
+        display: block;
+        margin: 1em 0;
+        text-align: center;
+    }
+
+    :global(.katex-html) {
+        display: none;
+    }
+
+    :global(.katex-mathml) {
+        position: absolute;
+        clip: rect(1px, 1px, 1px, 1px);
+        padding: 0;
+        border: 0;
+        height: 1px;
+        width: 1px;
+        overflow: hidden;
+    }
+}
