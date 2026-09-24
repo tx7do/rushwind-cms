@@ -1,6 +1,8 @@
 //! The remaining read faces: OrgUnit, Position, LoginPolicy,
 //! ContentModel, MediaAsset, Task, Translator, InternalMessage×3 —
-//! list/get over the golden schema (write paths land per-module).
+//! list/get over the golden schema (write paths land per-module;
+//! MediaAsset carries its full CRUD — the reference's media library
+//! face).
 
 use std::sync::Arc;
 
@@ -389,6 +391,87 @@ impl mediav1::media_asset_service_server::MediaAssetService for MediaAssetServic
         )
         .await?;
         Ok(Response::new(media_asset_proto(row)))
+    }
+
+    async fn update(
+        &self,
+        request: Request<mediav1::UpdateMediaAssetRequest>,
+    ) -> Result<Response<mediav1::MediaAsset>, Status> {
+        let req = request.into_inner();
+        let row = repo::media_assets_by_id(&self.state.db, req.id as i64).await?;
+        let mut a: media_assets::ActiveModel = row.into();
+        if let Some(data) = req.data {
+            if let Some(v) = data.r#type {
+                a.r#type = Set(asset_type_name(v));
+            }
+            if let Some(v) = data.filename {
+                a.filename = Set(Some(v));
+            }
+            if let Some(v) = data.mime_type {
+                a.mime_type = Set(Some(v));
+            }
+            if let Some(v) = data.size {
+                a.size = Set(Some(v as i64));
+            }
+            if let Some(v) = data.storage_path {
+                a.storage_path = Set(Some(v));
+            }
+            if let Some(v) = data.url {
+                a.url = Set(Some(v));
+            }
+            if let Some(v) = data.width {
+                a.width = Set(Some(v as i64));
+            }
+            if let Some(v) = data.height {
+                a.height = Set(Some(v as i64));
+            }
+            if let Some(v) = data.duration {
+                a.duration = Set(Some(v as i64));
+            }
+            if let Some(v) = data.alt_text {
+                a.alt_text = Set(Some(v));
+            }
+            if let Some(v) = data.title {
+                a.title = Set(Some(v));
+            }
+            if let Some(v) = data.caption {
+                a.caption = Set(Some(v));
+            }
+            if let Some(v) = data.processing_status {
+                a.processing_status = Set(processing_status_name(v));
+            }
+            if let Some(v) = data.processing_error {
+                a.processing_error = Set(Some(v));
+            }
+            if let Some(v) = data.file_hash {
+                a.file_hash = Set(Some(v));
+            }
+            if let Some(v) = data.file_id {
+                a.file_id = Set(Some(v as i64));
+            }
+            if let Some(v) = data.folder_id {
+                a.folder_id = Set(Some(v as i64));
+            }
+            if let Some(v) = data.is_private {
+                a.is_private = Set(Some(v));
+            }
+        }
+        a.updated_at = Set(Some(store::now()));
+        let row = repo::update_media_assets(&self.state.db, a).await?;
+        Ok(Response::new(media_asset_proto(row)))
+    }
+
+    async fn delete(
+        &self,
+        request: Request<mediav1::DeleteMediaAssetRequest>,
+    ) -> Result<Response<pbjson_types::Empty>, Status> {
+        let req = request.into_inner();
+        let id = match req.query_by {
+            Some(mediav1::delete_media_asset_request::QueryBy::Id(id)) => id as i64,
+            _ => return Err(bad("query_by required")),
+        };
+        repo::delete_media_assets(&self.state.db, id).await?;
+        Ok(Response::new(pbjson_types::Empty {}))
     }
 }
 

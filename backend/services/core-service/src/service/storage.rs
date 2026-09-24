@@ -41,6 +41,48 @@ fn file_proto(r: files::Model) -> storagev1::File {
     }
 }
 
+fn format_size(size: i64) -> String {
+    if size <= 0 {
+        return "0B".to_string();
+    }
+    const UNITS: [&str; 6] = ["B", "KB", "MB", "GB", "TB", "PB"];
+    let mut s = size as f64;
+    let mut i = 0usize;
+    while s >= 1024.0 && i < UNITS.len() - 1 {
+        s /= 1024.0;
+        i += 1;
+    }
+    if i == 0 {
+        return format!("{size}{}", UNITS[0]);
+    }
+    let v = (s * 100.0).round() / 100.0;
+    let t = format!("{v:.2}");
+    format!(
+        "{}{}",
+        t.trim_end_matches('0').trim_end_matches('.'),
+        UNITS[i]
+    )
+}
+
+fn oss_provider_name(v: i32) -> Option<String> {
+    Some(
+        match v {
+            0 => "MINIO",
+            1 => "ALIYUN",
+            2 => "AWS",
+            3 => "AZURE",
+            4 => "BAIDU",
+            5 => "QINIU",
+            6 => "TENCENT",
+            7 => "GOOGLE",
+            8 => "HUAWEI",
+            10 => "LOCAL",
+            _ => return None,
+        }
+        .to_string(),
+    )
+}
+
 pub struct FileServiceImpl {
     pub state: Arc<AppState>,
 }
@@ -55,12 +97,23 @@ fn operator_of<T>(request: &tonic::Request<T>) -> Result<i64, Status> {
         .ok_or_else(|| Status::unauthenticated("user identity required"))
 }
 
+fn tenant_of<T>(request: &tonic::Request<T>) -> i64 {
+    request
+        .metadata()
+        .get("x-tenant-id")
+        .and_then(|v| v.to_str().ok())
+        .and_then(|v| v.parse::<i64>().ok())
+        .filter(|v| *v >= 0)
+        .unwrap_or(0)
+}
+
 impl FileServiceImpl {
     /// Writes an object to the local store + the metadata row (the
     /// upload transport bridge calls this; JSON/base64 for now).
     pub async fn put(
         &self,
         uploader: i64,
+        tenant: i64,
         file_name: &str,
         _mime_type: &str,
         bytes: Vec<u8>,
@@ -84,28 +137,30 @@ impl FileServiceImpl {
             .map_err(|e| Status::internal(format!("storage write: {e}")))?;
 
         let now = store::now();
-        let row = files::ActiveModel {
-            provider: Set(Some("LOCAL".to_string())),
-            file_directory: Set(Some(dir.to_string_lossy().to_string())),
-            file_guid: Set(Some(guid.clone())),
-            save_file_name: Set(Some(save_name)),
-            file_name: Set(Some(stem)),
-            extension: Set(Some(ext)),
-            size: Set(Some(bytes.len() as i64)),
-            content_hash: Set(Some(format!("{:x}", {
-                use sha2::Digest as _;
-                sha2::Sha256::digest(&bytes)
-            }))),
-            link_url: Set(Some(format!("/admin/v1/file/download?fileGuid={guid}"))),
-            tenant_id: Set(Some(0)),
-            created_by: Set(Some(uploader)),
-            created_at: Set(Some(now)),
-            updated_at: Set(Some(now)),
-            ..Default::default()
-        }
-        .insert(&self.state.db)
-        .await
-        .map_err(db_status)?;
+        let row = repo::insert_files(
+            &self.state.db,
+            files::ActiveModel {
+                provider: Set(Some("LOCAL".to_string())),
+                file_directory: Set(Some(dir.to_string_lossy().to_string())),
+                file_guid: Set(Some(guid.clone())),
+                save_file_name: Set(Some(save_name)),
+                file_name: Set(Some(stem)),
+                extension: Set(Some(ext)),
+                size: Set(Some(bytes.len() as i64)),
+                size_format: Set(Some(format_size(bytes.len() as i64))),
+                content_hash: Set(Some(format!("{:x}", {
+                    use sha2::Digest as _;
+                    sha2::Sha256::digest(&bytes)
+                }))),
+                link_url: Set(Some(format!("/admin/v1/file/download?fileGuid={guid}"))),
+                tenant_id: Set(Some(tenant)),
+                created_by: Set(Some(uploader)),
+                created_at: Set(Some(now)),
+                updated_at: Set(Some(now)),
+                ..Default::default()
+            },
+        )
+        .await?;
         Ok(row)
     }
 
@@ -155,6 +210,7 @@ impl storagev1::file_service_server::FileService for FileServiceImpl {
         request: Request<storagev1::CreateFileRequest>,
     ) -> Result<Response<storagev1::File>, Status> {
         let uploader = operator_of(&request)?;
+        let tenant = tenant_of(&request);
         let req = request.into_inner();
         let Some(data) = req.data else {
             return Err(bad("data required"));
@@ -177,12 +233,62 @@ impl storagev1::file_service_server::FileService for FileServiceImpl {
         let row = self
             .put(
                 uploader,
+                tenant,
                 &data.file_name.clone().unwrap_or_default(),
                 "",
                 bytes,
             )
             .await?;
         Ok(Response::new(file_proto(row)))
+    }
+
+    async fn update(
+        &self,
+        request: Request<storagev1::UpdateFileRequest>,
+    ) -> Result<Response<pbjson_types::Empty>, Status> {
+        let req = request.into_inner();
+        let row = repo::files_by_id(&self.state.db, req.id as i64).await?;
+        let mut a: files::ActiveModel = row.into();
+        if let Some(data) = req.data {
+            if let Some(v) = data.provider {
+                a.provider = Set(oss_provider_name(v));
+            }
+            if let Some(v) = data.bucket_name {
+                a.bucket_name = Set(Some(v));
+            }
+            if let Some(v) = data.file_directory {
+                a.file_directory = Set(Some(v));
+            }
+            if let Some(v) = data.file_guid {
+                a.file_guid = Set(Some(v));
+            }
+            if let Some(v) = data.save_file_name {
+                a.save_file_name = Set(Some(v));
+            }
+            if let Some(v) = data.file_name {
+                a.file_name = Set(Some(v));
+            }
+            if let Some(v) = data.extension {
+                a.extension = Set(Some(v));
+            }
+            // The size re-derives the formatted label (the reference's
+            // coupling).
+            if let Some(v) = data.size {
+                a.size = Set(Some(v as i64));
+                a.size_format = Set(Some(format_size(v as i64)));
+            } else if let Some(v) = data.size_format {
+                a.size_format = Set(Some(v));
+            }
+            if let Some(v) = data.link_url {
+                a.link_url = Set(Some(v));
+            }
+            if let Some(v) = data.content_hash {
+                a.content_hash = Set(Some(v));
+            }
+        }
+        a.updated_at = Set(Some(store::now()));
+        repo::update_files(&self.state.db, a).await?;
+        Ok(Response::new(pbjson_types::Empty {}))
     }
 
     async fn delete(
@@ -194,11 +300,7 @@ impl storagev1::file_service_server::FileService for FileServiceImpl {
             Some(storagev1::delete_file_request::QueryBy::Id(id)) => id as i64,
             _ => return Err(bad("query_by required")),
         };
-        if let Some(row) = files::Entity::find_by_id(id)
-            .one(&self.state.db)
-            .await
-            .map_err(db_status)?
-        {
+        if let Ok(row) = repo::files_by_id(&self.state.db, id).await {
             let p = std::path::Path::new(&row.file_directory.clone().unwrap_or_default())
                 .join(row.save_file_name.clone().unwrap_or_default());
             let _ = tokio::fs::remove_file(p).await;

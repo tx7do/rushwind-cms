@@ -304,13 +304,38 @@ DOWN2=$(curl -s -H "$AUTH" -w "|%{http_code}|%{content_type}" "$ADMIN/admin/v1/f
 check "download by id streams bytes" "|200|text/plain" "$DOWN2"
 check "download roundtrip content (id)" 'e2e-upload-content-rushwind' "$DOWN2"
 
-# 清理：两条文件行连同磁盘对象（media_assets 行留作演示数据，删面为桩）
-A_ID=$(echo "$FLIST" | python3 -c "
+# 文件更新：改名 + size→sizeFormat 联动（reference 的 Update 耦合）
+FUP=$(curl -s -o /dev/null -w "%{http_code}" -X PUT -H "$AUTH" -H "Content-Type: application/json" \
+  -d '{"data":{"fileName":"renamed-e2e","size":2048}}' "$ADMIN/admin/v1/files/$F_ID")
+check "file update → 200" "200" "$FUP"
+FGOT=$(curl -s -H "$AUTH" "$ADMIN/admin/v1/files/$F_ID")
+check "file update renamed" '"fileName":"renamed-e2e"' "$FGOT"
+check "file sizeFormat coupling (2048 → 2KB)" '"sizeFormat":"2KB"' "$FGOT"
+
+# 媒体库更新与删除
+MA_ID=$(echo "$ALIST" | python3 -c "
+import json,sys
+d=json.load(sys.stdin)
+print(next((i.get('id',0) for i in d.get('items',[]) if i.get('filename')=='e2e-upload.txt'),0))" 2>/dev/null)
+MAUP=$(curl -s -X PUT -H "$AUTH" -H "Content-Type: application/json" \
+  -d '{"data":{"altText":"e2e-alt"}}' "$ADMIN/admin/v1/media-assets/$MA_ID")
+check "media asset update (altText)" '"altText":"e2e-alt"' "$MAUP"
+MAD=$(curl -s -o /dev/null -w "%{http_code}" -X DELETE -H "$AUTH" "$ADMIN/admin/v1/media-assets/$MA_ID")
+check "media asset delete → 200" "200" "$MAD"
+R=$(curl -s -o /dev/null -w "%{http_code}" -H "$AUTH" "$ADMIN/admin/v1/media-assets/$MA_ID")
+check "deleted media asset get → 404" "404" "$R"
+
+# 清理：两条文件行连同磁盘对象
+A_FID=$(echo "$FLIST" | python3 -c "
 import json,sys
 d=json.load(sys.stdin)
 print(next((i.get('id',0) for i in d.get('items',[]) if i.get('fileGuid')=='$A_GUID'),0))" 2>/dev/null)
-[ -n "$F_ID" ] && [ "$F_ID" != "0" ] && curl -s -o /dev/null -X DELETE -H "$AUTH" "$ADMIN/admin/v1/files/$F_ID"
-[ -n "$A_ID" ] && [ "$A_ID" != "0" ] && curl -s -o /dev/null -X DELETE -H "$AUTH" "$ADMIN/admin/v1/files/$A_ID"
+DEL=$(curl -s -o /dev/null -w "%{http_code}" -X DELETE -H "$AUTH" "$ADMIN/admin/v1/files/$F_ID")
+check "file delete → 200" "200" "$DEL"
+R=$(curl -s -o /dev/null -w "%{http_code}" -H "$AUTH" "$ADMIN/admin/v1/files/$F_ID")
+check "deleted file get → 404" "404" "$R"
+DEL2=$(curl -s -o /dev/null -w "%{http_code}" -X DELETE -H "$AUTH" "$ADMIN/admin/v1/files/$A_FID")
+check "asset-flow file delete → 200" "200" "$DEL2"
 rm -f /tmp/e2e-upload.txt
 
 echo "── 10. SSE 与 CORS ──────────────────────"
