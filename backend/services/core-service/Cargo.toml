@@ -29,6 +29,7 @@ chrono = { workspace = true }
 uuid = { workspace = true }
 rand = "0.9"
 hex = "0.4"
+base64 = "0.22"
 sha2 = "0.10"
 minio = "0.4"
 pbjson-types = { workspace = true }

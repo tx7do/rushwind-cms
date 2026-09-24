@@ -101,6 +101,12 @@ fn in_list(field: &str, values: &[String], kind: Kind) -> Option<SimpleExpr> {
 
 fn filter_condition(kind: Kind, field: &str, op: &str, value: &str) -> Option<Condition> {
     use rust_utils::query_parser as qp;
+    // A numeric column with a non-numeric literal (the front-end echoes
+    // unresolved ids as the string "undefined") cannot bind — drop the
+    // condition instead of failing the whole query on a PG type error.
+    if kind == Kind::Number && value.parse::<i64>().is_err() {
+        return None;
+    }
     let cond = match op {
         "" | qp::FILTER_EXACT => Condition::all().add(cmp(field, BinOper::Equal, value, kind)),
         qp::FILTER_NOT | qp::FILTER_NOT_IN => {
@@ -218,7 +224,16 @@ where
         order_specs.push(("id".to_string(), false));
     }
     for (field, desc) in &order_specs {
-        let col = Expr::col(Alias::new(field));
+        // The wire names are camelCase (the front-end's field names);
+        // order only by real entity columns in their snake_case form —
+        // anything else would ORDER BY a nonexistent column.
+        let snake = rust_utils::stringcase::to_snake_case(field);
+        let known = <E::Column as sea_orm::Iterable>::iter()
+            .any(|c| sea_orm::sea_query::Iden::to_string(&c) == snake);
+        if !known {
+            continue;
+        }
+        let col = Expr::col(Alias::new(&snake));
         select = if *desc {
             select.order_by(col, sea_orm::Order::Desc)
         } else {
@@ -244,4 +259,22 @@ where
     }
 
     select
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn numeric_column_drops_non_numeric_filter_values() {
+        // The "undefined" echo from the front-end must not poison the SQL.
+        assert!(filter_condition(Kind::Number, "recipient_user_id", "", "undefined").is_none());
+        assert!(filter_condition(Kind::Number, "id", qp_eq(), "12").is_some());
+        // Text columns keep arbitrary literals.
+        assert!(filter_condition(Kind::Text, "status", "", "RECEIVED").is_some());
+    }
+
+    fn qp_eq() -> &'static str {
+        rust_utils::query_parser::FILTER_EXACT
+    }
 }

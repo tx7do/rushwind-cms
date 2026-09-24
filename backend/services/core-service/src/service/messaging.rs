@@ -405,7 +405,7 @@ impl imv1::internal_message_service_server::InternalMessageService
         // The recipient rows + the SSE payload list (returned via the
         // response metadata so the BFF hub can fan out without a
         // re-query).
-        let mut payload = Vec::new();
+        let mut events: Vec<serde_json::Value> = Vec::new();
         for uid in targets {
             let row = internal_message_recipients::ActiveModel {
                 message_id: Set(Some(msg.id)),
@@ -419,25 +419,34 @@ impl imv1::internal_message_service_server::InternalMessageService
             .await
             .map_err(db_status)?;
             let proto = recipient_proto(row);
-            payload.push(format!("{}:{}", uid, serde_json::to_string(&serde_json::json!({
-                "id": proto.id,
-                "messageId": proto.message_id,
-                "recipientUserId": proto.recipient_user_id,
-                "status": "RECEIVED",
-                "title": req.title,
-                "content": req.content,
-                "receivedAt": proto.received_at.map(|ts| serde_json::json!({"seconds": ts.seconds, "nanos": ts.nanos})),
-            })).unwrap_or_default()));
+            events.push(serde_json::json!({
+                "uid": uid,
+                "payload": {
+                    "id": proto.id,
+                    "messageId": proto.message_id,
+                    "recipientUserId": proto.recipient_user_id,
+                    "status": "RECEIVED",
+                    "title": req.title,
+                    "content": req.content,
+                    "receivedAt": proto.received_at.map(|ts| serde_json::json!({"seconds": ts.seconds, "nanos": ts.nanos})),
+                },
+            }));
         }
 
-        // The payload rides a response metadata key (JSON array) for the
-        // BFF SSE fan-out.
+        // The event list rides a response metadata key — base64 of the
+        // JSON array, because gRPC metadata is header-shaped: raw UTF-8
+        // (Chinese titles/contents) would ride as obs-text and the BFF's
+        // ASCII-only read would drop the whole fan-out.
+        let wire =
+            serde_json::to_string(&events).map_err(|_| Status::internal("sse payload encode"))?;
+        use base64::Engine as _;
         let mut resp = Response::new(imv1::SendMessageResponse {
             message_id: msg.id as u32,
         });
         resp.metadata_mut().insert(
             "x-sse-payload",
-            format!("[{}]", payload.join(","))
+            base64::engine::general_purpose::STANDARD
+                .encode(wire)
                 .parse()
                 .map_err(|_| Status::internal("payload header"))?,
         );
@@ -530,19 +539,71 @@ impl imv1::internal_message_recipient_service_server::InternalMessageRecipientSe
         &self,
         request: Request<proto::proto::pagination::PagingRequest>,
     ) -> Result<Response<imv1::ListUserInboxResponse>, Status> {
+        use proto::proto::pagination::paging_request::FilteringType;
         let uid = operator_of(&request)?;
         let req = request.into_inner();
-        let _ = req;
-        let rows = internal_message_recipients::Entity::find()
-            .filter(internal_message_recipients::Column::RecipientUserId.eq(uid))
-            .all(&self.state.db)
-            .await
-            .map_err(db_status)?;
-        let total = rows.len() as u64;
-        Ok(Response::new(imv1::ListUserInboxResponse {
-            items: rows.into_iter().map(recipient_proto).collect(),
-            total,
-        }))
+        // The status form filter the front-end sends alongside its
+        // (operator-pinned) recipient scope. The front page may also echo
+        // an unresolved recipient_user_id ("undefined") — the operator
+        // metadata wins, so the query's uid form is ignored outright and
+        // `field__contains`-style operator suffixes are tolerated.
+        let mut cond = sea_orm::Condition::all()
+            .add(internal_message_recipients::Column::RecipientUserId.eq(uid));
+        if let Some(FilteringType::Query(q)) = &req.filtering_type {
+            if let Ok(serde_json::Value::Object(map)) = serde_json::from_str::<serde_json::Value>(q)
+            {
+                if let Some(v) = map
+                    .iter()
+                    .find(|(k, _)| k.split("__").next() == Some("status"))
+                    .and_then(|(_, v)| v.as_str())
+                    .filter(|s| !s.is_empty())
+                {
+                    // The front form posts the proto enum number; the row
+                    // stores the value name — accept either form.
+                    let name = v
+                        .parse::<i32>()
+                        .ok()
+                        .and_then(recipient_status_name)
+                        .unwrap_or(v);
+                    cond = cond.add(internal_message_recipients::Column::Status.eq(name));
+                }
+            }
+        }
+        let (rows, total) = fetch_paged(
+            &self.state.db,
+            internal_message_recipients::Entity::find().filter(cond),
+            &req,
+        )
+        .await
+        .map_err(|e| Status::internal(e.message))?;
+        // The inbox shows the message's title/content beside the receipt
+        // row — batch-join the referenced messages.
+        let msg_ids: Vec<i64> = rows.iter().filter_map(|r| r.message_id).collect();
+        let msgs: std::collections::HashMap<i64, (Option<String>, Option<String>)> =
+            if msg_ids.is_empty() {
+                std::collections::HashMap::new()
+            } else {
+                internal_messages::Entity::find()
+                    .filter(internal_messages::Column::Id.is_in(msg_ids))
+                    .all(&self.state.db)
+                    .await
+                    .map_err(db_status)?
+                    .into_iter()
+                    .map(|m| (m.id, (m.title, m.content)))
+                    .collect()
+            };
+        let items = rows
+            .into_iter()
+            .map(|r| {
+                let mut p = recipient_proto(r.clone());
+                if let Some((title, content)) = msgs.get(&r.message_id.unwrap_or(0)) {
+                    p.title = title.clone();
+                    p.content = content.clone();
+                }
+                p
+            })
+            .collect();
+        Ok(Response::new(imv1::ListUserInboxResponse { items, total }))
     }
 
     async fn mark_notification_as_read(

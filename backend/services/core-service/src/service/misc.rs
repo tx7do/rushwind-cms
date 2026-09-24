@@ -1610,18 +1610,72 @@ impl imv1::internal_message_recipient_service_server::InternalMessageRecipientSe
         &self,
         request: Request<proto::proto::pagination::PagingRequest>,
     ) -> Result<Response<imv1::ListInternalMessageRecipientResponse>, Status> {
+        use proto::proto::pagination::paging_request::FilteringType;
+        let req = request.into_inner();
+        // The front-end's form filter rides the query JSON
+        // ({"recipient_user_id":…, "status":…}); mirror the columns it
+        // names. Operator suffixes (`field__contains`…) are tolerated;
+        // unparseable values drop the filter instead of failing the
+        // query with a column-type error.
+        let mut cond = sea_orm::Condition::all();
+        if let Some(FilteringType::Query(q)) = &req.filtering_type {
+            if let Ok(serde_json::Value::Object(map)) = serde_json::from_str::<serde_json::Value>(q)
+            {
+                let bare = |key: &str| map.iter().find(|(k, _)| k.split("__").next() == Some(key));
+                let uid = bare("recipient_user_id")
+                    .or_else(|| bare("recipientUserId"))
+                    .and_then(|(_, v)| {
+                        v.as_str()
+                            .and_then(|s| s.parse::<i64>().ok())
+                            .or(v.as_u64().map(|u| u as i64))
+                    });
+                if let Some(v) = uid {
+                    cond = cond.add(internal_message_recipients::Column::RecipientUserId.eq(v));
+                }
+                if let Some(v) = bare("status")
+                    .and_then(|(_, v)| v.as_str())
+                    .filter(|s| !s.is_empty())
+                {
+                    cond = cond.add(internal_message_recipients::Column::Status.eq(v.to_string()));
+                }
+            }
+        }
         let (rows, total) = fetch_paged(
             &self.state.db,
-            internal_message_recipients::Entity::find(),
-            &request.into_inner(),
+            internal_message_recipients::Entity::find().filter(cond),
+            &req,
         )
         .await
         .map_err(|e| Status::internal(e.message))?;
+        // The inbox surface shows the message's title/content beside the
+        // receipt row — batch-join the referenced messages.
+        let msg_ids: Vec<i64> = rows.iter().filter_map(|r| r.message_id).collect();
+        let msgs: std::collections::HashMap<i64, (Option<String>, Option<String>)> =
+            if msg_ids.is_empty() {
+                std::collections::HashMap::new()
+            } else {
+                internal_messages::Entity::find()
+                    .filter(internal_messages::Column::Id.is_in(msg_ids))
+                    .all(&self.state.db)
+                    .await
+                    .map_err(db_status)?
+                    .into_iter()
+                    .map(|m| (m.id, (m.title, m.content)))
+                    .collect()
+            };
+        let items = rows
+            .into_iter()
+            .map(|r| {
+                let mut p = internal_message_recipient_proto(r.clone());
+                if let Some((title, content)) = msgs.get(&r.message_id.unwrap_or(0)) {
+                    p.title = title.clone();
+                    p.content = content.clone();
+                }
+                p
+            })
+            .collect();
         Ok(Response::new(imv1::ListInternalMessageRecipientResponse {
-            items: rows
-                .into_iter()
-                .map(internal_message_recipient_proto)
-                .collect(),
+            items,
             total,
         }))
     }

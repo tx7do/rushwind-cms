@@ -30,6 +30,14 @@ fn status_to_i32(prefix: &str, name: Option<String>) -> Option<i32> {
         (_, "POST_STATUS_TRASHED") => 4,
         (_, "PAGE_STATUS_DRAFT") => 1,
         (_, "PAGE_STATUS_PUBLISHED") => 2,
+        (_, "PAGE_STATUS_ARCHIVED") => 3,
+        (_, "CATEGORY_STATUS_ACTIVE") => 1,
+        (_, "CATEGORY_STATUS_HIDDEN") => 2,
+        (_, "CATEGORY_STATUS_ARCHIVED") => 3,
+        (_, "TAG_STATUS_ACTIVE") => 1,
+        (_, "TAG_STATUS_HIDDEN") => 2,
+        (_, "TAG_STATUS_ARCHIVED") => 3,
+        // Legacy labels the seed layers used before the enum alignment.
         (_, "CATEGORY_STATUS_DRAFT") => 1,
         (_, "CATEGORY_STATUS_PUBLISHED") => 2,
         (_, "TAG_STATUS_NORMAL") => 1,
@@ -47,10 +55,13 @@ fn status_from_i32(prefix: &str, v: i32) -> Option<String> {
             ("post", 4) => "POST_STATUS_TRASHED",
             ("page", 1) => "PAGE_STATUS_DRAFT",
             ("page", 2) => "PAGE_STATUS_PUBLISHED",
-            ("category", 1) => "CATEGORY_STATUS_DRAFT",
-            ("category", 2) => "CATEGORY_STATUS_PUBLISHED",
-            ("tag", 1) => "TAG_STATUS_NORMAL",
-            ("tag", 2) => "TAG_STATUS_DISABLED",
+            ("page", 3) => "PAGE_STATUS_ARCHIVED",
+            ("category", 1) => "CATEGORY_STATUS_ACTIVE",
+            ("category", 2) => "CATEGORY_STATUS_HIDDEN",
+            ("category", 3) => "CATEGORY_STATUS_ARCHIVED",
+            ("tag", 1) => "TAG_STATUS_ACTIVE",
+            ("tag", 2) => "TAG_STATUS_HIDDEN",
+            ("tag", 3) => "TAG_STATUS_ARCHIVED",
             _ => return None,
         }
         .to_string(),
@@ -178,6 +189,198 @@ async fn post_relations(
 
 pub struct PostServiceImpl {
     pub state: Arc<AppState>,
+}
+
+/// The embedded-array translation upsert shared by the update faces
+/// (the reference's repo semantics): a (main id, language) row is
+/// updated in place, a missing language inserts fresh.
+async fn upsert_post_translation_row(
+    db: &sea_orm::DatabaseConnection,
+    post_id: i64,
+    t: contentv1::PostTranslation,
+    now: chrono::DateTime<chrono::FixedOffset>,
+) -> Result<(), Status> {
+    let lang = t.language_code.clone().unwrap_or_default();
+    if lang.is_empty() {
+        return Ok(());
+    }
+    let existing = post_translations::Entity::find()
+        .filter(post_translations::Column::PostId.eq(post_id))
+        .filter(post_translations::Column::LanguageCode.eq(lang.clone()))
+        .one(db)
+        .await
+        .map_err(db_status)?;
+    if let Some(row) = existing {
+        let mut a: post_translations::ActiveModel = row.into();
+        a.title = Set(t.title);
+        a.slug = Set(t.slug);
+        a.summary = Set(t.summary);
+        a.content = Set(t.content);
+        a.full_path = Set(t.full_path);
+        a.seo = Set(seo_to_json(t.seo));
+        a.updated_at = Set(Some(now));
+        a.update(db).await.map_err(db_status)?;
+    } else {
+        post_translations::ActiveModel {
+            post_id: Set(Some(post_id)),
+            language_code: Set(Some(lang)),
+            title: Set(t.title),
+            slug: Set(t.slug),
+            summary: Set(t.summary),
+            content: Set(t.content),
+            full_path: Set(t.full_path),
+            seo: Set(seo_to_json(t.seo)),
+            created_at: Set(Some(now)),
+            updated_at: Set(Some(now)),
+            ..Default::default()
+        }
+        .insert(db)
+        .await
+        .map_err(db_status)?;
+    }
+    Ok(())
+}
+
+/// The category translation embedded upsert (shared shape with tags).
+async fn upsert_category_translation_row(
+    db: &sea_orm::DatabaseConnection,
+    category_id: i64,
+    t: contentv1::CategoryTranslation,
+    now: chrono::DateTime<chrono::FixedOffset>,
+) -> Result<(), Status> {
+    let lang = t.language_code.clone().unwrap_or_default();
+    if lang.is_empty() {
+        return Ok(());
+    }
+    let existing = category_translations::Entity::find()
+        .filter(category_translations::Column::CategoryId.eq(category_id))
+        .filter(category_translations::Column::LanguageCode.eq(lang.clone()))
+        .one(db)
+        .await
+        .map_err(db_status)?;
+    if let Some(row) = existing {
+        let mut a: category_translations::ActiveModel = row.into();
+        a.name = Set(t.name);
+        a.slug = Set(t.slug);
+        a.description = Set(t.description);
+        a.cover_image = Set(t.cover_image);
+        a.full_path = Set(t.full_path);
+        a.seo = Set(seo_to_json(t.seo));
+        a.updated_at = Set(Some(now));
+        a.update(db).await.map_err(db_status)?;
+    } else {
+        category_translations::ActiveModel {
+            category_id: Set(Some(category_id)),
+            language_code: Set(Some(lang)),
+            name: Set(t.name),
+            slug: Set(t.slug),
+            description: Set(t.description),
+            cover_image: Set(t.cover_image),
+            full_path: Set(t.full_path),
+            seo: Set(seo_to_json(t.seo)),
+            created_at: Set(Some(now)),
+            updated_at: Set(Some(now)),
+            ..Default::default()
+        }
+        .insert(db)
+        .await
+        .map_err(db_status)?;
+    }
+    Ok(())
+}
+
+/// The tag translation embedded upsert (the named-translation shape).
+async fn upsert_tag_translation_row(
+    db: &sea_orm::DatabaseConnection,
+    tag_id: i64,
+    t: contentv1::TagTranslation,
+    now: chrono::DateTime<chrono::FixedOffset>,
+) -> Result<(), Status> {
+    let lang = t.language_code.clone().unwrap_or_default();
+    if lang.is_empty() {
+        return Ok(());
+    }
+    let existing = tag_translations::Entity::find()
+        .filter(tag_translations::Column::TagId.eq(tag_id))
+        .filter(tag_translations::Column::LanguageCode.eq(lang.clone()))
+        .one(db)
+        .await
+        .map_err(db_status)?;
+    if let Some(row) = existing {
+        let mut a: tag_translations::ActiveModel = row.into();
+        a.name = Set(t.name);
+        a.slug = Set(t.slug);
+        a.description = Set(t.description);
+        a.cover_image = Set(t.cover_image);
+        a.full_path = Set(t.full_path);
+        a.seo = Set(seo_to_json(t.seo));
+        a.updated_at = Set(Some(now));
+        a.update(db).await.map_err(db_status)?;
+    } else {
+        tag_translations::ActiveModel {
+            tag_id: Set(Some(tag_id)),
+            language_code: Set(Some(lang)),
+            name: Set(t.name),
+            slug: Set(t.slug),
+            description: Set(t.description),
+            cover_image: Set(t.cover_image),
+            full_path: Set(t.full_path),
+            seo: Set(seo_to_json(t.seo)),
+            created_at: Set(Some(now)),
+            updated_at: Set(Some(now)),
+            ..Default::default()
+        }
+        .insert(db)
+        .await
+        .map_err(db_status)?;
+    }
+    Ok(())
+}
+
+/// The page translation embedded upsert.
+async fn upsert_page_translation_row(
+    db: &sea_orm::DatabaseConnection,
+    page_id: i64,
+    t: contentv1::PageTranslation,
+    now: chrono::DateTime<chrono::FixedOffset>,
+) -> Result<(), Status> {
+    let lang = t.language_code.clone().unwrap_or_default();
+    if lang.is_empty() {
+        return Ok(());
+    }
+    let existing = page_translations::Entity::find()
+        .filter(page_translations::Column::PageId.eq(page_id))
+        .filter(page_translations::Column::LanguageCode.eq(lang.clone()))
+        .one(db)
+        .await
+        .map_err(db_status)?;
+    if let Some(row) = existing {
+        let mut a: page_translations::ActiveModel = row.into();
+        a.title = Set(t.title);
+        a.slug = Set(t.slug);
+        a.cover_image = Set(t.cover_image);
+        a.full_path = Set(t.full_path);
+        a.seo = Set(seo_to_json(t.seo));
+        a.updated_at = Set(Some(now));
+        a.update(db).await.map_err(db_status)?;
+    } else {
+        page_translations::ActiveModel {
+            page_id: Set(Some(page_id)),
+            language_code: Set(Some(lang)),
+            title: Set(t.title),
+            slug: Set(t.slug),
+            cover_image: Set(t.cover_image),
+            full_path: Set(t.full_path),
+            seo: Set(seo_to_json(t.seo)),
+            created_at: Set(Some(now)),
+            updated_at: Set(Some(now)),
+            ..Default::default()
+        }
+        .insert(db)
+        .await
+        .map_err(db_status)?;
+    }
+    Ok(())
 }
 
 #[async_trait::async_trait]
@@ -329,6 +532,7 @@ impl contentv1::post_service_server::PostService for PostServiceImpl {
         let req = request.into_inner();
         let row = repo::post_by_id(&self.state.db, req.id as i64).await?;
         let mut a: posts::ActiveModel = row.into();
+        let embedded = req.data.as_ref().map(|d| d.translations.clone());
         if let Some(data) = req.data {
             if let Some(v) = data.status {
                 a.status = Set(status_from_i32("post", v));
@@ -360,6 +564,12 @@ impl contentv1::post_service_server::PostService for PostServiceImpl {
         }
         a.updated_at = Set(Some(store::now()));
         let row = a.update(&self.state.db).await.map_err(db_status)?;
+        if let Some(ts) = embedded {
+            let now = store::now();
+            for t in ts {
+                upsert_post_translation_row(&self.state.db, row.id, t, now).await?;
+            }
+        }
         let (translations, category_ids, tag_ids) = post_relations(&self.state.db, row.id).await?;
         Ok(Response::new(post_proto(
             row,
@@ -711,6 +921,7 @@ impl contentv1::category_service_server::CategoryService for CategoryServiceImpl
         let req = request.into_inner();
         let row = repo::category_by_id(&self.state.db, req.id as i64).await?;
         let mut a: categories::ActiveModel = row.into();
+        let embedded = req.data.as_ref().map(|d| d.translations.clone());
         if let Some(data) = req.data {
             if let Some(v) = data.status {
                 a.status = Set(status_from_i32("category", v));
@@ -730,6 +941,12 @@ impl contentv1::category_service_server::CategoryService for CategoryServiceImpl
         }
         a.updated_at = Set(Some(store::now()));
         let row = a.update(&self.state.db).await.map_err(db_status)?;
+        if let Some(ts) = embedded {
+            let now = store::now();
+            for t in ts {
+                upsert_category_translation_row(&self.state.db, row.id, t, now).await?;
+            }
+        }
         let translations = category_translations_of(&self.state.db, row.id).await?;
         Ok(Response::new(category_proto(row, translations)))
     }
@@ -1007,6 +1224,7 @@ impl contentv1::tag_service_server::TagService for TagServiceImpl {
         let req = request.into_inner();
         let row = repo::tag_by_id(&self.state.db, req.id as i64).await?;
         let mut a: tags::ActiveModel = row.into();
+        let embedded = req.data.as_ref().map(|d| d.translations.clone());
         if let Some(data) = req.data {
             if let Some(v) = data.status {
                 a.status = Set(status_from_i32("tag", v));
@@ -1029,6 +1247,12 @@ impl contentv1::tag_service_server::TagService for TagServiceImpl {
         }
         a.updated_at = Set(Some(store::now()));
         let row = a.update(&self.state.db).await.map_err(db_status)?;
+        if let Some(ts) = embedded {
+            let now = store::now();
+            for t in ts {
+                upsert_tag_translation_row(&self.state.db, row.id, t, now).await?;
+            }
+        }
         let translations = tag_translations::Entity::find()
             .filter(tag_translations::Column::TagId.eq(row.id))
             .all(&self.state.db)
@@ -1319,6 +1543,7 @@ impl contentv1::page_service_server::PageService for PageServiceImpl {
         let req = request.into_inner();
         let row = repo::page_by_id(&self.state.db, req.id as i64).await?;
         let mut a: pages::ActiveModel = row.into();
+        let embedded = req.data.as_ref().map(|d| d.translations.clone());
         if let Some(data) = req.data {
             if let Some(v) = data.status {
                 a.status = Set(status_from_i32("page", v));
@@ -1338,6 +1563,12 @@ impl contentv1::page_service_server::PageService for PageServiceImpl {
         }
         a.updated_at = Set(Some(store::now()));
         let row = a.update(&self.state.db).await.map_err(db_status)?;
+        if let Some(ts) = embedded {
+            let now = store::now();
+            for t in ts {
+                upsert_page_translation_row(&self.state.db, row.id, t, now).await?;
+            }
+        }
         let translations = page_translations::Entity::find()
             .filter(page_translations::Column::PageId.eq(row.id))
             .all(&self.state.db)
@@ -1488,10 +1719,13 @@ mod tests {
             ("post", 4, "POST_STATUS_TRASHED"),
             ("page", 1, "PAGE_STATUS_DRAFT"),
             ("page", 2, "PAGE_STATUS_PUBLISHED"),
-            ("category", 1, "CATEGORY_STATUS_DRAFT"),
-            ("category", 2, "CATEGORY_STATUS_PUBLISHED"),
-            ("tag", 1, "TAG_STATUS_NORMAL"),
-            ("tag", 2, "TAG_STATUS_DISABLED"),
+            ("page", 3, "PAGE_STATUS_ARCHIVED"),
+            ("category", 1, "CATEGORY_STATUS_ACTIVE"),
+            ("category", 2, "CATEGORY_STATUS_HIDDEN"),
+            ("category", 3, "CATEGORY_STATUS_ARCHIVED"),
+            ("tag", 1, "TAG_STATUS_ACTIVE"),
+            ("tag", 2, "TAG_STATUS_HIDDEN"),
+            ("tag", 3, "TAG_STATUS_ARCHIVED"),
         ];
         for (prefix, v, want) in table {
             assert_eq!(
@@ -1509,11 +1743,11 @@ mod tests {
             ("post", 0),
             ("post", 5),
             ("page", 0),
-            ("page", 3),
+            ("page", 4),
             ("category", 0),
-            ("category", 3),
+            ("category", 4),
             ("tag", 0),
-            ("tag", 3),
+            ("tag", 4),
         ] {
             assert_eq!(status_from_i32(prefix, v), None, "{prefix}/{v}");
         }

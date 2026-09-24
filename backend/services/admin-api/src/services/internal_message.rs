@@ -88,34 +88,29 @@ impl proto::gen_admin::services::InternalMessageServiceHandlers for InternalMess
             .send_message(with_operator(&ctx, req))
             .await
             .map_err(map_status)?;
-        // The SSE fan-out: the payload metadata carries
-        // [uid:json, uid:json, ...] — push each to its user's stream.
-        if let Some(payload) = resp
+        // The SSE fan-out: the payload metadata carries the base64 of a
+        // JSON event list [{uid, payload}, …] — decoded here, each event
+        // pushed to its user's stream.
+        if let Some(wire) = resp
             .metadata()
             .get("x-sse-payload")
             .and_then(|v| v.to_str().ok())
         {
-            for entry in payload.split("},{") {
-                // Re-split robustly: entries are uid:{json} pairs.
-                let (uid, json) = match entry.split_once(':') {
-                    Some((uid, json)) => (uid, json),
-                    None => continue,
-                };
-                let uid: u32 = match uid
-                    .trim_matches(|c: char| c == '[' || c == ']' || c == ',')
-                    .parse()
-                {
-                    Ok(v) => v,
-                    Err(_) => continue,
-                };
-                let mut body = json.to_string();
-                if !body.starts_with('{') {
-                    body = format!("{{{body}");
+            use base64::Engine as _;
+            let decoded = base64::engine::general_purpose::STANDARD
+                .decode(wire)
+                .ok()
+                .and_then(|b| serde_json::from_slice::<serde_json::Value>(&b).ok());
+            if let Some(serde_json::Value::Array(events)) = decoded {
+                for ev in events {
+                    let uid = ev.get("uid").and_then(|v| v.as_u64()).unwrap_or(0) as u32;
+                    let payload = ev.get("payload").cloned().unwrap_or_default();
+                    if uid > 0 && payload.is_object() {
+                        let body =
+                            serde_json::to_string(&payload).unwrap_or_else(|_| "{}".to_string());
+                        self.state.hub.publish(uid, body);
+                    }
                 }
-                if !body.ends_with('}') {
-                    body = format!("{body}}}");
-                }
-                self.state.hub.publish(uid, body);
             }
         }
         Ok(resp.into_inner())
