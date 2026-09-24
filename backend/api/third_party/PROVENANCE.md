@@ -1,7 +1,7 @@
 # api/third_party 来源清单
 
-全部文件由 `api/vendor-third-party.sh` 从本地 buf 模块缓存复制，版本与
-`go-wind-admin/backend/api/buf.lock` 锁定的 commit 一一对应。**不要手改**，重新执行脚本即可。
+第三方注解声明的本地 vendor 副本（六个 buf 模块），版本以各模块锁定 commit 为准。
+**不要手改**。
 
 | 文件 | 模块 | 锁定 commit（buf.lock） | 用途 |
 |---|---|---|---|

@@ -1,4 +1,4 @@
--- 系统默认种子（对位 go-wind-cms pkg/constants/default_data.go 的空库引导）：
+-- 系统默认种子（空库引导）：
 -- 权限组 / 权限 / 角色 / 角色元数据 / 平台管理员 / 用户角色 / 成员关系 / 语言。
 -- 幂等：以「表空才插」为约定（bootstrap 只在空库执行 schema → seed → demo）。
 

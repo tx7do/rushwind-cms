@@ -1,17 +1,16 @@
-# buf 工作区（本地、无 BSR 依赖）——把既有同步/vendoring 模型显式化给 buf CLI：
+# buf 工作区（本地、无 BSR 依赖）——把同步/vendoring 模型显式化给 buf CLI：
 #
 #   cd backend/api
 #   buf lint                              # 样式报告（仅契约树；快照禁手改，
-#                                         #   发现的问题回上游 go-wind-cms 修）
+#                                         #   发现的问题在契约源头修复后再同步）
 #   buf build -o /tmp/api-image.binpb     # 编译全工作区（含注解闭包，选项字节保真）
 #   buf breaking --against "../../.git#branch=main,subdir=backend/api"
-#                                         # 再同步接受新 vintage 前的契约演进检查
+#                                         # 接受新契约 vintage 前的演进检查
 #
-# 契约源与第三方注解都来自上游 go-wind-cms 的字节同步（api/sync-protos.sh +
-# third_party/PROVENANCE.md——与 rushwind-admin 同源的六个 BSR 模块本地投影），
-# 因此这里【不做】buf format（会砸字节清单门）、【不挂】BSR deps（上游 buf.lock
-# 是唯一版本事实源；本地直接把 vendored 子树声明为 workspace 模块，import 跨模块
-# 自动解析）。
+# 契约树为字节同步快照（api/sync-protos.sh + api/MANIFEST.sha256 门），第三方
+# 注解为本地 vendoring（third_party/PROVENANCE.md）。因此这里【不做】buf format
+# （会砸字节清单门）、【不挂】BSR deps（本地直接把 vendored 子树声明为 workspace
+# 模块，import 跨模块自动解析）。
 version: v2
 
 modules:

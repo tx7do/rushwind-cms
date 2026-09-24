@@ -211,7 +211,59 @@ check "post unwatch" '"watched":false' "$UNWATCH"
 R=$(curl -s -X POST -H "Content-Type: application/json" -d '{"targetType":1,"targetId":1}' "$APP/app/v1/interactions/like")
 check "like without token → 401" '401' "$(curl -s -o /dev/null -w '%{http_code}' -X POST -H 'Content-Type: application/json' -d '{"targetType":1,"targetId":1}' "$APP/app/v1/interactions/like")"
 
-echo "── 8. SSE 与 CORS ──────────────────────"
+echo "── 8. 写路径与聚合面（本轮新增） ──────────────────────"
+# 用户 CRUD
+UNIQ=$$
+NEWU=$(curl -s -X POST -H "$AUTH" -H "Content-Type: application/json" -d "{\"data\":{\"username\":\"e2e_user_$UNIQ\",\"nickname\":\"端到端用户\",\"email\":\"uc$UNIQ@example.com\"},\"password\":\"Passw0rd!123\"}" "$ADMIN/admin/v1/users")
+U_ID=$(echo "$NEWU" | python3 -c "import json,sys; print(json.load(sys.stdin).get('id',0))" 2>/dev/null)
+check "user create returns id" "\"username\":\"e2e_user_$UNIQ\"" "$NEWU"
+GOTU=$(curl -s -H "$AUTH" "$ADMIN/admin/v1/users/$U_ID")
+check "user get by id" '"nickname":"端到端用户"' "$GOTU"
+UPU=$(curl -s -X PUT -H "$AUTH" -H "Content-Type: application/json" -d '{"data":{"nickname":"端到端用户改"}}' "$ADMIN/admin/v1/users/$U_ID")
+GOTU2=$(curl -s -H "$AUTH" "$ADMIN/admin/v1/users/$U_ID")
+check "user update" '"nickname":"端到端用户改"' "$GOTU2"
+EXISTS=$(curl -s -H "$AUTH" "$ADMIN/admin/v1/users:exists?id=${U_ID//[!0-9]/}")
+check "user exists" '"exist":true' "$EXISTS"
+# 新用户登录（凭证已建）
+NULOGIN=$(curl -s -X POST -H "Content-Type: application/json" -d "{\"grant_type\":0,\"username\":\"e2e_user_$UNIQ\",\"password\":\"oIWFVq71OW82um7L6YOsxw==\"}" "$APP/app/v1/login")
+check "new user can login (credential works)" '"token_type":"bearer"' "$NULOGIN"
+
+DEL=$(curl -s -o /dev/null -w "%{http_code}" -X DELETE -H "$AUTH" "$ADMIN/admin/v1/users/$U_ID")
+check "user delete" "200" "$DEL"
+GONE=$(curl -s -o /dev/null -w "%{http_code}" -H "$AUTH" "$ADMIN/admin/v1/users/$U_ID")
+check "deleted user 404" "404" "$GONE"
+
+# 角色写
+NEWR=$(curl -s -X POST -H "$AUTH" -H "Content-Type: application/json" -d '{"data":{"name":"E2E角色","code":"e2e:role","permissions":[1]}}' "$ADMIN/admin/v1/roles")
+R_ID=$(echo "$NEWR" | python3 -c "import json,sys; d=json.load(sys.stdin); print(d.get('id',0))" 2>/dev/null)
+R_BODY=$(curl -s -H "$AUTH" "$ADMIN/admin/v1/roles")
+check "role create+list" '"code":"e2e:role"' "$R_BODY"
+[ -n "$R_ID" ] && [ "$R_ID" != "0" ] && curl -s -o /dev/null -X DELETE -H "$AUTH" "$ADMIN/admin/v1/roles/$R_ID"
+
+# 租户写
+NEWT=$(curl -s -o /dev/null -w "%{http_code}" -X POST -H "$AUTH" -H "Content-Type: application/json" -d "{\"data\":{\"name\":\"E2E租户$UNIQ\",\"code\":\"e2e-tenant-$UNIQ\"}}" "$ADMIN/admin/v1/tenants")
+check "tenant create → 200" "200" "$NEWT"
+TLIST=$(curl -s -H "$AUTH" "$ADMIN/admin/v1/tenants?page=1&pageSize=50")
+check "tenant created visible" "\"code\":\"e2e-tenant-$UNIQ\"" "$TLIST"
+T_ID=$(echo "$TLIST" | python3 -c "
+import json,sys
+d=json.load(sys.stdin)
+print(next((i.get('id',0) for i in d.get('items',[]) if i.get('code')=='e2e-tenant-$UNIQ'),0))" 2>/dev/null)
+[ -n "$T_ID" ] && [ "$T_ID" != "0" ] && curl -s -o /dev/null -X DELETE -H "$AUTH" "$ADMIN/admin/v1/tenants/$T_ID"
+
+# 聚合面
+NAV=$(curl -s -H "$AUTH" "$ADMIN/admin/v1/routes")
+check "portal navigation (routes)" '"items"' "$NAV"
+CODES=$(curl -s -H "$AUTH" "$ADMIN/admin/v1/perm-codes")
+check "portal perm codes" '"sys:access_backend"' "$CODES"
+CTX=$(curl -s -H "$AUTH" "$ADMIN/admin/v1/initial-context")
+check "portal initial context" '"permissions"' "$CTX"
+
+# app 面 user profile
+APPUID=$(curl -s -H "Authorization: Bearer $APPTOKEN2" "$APP/app/v1/me" 2>/dev/null)
+check "app user profile" '"username"' "$APPUID"
+
+echo "── 9. SSE 与 CORS ──────────────────────"
 R=$(curl -s -o /dev/null -w "%{http_code}" -X OPTIONS "http://127.0.0.1:6601/events")
 check "SSE preflight 204" "204" "$R"
 R=$(curl -s -i -X OPTIONS -H "Origin: http://localhost:5999" -H "Access-Control-Request-Method: POST" "$ADMIN/admin/v1/login" 2>&1 | grep -i "access-control-allow-origin" | head -1)

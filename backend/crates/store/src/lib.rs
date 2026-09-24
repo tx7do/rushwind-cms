@@ -3,9 +3,8 @@
 //! migration (golden DDL + demo data), and shared query helpers.
 //!
 //! The entity modules are GENERATED from the golden DDL
-//! (`backend/sql/schema.sql`, the ent auto-migration output of the Go
-//! reference) by `scripts/gen-entities.py` — regenerate on schema
-//! re-dump, never hand-edit.
+//! (`backend/sql/schema.sql`) by `scripts/gen-entities.py` — regenerate
+//! on schema re-dump, never hand-edit.
 
 pub mod auth;
 pub mod bootstrap;
@@ -15,10 +14,9 @@ pub mod paging;
 
 use sea_orm::DatabaseConnection;
 
-/// The golden DDL (ent auto-migration output), embedded.
+/// The golden DDL, embedded.
 pub const SCHEMA_SQL: &str = include_str!("../../../sql/schema.sql");
-/// The system-default seed (the Go reference's empty-DB bootstrap
-/// constants), embedded.
+/// The system-default seed (empty-DB bootstrap), embedded.
 pub const SEED_SQL: &str = include_str!("../../../sql/seed.sql");
 /// The demo seed data, embedded.
 pub const DEMO_DATA_SQL: &str = include_str!("../../../sql/demo-data.sql");

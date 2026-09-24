@@ -1,6 +1,7 @@
 //! The service implementations, one module per BFF service. Modules
 //! absent from this list ride the generator's null placeholders.
 
+pub mod admin_portal;
 pub mod authentication;
 pub mod proxies;
 

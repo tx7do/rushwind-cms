@@ -1,34 +1,31 @@
 # rushwind-cms 开发评估与计划
 
-> 目标：以 Rust 复刻 `go-wind-cms`（下称「Go 后端」，GoWind Content Hub），
+> 目标：以 Rust 构建 RushWind CMS——全栈 Headless 内容平台，
 > **proto 为唯一 API 契约，五个前端（admin-react + 前台 react/vue/taro/flutter）
-> 零改动可对接两个后端**。底座：`rushwind`（框架 monorepo）+ `rust-utils`（工具库）。
-> 移植模式与 `rushwind-admin` 同源——本计划是其开发模式的 CMS 投射，
-> 已验证的框架机制（http-binding / gen-http / authn-jwt / bootstrap）直接复用，
-> CMS 特有差异逐条登记。
+> 零改动可对接**。底座：`rushwind`（框架 monorepo）+ `rust-utils`（工具库）。
+> 框架机制与姊妹项目 `rushwind-admin` 共用（http-binding / gen-http / authn-jwt /
+> bootstrap），CMS 特有差异逐条登记。
 
 ---
 
-## 1. 与 rushwind-admin 的关键差异（决定本项目独有工作）
+## 1. 关键架构决策（决定本项目独有工作）
 
-| # | 差异 | 处理 |
+| # | 决策 | 处理 |
 |---|------|------|
-| C1 | **双 BFF 面**：Go 侧分 admin（:6600/:6601）与 app（:6700/:6701）两个服务、两份白名单 | 一个契约 crate、两个服务 crate（admin-api / app-api）；生成器按 BFF 子闭包各跑一次（admin 面 42 服务 / app 面 11 服务），AUTH_FREE 取两白名单并集（路由集不相交，互不干扰） |
+| C1 | **双 BFF 面**：admin（:6600/:6601）与 app（:6700/:6701）两个对外服务、两份白名单 | 一个契约 crate、两个服务 crate（admin-api / app-api）；生成器按 BFF 子闭包各跑一次（admin 面 42 服务 / app 面 11 服务），AUTH_FREE 取两白名单并集（路由集不相交，互不干扰） |
 | C2 | 生成器 trait 按服务短名命名，两个 BFF 有同名服务（TagService 等） | 每 BFF 一个生成面（gen_admin / gen_app），自引用 `crate::gen::` 改写为各自模块名（见 §3 关键事实） |
-| C3 | **JWT HS256**（共享秘钥），非 admin 项目的 RS256 | authn-jwt `with_key`；`jwt_signing_key` 环境变量与 Go 侧 `${jwt_signing_key:...}` 占位同名 |
-| C4 | Redis 键族前缀 `gwc:`，at 键形 `gwc:at:{ct}:{uid}:{jti}`（ct=client type 0/1） | TokenStore 按客户端类型分键空间（admin=0 / app=1），与 Go `user_token_cache.go` 逐字对位 |
-| C5 | app BFF 有一条 proto 外的手工路由：`POST /app/v1/register` | app-api rest.rs 手工挂载（bind 层 + 白名单），对位 Go 侧手工注册 |
+| C3 | **JWT HS256**（共享密钥） | authn-jwt `with_key`；密钥经 `jwt_signing_key` 环境变量注入 |
+| C4 | Redis 键族前缀 `gwc:`，at 键形 `gwc:at:{ct}:{uid}:{jti}`（ct=client type 0/1） | TokenStore 按客户端类型分键空间（admin=0 / app=1） |
+| C5 | app BFF 有一条 proto 外的手工路由：`POST /app/v1/register` | app-api rest.rs 手工挂载（bind 层 + 白名单） |
 | C6 | 内容域模型更重：内容建模（content_model）/ 富文本 section / 多语言翻译（GetTranslation）/ OpenSearch 全文搜索（SearchPosts）/ 媒体资产 / 互动（点赞/收藏/观看）/ 评论审核 / 站点与导航 | Phase 2+ 按模块流水线逐个落地；OpenSearch 客户端选型（考 rust-opensearch）在内容批次前定 |
-| C7 | Go 侧三服务（admin BFF / app BFF / core 领域层，gRPC 互联） | Rust 侧合并为单体（BFF 直连存储），对位 rushwind-admin 的合并策略；gRPC 通道不复刻（Go 侧也未注册 gRPC server 给外部） |
+| C7 | **三服务拓扑**：core-service（领域层，对内 gRPC :6602，独占 PG/Redis）+ admin-api / app-api 薄 BFF | 已落地（见 §6）：BFF 经 gRPC 调 core，不直连存储；core 不对外暴露 |
 
 ## 2. 硬约束（「前端零改动」）
-
-与 rushwind-admin 的 T1-T6 / B1-B6 / R1-R4 / SSE 契约同族，此处只登记 CMS 侧的实测差异：
 
 - admin 前端（admin-react）dev :5999 → 代理 REST :6600；前台 react（Next.js）dev :5001 直连 :6700
 - 前台 AES key `f51d66a73d8a0927`（NEXT_PUBLIC_AES_KEY，与 admin 侧同值）——登录口令应用层加密
 - CORS origins 见各 server.yaml（admin：localhost:5999；app：5001/5011/5021/10086 + 演示域名）
-- 错误信封同为 Kratos Status protojson 四字段；reason→状态由各 BFF 的 `*_error.proto` 注解表锚定
+- 错误信封为 Kratos Status protojson 四字段；reason→状态由各 BFF 的 `*_error.proto` 注解表锚定
 
 ## 3. 关键事实（Phase 0 会话沉淀）
 
@@ -37,7 +34,7 @@
   **字节级**的（顶层记录过滤 + 逐记录 name/dependency 最小解析，记录体原样复制），
   不经任何消息重编码。
 - **sea-orm 2.0 的 DSN 只认 URL 形式**（`postgres://user:pass@host/db?sslmode=disable`），
-  Go 风格 key=value 串解析失败。
+  key=value 串解析失败。
 - buf 工作区输出文件名不带模块路径前缀（`admin/service/v1/...`），与 import 引用一致。
 - admin 面 42 个 BFF 服务、app 面 11 个；遮蔽路由恰一条（`GET /admin/v1/apis/walk-route`
   被 `{id}` 模式吸收，与 rushwind-admin 同款注册顺序遮蔽）。
@@ -62,14 +59,14 @@
 - [x] 端到端冒烟（本地 PG/Redis）：门控 401 双形态 / 公开桩 500 Unknown /
       坏 body 400 CODEC / 注册路由 bind / CORS 允许与拒绝 / SSE 预检与 401 文本形态
 
-### Phase 1 — 认证与会话内核
+### Phase 1 — 认证与会话内核 ✅（已完成，见 §6）
 
-- [ ] 登录链：验证码（rust-utils captcha + Redis）→ AES-CBC 口令解密 → bcrypt +
+- [x] 登录链：验证码（rust-utils captcha + Redis）→ AES-CBC 口令解密 → bcrypt +
       恒时假校验 → 失败归一 INVALID_PASSWORD → 登录限流
-- [ ] HS256 令牌对签发（claims 键名逐键对位 Go 侧 UserTokenPayload）+ gwc: 键族
+- [x] HS256 令牌对签发（claims 键名与前端令牌解析约定逐键一致）+ gwc: 键族
       落库 + refresh cookie 三态 + logout 吊销
-- [ ] app 面：C 端注册（RegisterUser）+ 短期 token（15min，refresh 禁用语义）
-- [ ] 两前端完整登录/登出/刷新 E2E
+- [x] app 面：C 端注册（RegisterUser）+ 短期 token（15min，refresh 禁用语义）
+- [x] 两前端完整登录/登出/刷新 E2E
 
 ### Phase 2 — 鉴权/数据横切
 
@@ -91,7 +88,7 @@
 
 ### Phase 4 — 收尾
 
-- [ ] 差分回归台架（Go/Rust 双后端回放，归一比较器 + 豁免集）
+- [ ] 回放回归台架（请求/响应回放比对，归一比较器 + 豁免集）
 - [ ] 部署对齐（docker-compose / Dockerfile / 配置 schema 等价）
 - [ ] 文档：ARCHITECTURE / 模块新增指南 / 运维手册
 
@@ -102,7 +99,7 @@
 | # | 风险 | 缓解 |
 |---|------|------|
 | R1 | 双 BFF 生成面的自引用改写属构建期字符串操作，生成器升级若改变自引用形态会静默失配 | 升级 rushwind-gen-http rev 后全量重建并跑语料守卫；中期把「模块路径参数化」回馈上游生成器 |
-| R2 | OpenSearch 全文（SearchPosts）在 Rust 侧的等价实现（分词/评分） | 差分豁免集起步，逐步收敛；必要时经 HTTP API 而非客户端库 |
+| R2 | OpenSearch 全文（SearchPosts）的等价实现（分词/评分） | 豁免集起步，逐步收敛；必要时经 HTTP API 而非客户端库 |
 | R3 | 内容建模元数据驱动的动态字段（section/content_model）无静态 schema | 参照 rushwind-storage-seaorm 的动态 Schema 能力；金样测试钉死 |
 | R4 | 多语言翻译（i18n map / GetTranslation）批量子表语义 | 逐端点差分 |
 
@@ -112,16 +109,16 @@
 
 ## 6. 会话记录（2026-09-24，Phase 1 + 部分 Phase 3）
 
-- **三服务重构（用户指示）**：对位 Go 侧拓扑落成 core-service（gRPC :6602，独占 PG/Redis，
+- **三服务重构（用户指示）**：落成 core-service（gRPC :6602，独占 PG/Redis，
   tonic）+ admin-api / app-api 薄 BFF。proto crate 同一 prost pass 嵌入 tonic-prost 服务
   生成（`.generate_default_stubs(true)`——trait 方法默认 Unimplemented，逐服务落地）；
   tonic 0.14 的 proto 驱动代码gen在 tonic-prost-build（tonic-build 0.14 已改手工模式）。
 - **BFF 代理生成器**（scripts/gen-proxies.py）：从生成的 BFF trait 自动产出 pass-through
   代理（admin 39 / app 8）；签名错位方法登记 STUB_METHODS 桩表（sync_apis 等 7 处）；
   Authentication/AdminPortal/FileTransfer/UserProfile(app) 手写或保持桩。
-- **黄金 DDL 管线**：ent 迁移经 dump-schema 程序导出（约束三遍排序：PK→UNIQUE→FK）；
-  id 列补 `DEFAULT nextval`（ent 客户端取号的 Rust 侧等价）；正则表名须含数字
-  （`sys_dict_entry_i18n` 教训）。种子=系统种子（对位 default_data.go）+上游演示数据；
+- **黄金 DDL 管线**：DDL 经 dump-schema 程序导出（约束三遍排序：PK→UNIQUE→FK）；
+  id 列补 `DEFAULT nextval`（序列取号等价）；正则表名须含数字
+  （`sys_dict_entry_i18n` 教训）。种子=系统种子+演示数据；
   双逗号/无默认 NOT NULL 列逐项修复后空库一次性引导通过。
 - **已落地 core 领域服务**：认证内核（登录密码授权：租户解析→AES+bcrypt+恒时假校验→
   权限门→HS256 令牌对；刷新 verify-and-revoke Lua 轮换；登出 SCAN 前缀吊销；注册事务+

@@ -145,7 +145,11 @@ pub fn build_router(state: Arc<AppState>) -> axum::Router {
     }
 
     mount_services!(
-        mount_admin_portal_service => proto::gen_admin::nulls::null_admin_portal_service(),
+        mount_admin_portal_service => std::sync::Arc::new(
+            crate::services::admin_portal::AdminPortalService {
+                state: std::sync::Arc::clone(&state),
+            },
+        ),
         mount_api_audit_log_service => std::sync::Arc::new(crate::services::proxies::ApiAuditLogProxy { state: std::sync::Arc::clone(&state) }),
         mount_api_service => std::sync::Arc::new(crate::services::proxies::ApiProxy { state: std::sync::Arc::clone(&state) }),
         mount_authentication_service => Arc::new(

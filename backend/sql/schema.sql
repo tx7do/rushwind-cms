@@ -1,5 +1,4 @@
--- Golden DDL: ent auto-migration output of go-wind-cms core service
--- (dumped from pg_catalog; applied verbatim by the Rust side's bootstrap)
+-- Golden DDL（从 pg_catalog 导出；空库引导时按语句原样执行）
 
 CREATE SEQUENCE IF NOT EXISTS "categories_id_seq";
 CREATE SEQUENCE IF NOT EXISTS "category_translations_id_seq";

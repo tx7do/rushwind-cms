@@ -1,7 +1,7 @@
 authenticator:
-  # 对位 go-wind-cms 的 authenticator.yaml：admin / app 两个客户端配置。
+  # admin / app 两个客户端配置。
   # 本服务（admin BFF）吃 admin 段；HS256 共享秘钥经环境变量
-  # jwt_signing_key 覆盖（与 Go 侧 ${jwt_signing_key:...} 占位同名）。
+  # jwt_signing_key 覆盖。
   admin:
     method: "HS256" # 对称加密算法，支持 HS256, HS384, HS512
     key: "dev_only_change_me_in_prod" # 生产环境必须通过环境变量 jwt_signing_key 覆盖

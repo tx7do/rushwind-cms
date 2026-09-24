@@ -5,7 +5,7 @@
 - `overlay/<frontend>/` — logo / favicon 等二进制资产，同步后原样覆盖进快照。
   来源：rushwind 仓的 RushWind 品牌资产（与 rushwind-admin 的 overlay 同源）。
   flutter_app 无二进制覆写——启动器图标在原生工程里，仅做字符串替换。
-- `apply-brand.sh` — 声明文件的品牌文案替换表（GoWind / 风行 → RushWind / 锐风）。
+- `apply-brand.sh` — 声明文件的品牌文案替换表（快照默认品牌字样 → RushWind / 锐风）。
 
 登记的偏离面：
 

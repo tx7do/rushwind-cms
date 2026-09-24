@@ -684,8 +684,14 @@ impl proto::gen_app::services::SiteServiceHandlers for SiteProxy {
         _ctx: rushwind_http_binding::ctx::RequestContext,
         req: proto::proto::site::service::v1::UpdateSiteRequest,
     ) -> Result<proto::proto::site::service::v1::Site, StatusError> {
-        let _ = (req, &self.state);
-        Err(crate::state::internal_error("not implemented"))
+        let mut core = proto::proto::site::service::v1::site_service_client::SiteServiceClient::new(
+            self.state.core_channel.clone(),
+        );
+        let _ = core
+            .update(tonic::Request::new(req))
+            .await
+            .map_err(map_status)?;
+        Ok(<proto::proto::site::service::v1::Site>::default())
     }
 
     async fn delete(
@@ -805,5 +811,70 @@ impl proto::gen_app::services::TagServiceHandlers for TagProxy {
             .await
             .map_err(map_status)?
             .into_inner())
+    }
+}
+
+/// The pass-through proxy of `UserProfileServiceHandlers`.
+pub struct UserProfileProxy {
+    pub state: Arc<AppState>,
+}
+
+#[async_trait::async_trait]
+impl proto::gen_app::services::UserProfileServiceHandlers for UserProfileProxy {
+    async fn get_user(
+        &self,
+        _ctx: rushwind_http_binding::ctx::RequestContext,
+        req: pbjson_types::Empty,
+    ) -> Result<proto::proto::identity::service::v1::User, StatusError> {
+        let mut core = proto::proto::identity::service::v1::user_profile_service_client::UserProfileServiceClient::new(
+            self.state.core_channel.clone(),
+        );
+        Ok(core
+            .get_user(with_operator(&_ctx, req))
+            .await
+            .map_err(map_status)?
+            .into_inner())
+    }
+
+    async fn update_user(
+        &self,
+        _ctx: rushwind_http_binding::ctx::RequestContext,
+        req: proto::proto::identity::service::v1::UpdateUserRequest,
+    ) -> Result<pbjson_types::Empty, StatusError> {
+        let mut core = proto::proto::identity::service::v1::user_profile_service_client::UserProfileServiceClient::new(
+            self.state.core_channel.clone(),
+        );
+        Ok(core
+            .update_user(with_operator(&_ctx, req))
+            .await
+            .map_err(map_status)?
+            .into_inner())
+    }
+
+    async fn change_password(
+        &self,
+        _ctx: rushwind_http_binding::ctx::RequestContext,
+        req: proto::proto::identity::service::v1::ChangePasswordRequest,
+    ) -> Result<pbjson_types::Empty, StatusError> {
+        let _ = (req, &self.state);
+        Err(crate::state::internal_error("not implemented"))
+    }
+
+    async fn bind_contact(
+        &self,
+        _ctx: rushwind_http_binding::ctx::RequestContext,
+        req: proto::proto::identity::service::v1::BindContactRequest,
+    ) -> Result<pbjson_types::Empty, StatusError> {
+        let _ = (req, &self.state);
+        Err(crate::state::internal_error("not implemented"))
+    }
+
+    async fn verify_contact(
+        &self,
+        _ctx: rushwind_http_binding::ctx::RequestContext,
+        req: proto::proto::identity::service::v1::VerifyContactRequest,
+    ) -> Result<pbjson_types::Empty, StatusError> {
+        let _ = (req, &self.state);
+        Err(crate::state::internal_error("not implemented"))
     }
 }

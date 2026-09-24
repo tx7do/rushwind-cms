@@ -138,7 +138,11 @@ pub fn build_router(state: Arc<AppState>) -> axum::Router {
             },
         ),
         mount_file_transfer_service => proto::gen_app::nulls::null_file_transfer_service(),
-        mount_user_profile_service => proto::gen_app::nulls::null_user_profile_service(),
+        mount_user_profile_service => std::sync::Arc::new(
+            crate::services::proxies::UserProfileProxy {
+                state: std::sync::Arc::clone(&state),
+            },
+        ),
         mount_navigation_service => std::sync::Arc::new(crate::services::proxies::NavigationProxy { state: std::sync::Arc::clone(&state) }),
         mount_site_service => std::sync::Arc::new(crate::services::proxies::SiteProxy { state: std::sync::Arc::clone(&state) }),
         mount_post_service => std::sync::Arc::new(crate::services::proxies::PostProxy { state: std::sync::Arc::clone(&state) }),

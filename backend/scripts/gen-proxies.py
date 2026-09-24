@@ -64,7 +64,7 @@ PACKAGE = {
 # 手工实现的面（不生成）
 SKIP = {"Authentication", "AdminPortal", "FileTransfer"}
 # 面特定的额外跳过（BFF 方法集超出领域面）
-SKIP_BY_FACE = {"app": {"UserProfile"}, "admin": set()}
+SKIP_BY_FACE = {"app": set(), "admin": set()}
 
 # BFF/领域签名错位的方法（非零映射转发）——生成桩，待手写适配：
 #   ApiService.SyncApis：BFF Empty ↔ 领域 SyncApisRequest
@@ -74,13 +74,15 @@ STUB_METHODS = {
     ("File", "create"),
     ("Menu", "sync_menus"),
     ("Permission", "sync_permissions"),
-    ("Site", "update"),
-    ("Tenant", "create"),
     ("UserProfile", "bind_contact"),
     ("UserProfile", "change_password"),
     ("UserProfile", "verify_contact"),
-    ("User", "edit_user_password"),
 }
+
+# 响应形状错位（BFF Empty ↔ 领域实体）：转发后丢弃响应体
+ADAPTER_METHODS = {("Tenant", "create"), ("Site", "update")}
+# 请求形状错位：BFF 方法在领域面无同名 RPC——显式适配体
+EXPLICIT_METHODS = {("User", "edit_user_password")}
 
 RUST_KEYWORDS = {"type", "ref"}
 
@@ -166,7 +168,31 @@ def main():
             out.append("        _ctx: rushwind_http_binding::ctx::RequestContext,")
             out.append(f"        req: {req_ty},")
             out.append(f"    ) -> Result<{resp_ty}, StatusError> {{")
-            if stubbed:
+            if (service, method) in EXPLICIT_METHODS:
+                out.append("        let mut core = proto::proto::identity::service::v1::user_service_client::UserServiceClient::new(")
+                out.append("            self.state.core_channel.clone(),")
+                out.append("        );")
+                out.append("        core")
+                out.append("            .update(tonic::Request::new(")
+                out.append("                proto::proto::identity::service::v1::UpdateUserRequest {")
+                out.append("                    id: req.user_id,")
+                out.append("                    password: Some(req.new_password),")
+                out.append("                    ..Default::default()")
+                out.append("                },")
+                out.append("            ))")
+                out.append("            .await")
+                out.append("            .map_err(map_status)?;")
+                out.append("        Ok(pbjson_types::Empty {})")
+            elif (service, method) in ADAPTER_METHODS:
+                out.append("        let mut core = proto::proto::%s::service::v1::%s::new(" % (pkg_mod, client))
+                out.append("            self.state.core_channel.clone(),")
+                out.append("        );")
+                out.append("        let _ = core")
+                out.append(f"            .{method}(tonic::Request::new(req))")
+                out.append("            .await")
+                out.append("            .map_err(map_status)?;")
+                out.append(f"        Ok(<{resp_ty}>::default())")
+            elif stubbed:
                 out.append("        let _ = (req, &self.state);")
                 out.append("        Err(crate::state::internal_error(\"not implemented\"))")
             else:

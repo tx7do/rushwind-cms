@@ -11,9 +11,9 @@ sync-frontend.sh <name> --check   # CI 门：快照终态与 MANIFEST 逐字节�
 ```
 
 - **管理后台**：`frontend/admin/sync-frontend.sh admin-react`（源：
-  go-wind-cms `frontend/admin-react`，`ADMIN_REACT_FRONTEND_SRC` 覆盖）
+  源仓 `frontend/admin-react`，`ADMIN_REACT_FRONTEND_SRC` 覆盖）
 - **前台四套**：`frontend/app/sync-frontend.sh <react|vue|taro|flutter_app>`
-  （源：go-wind-cms `frontend/app/<name>`，`<大写名>_FRONTEND_SRC` 覆盖）
+  （源：源仓 `frontend/app/<name>`，`<大写名>_FRONTEND_SRC` 覆盖）
 
 **快照唯一被允许的对上游偏离是 RushWind 品牌覆写**（各 `brand/` 目录：
 overlay 二进制资产 + apply-brand.sh 文案替换表，登记于 brand/README.md）。

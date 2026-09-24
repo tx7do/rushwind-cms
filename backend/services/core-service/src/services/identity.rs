@@ -13,7 +13,7 @@ use store::paging::fetch_paged;
 use proto::proto::identity::service::v1 as identityv1;
 use proto::proto::permission::service::v1 as permissionv1;
 
-fn user_proto(r: sys_users::Model) -> identityv1::User {
+pub(crate) fn user_proto(r: sys_users::Model) -> identityv1::User {
     identityv1::User {
         id: Some(r.id as u32),
         tenant_id: r.tenant_id.map(|v| v as u32),
@@ -99,7 +99,7 @@ impl identityv1::user_service_server::UserService for UserServiceImpl {
     }
 }
 
-fn role_proto(r: sys_roles::Model) -> permissionv1::Role {
+pub(crate) fn role_proto(r: sys_roles::Model) -> permissionv1::Role {
     permissionv1::Role {
         id: Some(r.id as u32),
         tenant_id: r.tenant_id.map(|v| v as u32),
@@ -156,7 +156,7 @@ impl permissionv1::role_service_server::RoleService for RoleServiceImpl {
     }
 }
 
-fn tenant_proto(r: sys_tenants::Model) -> identityv1::Tenant {
+pub(crate) fn tenant_proto(r: sys_tenants::Model) -> identityv1::Tenant {
     identityv1::Tenant {
         id: Some(r.id as u32),
         name: r.name,

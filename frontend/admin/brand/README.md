@@ -4,7 +4,7 @@
 
 - `overlay/admin-react/` — logo / favicon 等二进制资产，同步后原样覆盖进快照。
   来源：rushwind 仓的 RushWind 品牌资产（与 rushwind-admin 的 overlay 同源）。
-- `apply-brand.sh` — 声明文件的品牌文案替换表（GoWind / 风行 → RushWind / 锐风）。
+- `apply-brand.sh` — 声明文件的品牌文案替换表（快照默认品牌字样 → RushWind / 锐风）。
 
 登记的偏离面（admin-react）：
 

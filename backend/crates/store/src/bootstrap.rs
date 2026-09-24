@@ -1,9 +1,8 @@
 //! The database bootstrap: on a fresh database (no `sys_users` table),
 //! apply the golden DDL statement-by-statement (CREATE … IF NOT EXISTS /
 //! DO-block constraint guards — idempotent by construction), then the
-//! demo seed data. The DDL is the ent auto-migration output of the Go
-//! reference, dumped from pg_catalog (`backend/sql/schema.sql`); the
-//! seed mirrors the reference's `postgresql-demo-data.sql`.
+//! demo seed data. The DDL is dumped from pg_catalog
+//! (`backend/sql/schema.sql`).
 
 use sea_orm::DatabaseConnection;
 

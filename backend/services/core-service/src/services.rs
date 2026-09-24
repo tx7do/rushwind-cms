@@ -13,6 +13,7 @@ pub mod permission;
 pub mod site;
 pub mod social;
 pub mod stats;
+pub mod writes;
 
 use std::sync::Arc;
 
@@ -101,17 +102,27 @@ pub fn registry(state: Arc<AppState>) -> tonic::service::Routes {
     )
     .add_service(
         proto::proto::identity::service::v1::user_service_server::UserServiceServer::new(
-            identity::UserServiceImpl { state: Arc::clone(&state) },
+            writes::UserWriteServiceImpl { state: Arc::clone(&state) },
         ),
     )
     .add_service(
         proto::proto::identity::service::v1::tenant_service_server::TenantServiceServer::new(
-            identity::TenantServiceImpl { state: Arc::clone(&state) },
+            writes::TenantWriteServiceImpl { state: Arc::clone(&state) },
+        ),
+    )
+    .add_service(
+        proto::proto::identity::service::v1::user_profile_service_server::UserProfileServiceServer::new(
+            writes::UserProfileServiceImpl { state: Arc::clone(&state) },
+        ),
+    )
+    .add_service(
+        proto::proto::translator::service::v1::translator_service_server::TranslatorServiceServer::new(
+            writes::TranslatorServiceImpl { state: Arc::clone(&state) },
         ),
     )
     .add_service(
         proto::proto::permission::service::v1::role_service_server::RoleServiceServer::new(
-            identity::RoleServiceImpl { state: Arc::clone(&state) },
+            writes::RoleWriteServiceImpl { state: Arc::clone(&state) },
         ),
     )
     .add_service(

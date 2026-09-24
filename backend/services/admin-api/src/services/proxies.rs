@@ -2389,8 +2389,14 @@ impl proto::gen_admin::services::SiteServiceHandlers for SiteProxy {
         _ctx: rushwind_http_binding::ctx::RequestContext,
         req: proto::proto::site::service::v1::UpdateSiteRequest,
     ) -> Result<proto::proto::site::service::v1::Site, StatusError> {
-        let _ = (req, &self.state);
-        Err(crate::state::internal_error("not implemented"))
+        let mut core = proto::proto::site::service::v1::site_service_client::SiteServiceClient::new(
+            self.state.core_channel.clone(),
+        );
+        let _ = core
+            .update(tonic::Request::new(req))
+            .await
+            .map_err(map_status)?;
+        Ok(<proto::proto::site::service::v1::Site>::default())
     }
 
     async fn delete(
@@ -2869,8 +2875,15 @@ impl proto::gen_admin::services::TenantServiceHandlers for TenantProxy {
         _ctx: rushwind_http_binding::ctx::RequestContext,
         req: proto::proto::identity::service::v1::CreateTenantRequest,
     ) -> Result<pbjson_types::Empty, StatusError> {
-        let _ = (req, &self.state);
-        Err(crate::state::internal_error("not implemented"))
+        let mut core =
+            proto::proto::identity::service::v1::tenant_service_client::TenantServiceClient::new(
+                self.state.core_channel.clone(),
+            );
+        let _ = core
+            .create(tonic::Request::new(req))
+            .await
+            .map_err(map_status)?;
+        Ok(<pbjson_types::Empty>::default())
     }
 
     async fn update(
@@ -3134,7 +3147,19 @@ impl proto::gen_admin::services::UserServiceHandlers for UserProxy {
         _ctx: rushwind_http_binding::ctx::RequestContext,
         req: proto::proto::identity::service::v1::EditUserPasswordRequest,
     ) -> Result<pbjson_types::Empty, StatusError> {
-        let _ = (req, &self.state);
-        Err(crate::state::internal_error("not implemented"))
+        let mut core =
+            proto::proto::identity::service::v1::user_service_client::UserServiceClient::new(
+                self.state.core_channel.clone(),
+            );
+        core.update(tonic::Request::new(
+            proto::proto::identity::service::v1::UpdateUserRequest {
+                id: req.user_id,
+                password: Some(req.new_password),
+                ..Default::default()
+            },
+        ))
+        .await
+        .map_err(map_status)?;
+        Ok(pbjson_types::Empty {})
     }
 }
