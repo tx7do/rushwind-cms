@@ -6,7 +6,6 @@
 
 pub mod content_repo;
 pub mod dict_repo;
-pub mod helpers;
 pub mod identity_repo;
 pub mod messaging_repo;
 pub mod misc_repo;

@@ -7,6 +7,7 @@ pub mod behaviors;
 pub mod file_transfer;
 pub mod internal_message;
 pub mod proxies;
+pub mod proxy_kit;
 
 use crate::state::StatusError;
 

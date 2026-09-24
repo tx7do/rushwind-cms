@@ -12,6 +12,7 @@ use sea_orm::{EntityTrait, PaginatorTrait, Set};
 use tonic::{Request, Response, Status};
 
 use crate::data::storage_repo as repo;
+use crate::service::context::{operator_of, tenant_of};
 use crate::state::{bad, db_status, ts_to_proto, AppState};
 use store::entities::files;
 use store::paging::fetch_paged;
@@ -256,26 +257,6 @@ fn minio_validation(e: minio::s3::error::ValidationErr) -> Status {
 
 pub struct FileServiceImpl {
     pub state: Arc<AppState>,
-}
-
-fn operator_of<T>(request: &tonic::Request<T>) -> Result<i64, Status> {
-    request
-        .metadata()
-        .get("x-user-id")
-        .and_then(|v| v.to_str().ok())
-        .and_then(|v| v.parse::<i64>().ok())
-        .filter(|v| *v > 0)
-        .ok_or_else(|| Status::unauthenticated("user identity required"))
-}
-
-fn tenant_of<T>(request: &tonic::Request<T>) -> i64 {
-    request
-        .metadata()
-        .get("x-tenant-id")
-        .and_then(|v| v.to_str().ok())
-        .and_then(|v| v.parse::<i64>().ok())
-        .filter(|v| *v >= 0)
-        .unwrap_or(0)
 }
 
 impl FileServiceImpl {

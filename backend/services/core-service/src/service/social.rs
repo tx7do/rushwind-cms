@@ -9,6 +9,7 @@ use sea_orm::{
 use tonic::{Request, Response, Status};
 
 use crate::data::{content_repo, social_repo as repo};
+use crate::service::context::{operator_of, request_tenant_of, require_admin_operator};
 use crate::state::{bad, db_status, forbidden, not_found, ts_to_proto, AppState};
 use store::entities::{
     comment_likes, comments, interaction_counters, post_likes, post_watches, site_settings,
@@ -19,18 +20,6 @@ use proto::proto::audit::service::v1 as auditv1;
 use proto::proto::comment::service::v1 as commentv1;
 use proto::proto::content::service::v1 as contentv1;
 use proto::proto::interaction::service::v1 as interactionv1;
-
-/// The operator user id off the gRPC metadata the BFF forwards
-/// (`x-user-id` from the verified claims).
-fn operator_of<T>(request: &tonic::Request<T>) -> Result<i64, Status> {
-    request
-        .metadata()
-        .get("x-user-id")
-        .and_then(|v| v.to_str().ok())
-        .and_then(|v| v.parse::<i64>().ok())
-        .filter(|v| *v > 0)
-        .ok_or_else(|| tonic::Status::unauthenticated("user identity required"))
-}
 
 fn content_type_num(name: &str) -> Option<i32> {
     Some(match name {
@@ -91,22 +80,6 @@ fn comment_status_name(v: i32) -> Option<String> {
         }
         .to_string(),
     )
-}
-
-/// The trusted inner tenant stamp: the anonymous chain's explicit
-/// `x-md-global-tenant-id` (the reference's metadata channel) wins,
-/// else the operator bag's `x-tenant-id`.
-fn request_tenant_of<T>(request: &tonic::Request<T>) -> i64 {
-    for name in ["x-md-global-tenant-id", "x-tenant-id"] {
-        if let Some(v) = request.metadata().get(name).and_then(|v| v.to_str().ok()) {
-            if let Ok(n) = v.parse::<i64>() {
-                if n >= 0 {
-                    return n;
-                }
-            }
-        }
-    }
-    0
 }
 
 /// The site-settings boolean (the newest row for the key): missing row
@@ -675,20 +648,6 @@ fn target_type_num(target_type: i32) -> Option<i16> {
 /// operator identity must ride the metadata (401 otherwise) and the
 /// operator must sit in the platform/system context — tenant 0 in the
 /// metadata bag (403 otherwise).
-fn require_admin_operator<T>(request: &Request<T>) -> Result<(i64, i64), Status> {
-    let user_id = operator_of(request)?;
-    let tenant_id = request
-        .metadata()
-        .get("x-tenant-id")
-        .and_then(|v| v.to_str().ok())
-        .and_then(|v| v.parse::<i64>().ok())
-        .unwrap_or(0);
-    if tenant_id != 0 {
-        return Err(forbidden("platform admin only"));
-    }
-    Ok((tenant_id, user_id))
-}
-
 /// The purge/reset audit row (the reference's writeAudit: one
 /// OperationAuditLog with the DELETE action; a failed audit write never
 /// fails the RPC).

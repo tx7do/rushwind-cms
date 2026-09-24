@@ -180,27 +180,27 @@ pub fn registry(state: Arc<AppState>) -> tonic::service::Routes {
     )
     .add_service(
         proto::proto::identity::service::v1::org_unit_service_server::OrgUnitServiceServer::new(
-            service::misc::OrgUnitServiceImpl { state: Arc::clone(&state) },
+            service::org::OrgUnitServiceImpl { state: Arc::clone(&state) },
         ),
     )
     .add_service(
         proto::proto::identity::service::v1::position_service_server::PositionServiceServer::new(
-            service::misc::PositionServiceImpl { state: Arc::clone(&state) },
+            service::org::PositionServiceImpl { state: Arc::clone(&state) },
         ),
     )
     .add_service(
         proto::proto::authentication::service::v1::login_policy_service_server::LoginPolicyServiceServer::new(
-            service::misc::LoginPolicyServiceImpl { state: Arc::clone(&state) },
+            service::login_policy::LoginPolicyServiceImpl { state: Arc::clone(&state) },
         ),
     )
     .add_service(
         proto::proto::content::service::v1::content_model_service_server::ContentModelServiceServer::new(
-            service::misc::ContentModelServiceImpl { state: Arc::clone(&state) },
+            service::content_model::ContentModelServiceImpl { state: Arc::clone(&state) },
         ),
     )
     .add_service(
         proto::proto::media::service::v1::media_asset_service_server::MediaAssetServiceServer::new(
-            service::misc::MediaAssetServiceImpl { state: Arc::clone(&state) },
+            service::media_asset::MediaAssetServiceImpl { state: Arc::clone(&state) },
         ),
     )
     .add_service(
@@ -215,7 +215,7 @@ pub fn registry(state: Arc<AppState>) -> tonic::service::Routes {
     )
     .add_service(
         proto::proto::internal_message::service::v1::internal_message_category_service_server::InternalMessageCategoryServiceServer::new(
-            service::misc::InternalMessageCategoryServiceImpl { state: Arc::clone(&state) },
+            service::internal_message::InternalMessageCategoryServiceImpl { state: Arc::clone(&state) },
         ),
     )
     .add_service(

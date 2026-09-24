@@ -9,46 +9,15 @@ use sea_orm::{ActiveModelTrait, ColumnTrait, EntityTrait, QueryFilter, Set, Tran
 use tonic::{Request, Response, Status};
 
 use crate::data::messaging_repo as repo;
+use crate::service::context::{
+    operator_of, optional_operator_user_id, tenant_of as request_tenant_of,
+};
 use crate::state::{bad, db_status, forbidden, not_found, ts_to_proto, AppState};
 use store::entities::{internal_message_recipients, internal_messages, sys_tasks};
 use store::paging::fetch_paged;
 
 use proto::proto::internal_message::service::v1 as imv1;
 use proto::proto::task::service::v1 as taskv1;
-
-fn operator_of<T>(request: &tonic::Request<T>) -> Result<i64, Status> {
-    request
-        .metadata()
-        .get("x-user-id")
-        .and_then(|v| v.to_str().ok())
-        .and_then(|v| v.parse::<i64>().ok())
-        .filter(|v| *v > 0)
-        .ok_or_else(|| Status::unauthenticated("user identity required"))
-}
-
-/// The operator identity when present (the reference tolerates its
-/// absence on some flows, defaulting to operator 0).
-fn optional_operator_user_id<T>(request: &tonic::Request<T>) -> i64 {
-    request
-        .metadata()
-        .get("x-user-id")
-        .and_then(|v| v.to_str().ok())
-        .and_then(|v| v.parse::<i64>().ok())
-        .filter(|v| *v > 0)
-        .unwrap_or(0)
-}
-
-/// The caller's tenant scope off the BFF-forwarded header (0 = platform,
-/// which scopes to nothing — the reference's `maybeTenantFromViewer`
-/// only predicate applies for a *named* tenant).
-fn request_tenant_of<T>(request: &tonic::Request<T>) -> i64 {
-    request
-        .metadata()
-        .get("x-tenant-id")
-        .and_then(|v| v.to_str().ok())
-        .and_then(|v| v.parse::<i64>().ok())
-        .unwrap_or(0)
-}
 
 // ── enum converters ──────────────────────────────────────────────────
 // The enum columns hold the proto enum *names* (the reference's

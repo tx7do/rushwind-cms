@@ -75,19 +75,22 @@ STUB_METHODS = {
     ("Permission", "sync_permissions"),
 }
 
-# 行为模块（手写面）：生成代码按 face 路由到对应模块。
-BEHAVIOR_MODULES = {"app": "crate::services::public", "admin": "crate::services::behaviors"}
+# 行为模块（手写面）按 face 路由：admin → services/behaviors.rs，
+# app → services/public.rs（每个面恒定携带一行 `behaviors:`，供 hand 形态委派）。
 
 # 面特定的行为覆写——方法体改为调用手写模块，行为与生成代码解耦：
 #   app 公开站点语义（参照 app/service 的服务层逐方法对位）：公开读
 #   状态过滤、内容写禁用、Host 租户解析、游客评论策略、档案/改密钉扎。
-#   admin 侧：文件元数据创建（服务端操作者盖章）、权限派生重建触发、
-#   walk-route 调试面（本二进制路由表）、改密/联系面。
+#   admin 侧：文件元数据创建（服务端操作者盖章）、路由表同步（本二进制
+#   路由语料）、walk-route 调试面、权限派生重建触发、改密/联系面、
+#   管理员改密适配（BFF 路径参数 ↔ 领域 UpdateUserRequest）。
 BEHAVIOR_METHODS = {
     "admin": {
+        ("Api", "sync_apis"): "sync_apis",
         ("Api", "get_walk_route_data"): "walk_route_data",
         ("File", "create"): "file_create",
         ("Permission", "sync_permissions"): "sync_permissions",
+        ("User", "edit_user_password"): "edit_user_password",
         ("UserProfile", "change_password"): "change_password",
         ("UserProfile", "bind_contact"): "bind_contact",
         ("UserProfile", "verify_contact"): "verify_contact",
@@ -131,10 +134,8 @@ BEHAVIOR_METHODS = {
     },
 }
 
-# 响应形状错位（BFF Empty ↔ 领域实体）：转发后丢弃响应体
+# 响应形状错位（BFF Empty ↔ 领域实体）：转发后丢弃响应体（`drop` 形态）
 ADAPTER_METHODS = {("Tenant", "create"), ("Site", "update")}
-# 请求形状错位：BFF 方法在领域面无同名 RPC——显式适配体
-EXPLICIT_METHODS = {("User", "edit_user_password")}
 
 RUST_KEYWORDS = {"type", "ref"}
 
@@ -168,27 +169,42 @@ def snake(name):
     return re.sub(r"(?<!^)(?=[A-Z])", "_", name).lower()
 
 
+def method_kind(service, method, face):
+    """One contract method's proxy-kit form — (kind, behavior-name).
+
+    Precedence: the hand behavior wins over everything (an admin face
+    method can be both STUB-listed and behavior-overridden — the stub
+    only applies where no behavior rides), then the response-dropping
+    adapter, then the not-implemented stub, else the plain pass-through.
+    """
+    behavior = BEHAVIOR_METHODS.get(face, {}).get((service, method))
+    if behavior:
+        return "hand", behavior
+    if (service, method) in ADAPTER_METHODS:
+        return "drop", None
+    if (service, method) in STUB_METHODS:
+        return "stub", None
+    return "pass", None
+
+
 def main():
     gen_path, face = sys.argv[1], sys.argv[2]
     traits = parse_traits(gen_path)
     gen_mod = "gen_admin" if face == "admin" else "gen_app"
 
     out = []
-    out.append("//! Generated thin-BFF proxies — one impl per BFF trait method, each a")
-    out.append("//! pass-through to the core domain service's gRPC face (the BFF and")
-    out.append("//! domain methods share their message types by contract, so no mapping")
-    out.append("//! rides here). DO NOT EDIT; regenerate via scripts/gen-proxies.py when")
-    out.append("//! the contract re-syncs. Hand-written faces (authentication — captcha/")
+    out.append("//! Generated thin-BFF proxies — a table of `passthrough_proxy!`")
+    out.append("//! invocations, one per BFF face (see services/proxy_kit.rs for the")
+    out.append("//! pass/drop/stub/hand method kinds; the BFF and domain methods share")
+    out.append("//! their message types by contract, so no mapping rides here).")
+    out.append("//! DO NOT EDIT; regenerate via scripts/gen-proxies.py when the")
+    out.append("//! contract re-syncs. Hand-written faces (authentication — captcha/")
     out.append("//! cookie concerns; admin-portal aggregation; file-transfer multipart)")
     out.append("//! live in their own modules.")
     out.append("#![allow(clippy::all)]")
     out.append("#![allow(missing_docs)]")
     out.append("")
-    out.append("use std::sync::Arc;")
-    out.append("")
-    out.append("use crate::state::{AppState, StatusError};")
-    out.append("use crate::services::map_status;")
-    out.append("use crate::services::with_operator;")
+    out.append("use crate::passthrough_proxy;")
     out.append("")
 
     emitted = 0
@@ -200,92 +216,31 @@ def main():
         if pkg is None:
             continue
         client_mod = f"{snake(trait_name.removesuffix('Service'))}_service_client"
-        client = f"{client_mod}::{trait_name.removesuffix('Service')}ServiceClient"
+        # The Channel-generic spelled out: the kit calls the client via a
+        # qualified path (<Ty>::new), where inference does not apply.
+        client = (f"{client_mod}::{trait_name.removesuffix('Service')}"
+                  f"ServiceClient<tonic::transport::Channel>")
         pkg_mod = "::".join(pkg.split("."))
         struct_name = f"{trait_name.removesuffix('Service')}Proxy"
-        out.append(f"/// The pass-through proxy of `{trait_name}Handlers`.")
-        out.append(f"pub struct {struct_name} {{")
-        out.append("    pub state: Arc<AppState>,")
-        out.append("}")
-        out.append("")
-        out.append("#[async_trait::async_trait]")
-        out.append(
-            f"impl proto::{gen_mod}::services::{trait_name}Handlers for {struct_name} {{"
-        )
-        for method, req_ty, resp_ty in methods:
+        kinds = [(m, *method_kind(service, m, face), req_ty, resp_ty)
+                 for m, req_ty, resp_ty in methods]
+        behaviors = "behaviors" if face == "admin" else "public"
+        out.append("passthrough_proxy! {")
+        out.append(f"    /// The pass-through proxy of `{trait_name}Handlers`.")
+        out.append(f"    proto::{gen_mod}::services::{trait_name}Handlers for {struct_name} {{")
+        out.append(f"        client: proto::proto::{pkg_mod}::service::v1::{client},")
+        out.append(f"        behaviors: {behaviors},")
+        out.append("        methods: [")
+        for method, kind, behavior, req_ty, resp_ty in kinds:
             mname = f"r#{method}" if method in RUST_KEYWORDS else method
-            stubbed = (service, method) in STUB_METHODS
-            behavior = BEHAVIOR_METHODS.get(face, {}).get((service, method))
-            out.append("    async fn %s(" % mname)
-            out.append("        &self,")
-            out.append("        _ctx: rushwind_http_binding::ctx::RequestContext,")
-            out.append(f"        req: {req_ty},")
-            out.append(f"    ) -> Result<{resp_ty}, StatusError> {{")
-            if behavior:
-                behavior_mod = BEHAVIOR_MODULES[face]
-                out.append("        // The face's hand-written behavior (see the module docs).")
-                out.append(f"        {behavior_mod}::{behavior}(&self.state, &_ctx, req).await")
-            elif (service, method) == ("Api", "sync_apis"):
-                out.append("        let _ = req;")
-                out.append("        // Sync the generated route table into sys_apis (the route")
-                out.append("        // corpus this very binary was generated from).")
-                out.append("        let mut req = proto::proto::permission::service::v1::SyncApisRequest::default();")
-                out.append("        for r in proto::gen_admin::routes::ROUTES {")
-                out.append("            if r.shadowed { continue; }")
-                out.append("            req.apis.push(proto::proto::permission::service::v1::Api {")
-                out.append("                operation: Some(r.operation_id.to_string()),")
-                out.append("                path: Some(r.path.to_string()),")
-                out.append("                method: Some(r.method.to_string()),")
-                out.append("                module: Some(r.service_fq.split('.').next().unwrap_or_default().to_string()),")
-                out.append("                ..Default::default()")
-                out.append("            });")
-                out.append("        }")
-                out.append("        let mut core = proto::proto::permission::service::v1::api_service_client::ApiServiceClient::new(")
-                out.append("            self.state.core_channel.clone(),")
-                out.append("        );")
-                out.append("        core")
-                out.append("            .sync_apis(tonic::Request::new(req))")
-                out.append("            .await")
-                out.append("            .map_err(map_status)?;")
-                out.append("        Ok(pbjson_types::Empty {})")
-            elif (service, method) in EXPLICIT_METHODS:
-                out.append("        let mut core = proto::proto::identity::service::v1::user_service_client::UserServiceClient::new(")
-                out.append("            self.state.core_channel.clone(),")
-                out.append("        );")
-                out.append("        core")
-                out.append("            .update(tonic::Request::new(")
-                out.append("                proto::proto::identity::service::v1::UpdateUserRequest {")
-                out.append("                    id: req.user_id,")
-                out.append("                    password: Some(req.new_password),")
-                out.append("                    ..Default::default()")
-                out.append("                },")
-                out.append("            ))")
-                out.append("            .await")
-                out.append("            .map_err(map_status)?;")
-                out.append("        Ok(pbjson_types::Empty {})")
-            elif (service, method) in ADAPTER_METHODS:
-                out.append("        let mut core = proto::proto::%s::service::v1::%s::new(" % (pkg_mod, client))
-                out.append("            self.state.core_channel.clone(),")
-                out.append("        );")
-                out.append("        let _ = core")
-                out.append(f"            .{method}(tonic::Request::new(req))")
-                out.append("            .await")
-                out.append("            .map_err(map_status)?;")
-                out.append(f"        Ok(<{resp_ty}>::default())")
-            elif stubbed:
-                out.append("        let _ = (req, &self.state);")
-                out.append("        Err(crate::state::internal_error(\"not implemented\"))")
+            if kind == "hand":
+                out.append(
+                    f"            hand {mname}({req_ty}) -> {resp_ty} => {behavior},")
             else:
-                out.append("        let mut core = proto::proto::%s::service::v1::%s::new(" % (pkg_mod, client))
-                out.append("            self.state.core_channel.clone(),")
-                out.append("        );")
-                out.append("        Ok(core")
-                out.append(f"            .{method}(with_operator(&_ctx, req))")
-                out.append("            .await")
-                out.append("            .map_err(map_status)?")
-                out.append("            .into_inner())")
-            out.append("    }")
-            out.append("")
+                out.append(
+                    f"            {kind} {mname}({req_ty}) -> {resp_ty},")
+        out.append("        ]")
+        out.append("    }")
         out.append("}")
         out.append("")
         emitted += 1

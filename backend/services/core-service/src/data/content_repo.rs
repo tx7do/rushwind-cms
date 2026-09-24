@@ -1143,12 +1143,6 @@ pub(crate) async fn delete_page_translation(
     Ok(())
 }
 
-// keep Condition referenced for future cross-table filters
-#[allow(dead_code)]
-fn _c(c: Condition) -> Condition {
-    c
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;

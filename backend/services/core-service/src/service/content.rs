@@ -5,7 +5,6 @@
 
 use std::sync::Arc;
 
-use sea_orm::sea_query::Condition;
 use sea_orm::{ActiveModelTrait, ColumnTrait, EntityTrait, QueryFilter, Set};
 use tonic::{Request, Response, Status};
 
@@ -1698,11 +1697,6 @@ impl contentv1::page_service_server::PageService for PageServiceImpl {
     }
 }
 
-// The condition helper keeps the import set honest for future filters.
-#[allow(dead_code)]
-fn _unused(c: Condition) -> Condition {
-    c
-}
 
 #[cfg(test)]
 mod tests {

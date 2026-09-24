@@ -5,6 +5,7 @@
 pub mod authentication;
 pub mod file_transfer;
 pub mod proxies;
+pub mod proxy_kit;
 pub mod public;
 
 use crate::state::StatusError;

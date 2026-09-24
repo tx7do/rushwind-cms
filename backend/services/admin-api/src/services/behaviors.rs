@@ -38,6 +38,68 @@ pub async fn file_create(
     Ok(Empty {})
 }
 
+/// The route-table sync into sys_apis: the generated route corpus this
+/// very binary was compiled from (the shadowed entries the mux cannot
+/// reach are skipped).
+pub async fn sync_apis(
+    state: &AppState,
+    ctx: &Ctx,
+    _req: Empty,
+) -> Result<Empty, StatusError> {
+    let mut req = proto::proto::permission::service::v1::SyncApisRequest::default();
+    for r in proto::gen_admin::routes::ROUTES {
+        if r.shadowed {
+            continue;
+        }
+        req.apis.push(proto::proto::permission::service::v1::Api {
+            operation: Some(r.operation_id.to_string()),
+            path: Some(r.path.to_string()),
+            method: Some(r.method.to_string()),
+            module: Some(
+                r.service_fq
+                    .split('.')
+                    .next()
+                    .unwrap_or_default()
+                    .to_string(),
+            ),
+            ..Default::default()
+        });
+    }
+    let mut core =
+        proto::proto::permission::service::v1::api_service_client::ApiServiceClient::new(
+            state.core_channel.clone(),
+        );
+    core.sync_apis(with_operator(ctx, req))
+        .await
+        .map_err(map_status)?;
+    Ok(Empty {})
+}
+
+/// The admin-side password edit: the target user rides the path (the
+/// BFF face has no UpdateUserRequest-shaped body) — the domain update
+/// carries just the new password.
+pub async fn edit_user_password(
+    state: &AppState,
+    ctx: &Ctx,
+    req: proto::proto::identity::service::v1::EditUserPasswordRequest,
+) -> Result<Empty, StatusError> {
+    let mut core =
+        proto::proto::identity::service::v1::user_service_client::UserServiceClient::new(
+            state.core_channel.clone(),
+        );
+    core.update(with_operator(
+        ctx,
+        proto::proto::identity::service::v1::UpdateUserRequest {
+            id: req.user_id,
+            password: Some(req.new_password),
+            ..Default::default()
+        },
+    ))
+    .await
+    .map_err(map_status)?;
+    Ok(Empty {})
+}
+
 /// The derived-permission rebuild trigger (the reference scans the
 /// enabled menus and rebuilds the business permission tables core-side).
 pub async fn sync_permissions(

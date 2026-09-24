@@ -9,6 +9,9 @@ use sea_orm::{ActiveModelTrait, ColumnTrait, EntityTrait, QueryFilter, Set, Tran
 use tonic::{Request, Response, Status};
 
 use crate::data::identity_repo as repo;
+use crate::service::context::{
+    operator_of, operator_tenant_id, optional_operator_user_id,
+};
 use crate::state::{bad, db_status, forbidden, not_found, ts_to_proto, AppState};
 use store::entities::{
     sys_role_metadata, sys_role_permissions, sys_roles, sys_tenants, sys_user_credentials,
@@ -61,28 +64,6 @@ const TENANT_ADMIN_ROLE_CODE: &str = "tenant:manager";
 const TENANT_ADMIN_ROLE_NAME: &str = "租户管理员";
 /// The reference's constants.DefaultAdminUserName.
 const DEFAULT_ADMIN_USER_NAME: &str = "admin";
-
-/// The operator's tenant scope off the verified claims (0 = platform).
-fn operator_tenant_id<T>(request: &Request<T>) -> u32 {
-    request
-        .metadata()
-        .get("x-tenant-id")
-        .and_then(|v| v.to_str().ok())
-        .and_then(|v| v.parse::<u32>().ok())
-        .unwrap_or(0)
-}
-
-/// The operator identity when present (the reference tolerates its
-/// absence on some flows, defaulting to operator 0).
-fn optional_operator_user_id<T>(request: &Request<T>) -> i64 {
-    request
-        .metadata()
-        .get("x-user-id")
-        .and_then(|v| v.to_str().ok())
-        .and_then(|v| v.parse::<i64>().ok())
-        .filter(|v| *v > 0)
-        .unwrap_or(0)
-}
 
 /// validateTargetUserTenant — platform/system callers pass; a tenant
 /// operator may only touch same-tenant users. The reference's lookup is
@@ -346,7 +327,7 @@ impl identityv1::user_service_server::UserService for UserWriteServiceImpl {
     ) -> Result<Response<pbjson_types::Empty>, Status> {
         // The operator context is mandatory: an anonymous delete must
         // never pass (the reference errors before any lookup).
-        let operator_id = operator_user_id(&request)?;
+        let operator_id = operator_of(&request)?;
         let caller_tenant_id = operator_tenant_id(&request);
         let req = request.into_inner();
         let Some(identityv1::delete_user_request::QueryBy::Id(id)) = req.query_by else {
@@ -431,23 +412,13 @@ pub struct UserProfileServiceImpl {
     pub state: Arc<AppState>,
 }
 
-fn operator_user_id<T>(request: &Request<T>) -> Result<i64, Status> {
-    request
-        .metadata()
-        .get("x-user-id")
-        .and_then(|v| v.to_str().ok())
-        .and_then(|v| v.parse::<i64>().ok())
-        .filter(|v| *v > 0)
-        .ok_or_else(|| Status::unauthenticated("user identity required"))
-}
-
 #[async_trait::async_trait]
 impl identityv1::user_profile_service_server::UserProfileService for UserProfileServiceImpl {
     async fn get_user(
         &self,
         request: Request<pbjson_types::Empty>,
     ) -> Result<Response<identityv1::User>, Status> {
-        let uid = operator_user_id(&request)?;
+        let uid = operator_of(&request)?;
         let row = repo::users_by_id(&self.state.db, uid).await?;
         Ok(Response::new(user_proto(row)))
     }
@@ -456,7 +427,7 @@ impl identityv1::user_profile_service_server::UserProfileService for UserProfile
         &self,
         request: Request<identityv1::UpdateUserRequest>,
     ) -> Result<Response<pbjson_types::Empty>, Status> {
-        let uid = operator_user_id(&request)?;
+        let uid = operator_of(&request)?;
         let mut req = request.into_inner();
         req.id = uid as u32;
         <UserWriteServiceImpl as identityv1::user_service_server::UserService>::update(
@@ -765,7 +736,7 @@ impl permissionv1::role_service_server::RoleService for RoleWriteServiceImpl {
     ) -> Result<Response<pbjson_types::Empty>, Status> {
         // 操作人身份与租户必须从元数据推导，忽略客户端传入的
         // operator_id/tenant_id，防止越权将角色绑定写入他租户或伪造审计归属
-        let operator_id = operator_user_id(&request)?;
+        let operator_id = operator_of(&request)?;
         let caller_tenant_id = operator_tenant_id(&request);
         let req = request.into_inner();
         if req.user_id == 0 || req.role_ids.is_empty() {
@@ -1236,10 +1207,4 @@ impl translatorv1::translator_service_server::TranslatorService for TranslatorSe
             raw_content: Some(content),
         }))
     }
-}
-
-// ts_to_proto kept referenced for the mapper-external callers.
-#[allow(dead_code)]
-fn _ts(v: chrono::DateTime<chrono::FixedOffset>) -> Option<pbjson_types::Timestamp> {
-    ts_to_proto(v)
 }
