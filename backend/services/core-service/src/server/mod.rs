@@ -135,7 +135,7 @@ pub fn registry(state: Arc<AppState>) -> tonic::service::Routes {
     )
     .add_service(
         proto::proto::permission::service::v1::api_service_server::ApiServiceServer::new(
-            service::storage::ApiSyncServiceImpl { state: Arc::clone(&state) },
+            service::permission::ApiSyncServiceImpl { state: Arc::clone(&state) },
         ),
     )
     .add_service(

@@ -139,3 +139,19 @@ pub async fn delete_permissions(db: &DatabaseConnection, id: i64) -> StatusResul
         .map_err(db_status)?;
     Ok(())
 }
+
+// ── domain-specific queries ─────────────────────────────────────────
+
+/// The api row registered for one operation id (the sync face's
+/// upsert lookup).
+pub async fn apis_by_operation(
+    db: &DatabaseConnection,
+    operation: &str,
+) -> StatusResult<Option<sys_apis::Model>> {
+    use sea_orm::{ColumnTrait as _, QueryFilter as _};
+    sys_apis::Entity::find()
+        .filter(sys_apis::Column::Operation.eq(operation))
+        .one(db)
+        .await
+        .map_err(db_status)
+}

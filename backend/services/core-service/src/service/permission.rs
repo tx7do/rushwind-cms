@@ -1,7 +1,9 @@
 //! The permission cluster: Menu (tree), Api, PermissionGroup,
-//! Permission — CRUD over the golden schema. The walk-route and sync
-//! faces stay on their generated Unimplemented defaults (they rebuild
-//! derived tables; the dedicated pipeline owns that).
+//! Permission — CRUD over the golden schema. The walk-route face
+//! stays on its generated Unimplemented default (it rebuilds derived
+//! tables; the dedicated pipeline owns that); the sync face — the
+//! api registry upsert off the BFF's shipped route table — lives at
+//! the tail.
 
 use std::sync::Arc;
 
@@ -612,6 +614,129 @@ impl permissionv1::permission_service_server::PermissionService for PermissionSe
                     .map_err(db_status)?;
             }
             None => return Err(bad("query_by required")),
+        }
+        Ok(Response::new(pbjson_types::Empty {}))
+    }
+}
+
+// ── sync (the api registry face) ────────────────────────────────────
+
+/// The sync variant of the api service: the plain CRUD delegates to
+/// [`ApiServiceImpl`]; `sync_apis` upserts the BFF's shipped route
+/// table by operation id.
+pub struct ApiSyncServiceImpl {
+    pub state: Arc<AppState>,
+}
+
+#[async_trait::async_trait]
+impl permissionv1::api_service_server::ApiService for ApiSyncServiceImpl {
+    async fn list(
+        &self,
+        request: Request<proto::proto::pagination::PagingRequest>,
+    ) -> Result<Response<permissionv1::ListApiResponse>, Status> {
+        ApiServiceImpl {
+            state: Arc::clone(&self.state),
+        }
+        .list(request)
+        .await
+    }
+
+    async fn count(
+        &self,
+        request: Request<proto::proto::pagination::PagingRequest>,
+    ) -> Result<Response<permissionv1::CountApiResponse>, Status> {
+        ApiServiceImpl {
+            state: Arc::clone(&self.state),
+        }
+        .count(request)
+        .await
+    }
+
+    async fn get(
+        &self,
+        request: Request<permissionv1::GetApiRequest>,
+    ) -> Result<Response<permissionv1::Api>, Status> {
+        ApiServiceImpl {
+            state: Arc::clone(&self.state),
+        }
+        .get(request)
+        .await
+    }
+
+    async fn create(
+        &self,
+        request: Request<permissionv1::CreateApiRequest>,
+    ) -> Result<Response<pbjson_types::Empty>, Status> {
+        ApiServiceImpl {
+            state: Arc::clone(&self.state),
+        }
+        .create(request)
+        .await
+    }
+
+    async fn update(
+        &self,
+        request: Request<permissionv1::UpdateApiRequest>,
+    ) -> Result<Response<pbjson_types::Empty>, Status> {
+        ApiServiceImpl {
+            state: Arc::clone(&self.state),
+        }
+        .update(request)
+        .await
+    }
+
+    async fn delete(
+        &self,
+        request: Request<permissionv1::DeleteApiRequest>,
+    ) -> Result<Response<pbjson_types::Empty>, Status> {
+        ApiServiceImpl {
+            state: Arc::clone(&self.state),
+        }
+        .delete(request)
+        .await
+    }
+
+    async fn sync_apis(
+        &self,
+        request: Request<permissionv1::SyncApisRequest>,
+    ) -> Result<Response<pbjson_types::Empty>, Status> {
+        let req = request.into_inner();
+        // Upsert by operation: insert missing, refresh path/method of
+        // existing (the BFF ships the route table it generated).
+        let now = store::now();
+        for api in req.apis {
+            match repo::apis_by_operation(
+                &self.state.db,
+                &api.operation.clone().unwrap_or_default(),
+            )
+            .await?
+            {
+                Some(row) => {
+                    let mut a: sys_apis::ActiveModel = row.into();
+                    a.path = Set(api.path.clone());
+                    a.method = Set(api.method.clone());
+                    a.updated_at = Set(Some(now));
+                    repo::update_apis(&self.state.db, a).await?;
+                }
+                None => {
+                    repo::insert_apis(
+                        &self.state.db,
+                        sys_apis::ActiveModel {
+                            operation: Set(Some(api.operation.clone().unwrap_or_default())),
+                            path: Set(Some(api.path.clone().unwrap_or_default())),
+                            method: Set(Some(api.method.clone().unwrap_or_default())),
+                            module: Set(api.module.clone()),
+                            description: Set(api.description.clone()),
+                            status: Set("ON".to_string()),
+                            tenant_id: Set(Some(0)),
+                            created_at: Set(Some(now)),
+                            updated_at: Set(Some(now)),
+                            ..Default::default()
+                        },
+                    )
+                    .await?;
+                }
+            }
         }
         Ok(Response::new(pbjson_types::Empty {}))
     }

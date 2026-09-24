@@ -1,19 +1,19 @@
 //! The file storage face: local-disk object storage (the MinIO bridge
 //! lands with the OSS phase) + the files table metadata, and the
-//! sync_apis face (upserts the generated route table into sys_apis —
-//! the caller ships the route list in the request).
+//! streaming transfer channel (the proto's HttpBody streams — the
+//! object bytes' only wire path; `FileService` proper stays the
+//! metadata CRUD).
 
 use std::sync::Arc;
 
-use sea_orm::{ActiveModelTrait, ColumnTrait, EntityTrait, QueryFilter, Set};
+use sea_orm::{EntityTrait, Set};
 use tonic::{Request, Response, Status};
 
 use crate::data::storage_repo as repo;
-use crate::state::{bad, db_status, ts_to_proto, AppState};
-use store::entities::{files, sys_apis};
+use crate::state::{bad, ts_to_proto, AppState};
+use store::entities::files;
 use store::paging::fetch_paged;
 
-use proto::proto::permission::service::v1 as permissionv1;
 use proto::proto::storage::service::v1 as storagev1;
 
 /// The local object root (mount a volume here in deployments).
@@ -438,124 +438,5 @@ impl storagev1::file_transfer_service_server::FileTransferService for FileServic
         request: Request<tonic::Streaming<proto::proto::google::api::HttpBody>>,
     ) -> Result<Response<storagev1::UploadFileResponse>, Status> {
         self.upload_stream(request).await
-    }
-}
-
-// ── sync_apis (the permission face) ──────────────────────────────────
-
-pub struct ApiSyncServiceImpl {
-    pub state: Arc<AppState>,
-}
-
-#[async_trait::async_trait]
-impl permissionv1::api_service_server::ApiService for ApiSyncServiceImpl {
-    async fn list(
-        &self,
-        request: Request<proto::proto::pagination::PagingRequest>,
-    ) -> Result<Response<permissionv1::ListApiResponse>, Status> {
-        crate::service::permission::ApiServiceImpl {
-            state: Arc::clone(&self.state),
-        }
-        .list(request)
-        .await
-    }
-
-    async fn count(
-        &self,
-        request: Request<proto::proto::pagination::PagingRequest>,
-    ) -> Result<Response<permissionv1::CountApiResponse>, Status> {
-        crate::service::permission::ApiServiceImpl {
-            state: Arc::clone(&self.state),
-        }
-        .count(request)
-        .await
-    }
-
-    async fn get(
-        &self,
-        request: Request<permissionv1::GetApiRequest>,
-    ) -> Result<Response<permissionv1::Api>, Status> {
-        crate::service::permission::ApiServiceImpl {
-            state: Arc::clone(&self.state),
-        }
-        .get(request)
-        .await
-    }
-
-    async fn create(
-        &self,
-        request: Request<permissionv1::CreateApiRequest>,
-    ) -> Result<Response<pbjson_types::Empty>, Status> {
-        crate::service::permission::ApiServiceImpl {
-            state: Arc::clone(&self.state),
-        }
-        .create(request)
-        .await
-    }
-
-    async fn update(
-        &self,
-        request: Request<permissionv1::UpdateApiRequest>,
-    ) -> Result<Response<pbjson_types::Empty>, Status> {
-        crate::service::permission::ApiServiceImpl {
-            state: Arc::clone(&self.state),
-        }
-        .update(request)
-        .await
-    }
-
-    async fn delete(
-        &self,
-        request: Request<permissionv1::DeleteApiRequest>,
-    ) -> Result<Response<pbjson_types::Empty>, Status> {
-        crate::service::permission::ApiServiceImpl {
-            state: Arc::clone(&self.state),
-        }
-        .delete(request)
-        .await
-    }
-
-    async fn sync_apis(
-        &self,
-        request: Request<permissionv1::SyncApisRequest>,
-    ) -> Result<Response<pbjson_types::Empty>, Status> {
-        let req = request.into_inner();
-        // Upsert by operation: insert missing, refresh path/method of
-        // existing (the BFF ships the route table it generated).
-        let now = store::now();
-        for api in req.apis {
-            let existing = sys_apis::Entity::find()
-                .filter(sys_apis::Column::Operation.eq(api.operation.clone().unwrap_or_default()))
-                .one(&self.state.db)
-                .await
-                .map_err(db_status)?;
-            match existing {
-                Some(row) => {
-                    let mut a: sys_apis::ActiveModel = row.into();
-                    a.path = Set(api.path.clone());
-                    a.method = Set(api.method.clone());
-                    a.updated_at = Set(Some(now));
-                    a.update(&self.state.db).await.map_err(db_status)?;
-                }
-                None => {
-                    sys_apis::ActiveModel {
-                        operation: Set(Some(api.operation.clone().unwrap_or_default())),
-                        path: Set(Some(api.path.clone().unwrap_or_default())),
-                        method: Set(Some(api.method.clone().unwrap_or_default())),
-                        module: Set(api.module.clone()),
-                        description: Set(api.description.clone()),
-                        status: Set("ON".to_string()),
-                        tenant_id: Set(Some(0)),
-                        created_at: Set(Some(now)),
-                        updated_at: Set(Some(now)),
-                        ..Default::default()
-                    }
-                    .insert(&self.state.db)
-                    .await
-                    .map_err(db_status)?;
-                }
-            }
-        }
-        Ok(Response::new(pbjson_types::Empty {}))
     }
 }
