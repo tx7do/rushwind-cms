@@ -9,6 +9,7 @@ use sea_orm::sea_query::Condition;
 use sea_orm::{ActiveModelTrait, ColumnTrait, EntityTrait, QueryFilter, Set};
 use tonic::{Request, Response, Status};
 
+use crate::data::content_repo as repo;
 use crate::state::{bad, db_status, not_found, ts_to_proto, AppState};
 use store::entities::{
     categories, category_translations, page_translations, pages, post_categories, post_tags,
@@ -86,7 +87,7 @@ fn seo_to_json(seo: Option<contentv1::SeoMeta>) -> Option<sea_orm::JsonValue> {
 
 // ── Post ─────────────────────────────────────────────────────────────
 
-fn post_translation_proto(r: post_translations::Model) -> contentv1::PostTranslation {
+pub(crate) fn post_translation_proto(r: post_translations::Model) -> contentv1::PostTranslation {
     contentv1::PostTranslation {
         id: Some(r.id as u32),
         post_id: r.post_id.map(|v| v as u32),
@@ -105,7 +106,7 @@ fn post_translation_proto(r: post_translations::Model) -> contentv1::PostTransla
     }
 }
 
-fn post_proto(
+pub(crate) fn post_proto(
     r: posts::Model,
     translations: Vec<post_translations::Model>,
     category_ids: Vec<i64>,
@@ -320,11 +321,7 @@ impl contentv1::post_service_server::PostService for PostServiceImpl {
         request: Request<contentv1::UpdatePostRequest>,
     ) -> Result<Response<contentv1::Post>, Status> {
         let req = request.into_inner();
-        let row = posts::Entity::find_by_id(req.id as i64)
-            .one(&self.state.db)
-            .await
-            .map_err(db_status)?
-            .ok_or_else(|| not_found("post"))?;
+        let row = repo::post_by_id(&self.state.db, req.id as i64).await?;
         let mut a: posts::ActiveModel = row.into();
         if let Some(data) = req.data {
             if let Some(v) = data.status {
@@ -423,17 +420,16 @@ impl contentv1::post_service_server::PostService for PostServiceImpl {
         let Some(contentv1::delete_post_request::QueryBy::Id(id)) = req.query_by else {
             return Err(bad("query_by required"));
         };
-        posts::Entity::delete_by_id(id as i64)
-            .exec(&self.state.db)
-            .await
-            .map_err(db_status)?;
+        repo::delete_post(&self.state.db, id as i64).await?;
         Ok(Response::new(pbjson_types::Empty {}))
     }
 }
 
 // ── Category ─────────────────────────────────────────────────────────
 
-fn category_translation_proto(r: category_translations::Model) -> contentv1::CategoryTranslation {
+pub(crate) fn category_translation_proto(
+    r: category_translations::Model,
+) -> contentv1::CategoryTranslation {
     contentv1::CategoryTranslation {
         id: Some(r.id as u32),
         category_id: r.category_id.map(|v| v as u32),
@@ -450,7 +446,7 @@ fn category_translation_proto(r: category_translations::Model) -> contentv1::Cat
     }
 }
 
-fn category_proto(
+pub(crate) fn category_proto(
     r: categories::Model,
     translations: Vec<category_translations::Model>,
 ) -> contentv1::Category {
@@ -534,11 +530,7 @@ impl contentv1::category_service_server::CategoryService for CategoryServiceImpl
         let Some(contentv1::get_category_request::QueryBy::Id(id)) = req.query_by else {
             return Err(bad("query_by required"));
         };
-        let row = categories::Entity::find_by_id(id as i64)
-            .one(&self.state.db)
-            .await
-            .map_err(db_status)?
-            .ok_or_else(|| not_found("category"))?;
+        let row = repo::category_by_id(&self.state.db, id as i64).await?;
         let translations = category_translations_of(&self.state.db, row.id).await?;
         Ok(Response::new(category_proto(row, translations)))
     }
@@ -595,11 +587,7 @@ impl contentv1::category_service_server::CategoryService for CategoryServiceImpl
         request: Request<contentv1::UpdateCategoryRequest>,
     ) -> Result<Response<contentv1::Category>, Status> {
         let req = request.into_inner();
-        let row = categories::Entity::find_by_id(req.id as i64)
-            .one(&self.state.db)
-            .await
-            .map_err(db_status)?
-            .ok_or_else(|| not_found("category"))?;
+        let row = repo::category_by_id(&self.state.db, req.id as i64).await?;
         let mut a: categories::ActiveModel = row.into();
         if let Some(data) = req.data {
             if let Some(v) = data.status {
@@ -632,17 +620,14 @@ impl contentv1::category_service_server::CategoryService for CategoryServiceImpl
         let Some(contentv1::delete_category_request::QueryBy::Id(id)) = req.query_by else {
             return Err(bad("query_by required"));
         };
-        categories::Entity::delete_by_id(id as i64)
-            .exec(&self.state.db)
-            .await
-            .map_err(db_status)?;
+        repo::delete_category(&self.state.db, id as i64).await?;
         Ok(Response::new(pbjson_types::Empty {}))
     }
 }
 
 // ── Tag ──────────────────────────────────────────────────────────────
 
-fn tag_translation_proto(r: tag_translations::Model) -> contentv1::TagTranslation {
+pub(crate) fn tag_translation_proto(r: tag_translations::Model) -> contentv1::TagTranslation {
     contentv1::TagTranslation {
         id: Some(r.id as u32),
         tag_id: r.tag_id.map(|v| v as u32),
@@ -659,7 +644,10 @@ fn tag_translation_proto(r: tag_translations::Model) -> contentv1::TagTranslatio
     }
 }
 
-fn tag_proto(r: tags::Model, translations: Vec<tag_translations::Model>) -> contentv1::Tag {
+pub(crate) fn tag_proto(
+    r: tags::Model,
+    translations: Vec<tag_translations::Model>,
+) -> contentv1::Tag {
     let available_languages = translations
         .iter()
         .filter_map(|t| t.language_code.clone())
@@ -719,11 +707,7 @@ impl contentv1::tag_service_server::TagService for TagServiceImpl {
         let Some(contentv1::get_tag_request::QueryBy::Id(id)) = req.query_by else {
             return Err(bad("query_by required"));
         };
-        let row = tags::Entity::find_by_id(id as i64)
-            .one(&self.state.db)
-            .await
-            .map_err(db_status)?
-            .ok_or_else(|| not_found("tag"))?;
+        let row = repo::tag_by_id(&self.state.db, id as i64).await?;
         let translations = tag_translations::Entity::find()
             .filter(tag_translations::Column::TagId.eq(row.id))
             .all(&self.state.db)
@@ -786,11 +770,7 @@ impl contentv1::tag_service_server::TagService for TagServiceImpl {
         request: Request<contentv1::UpdateTagRequest>,
     ) -> Result<Response<contentv1::Tag>, Status> {
         let req = request.into_inner();
-        let row = tags::Entity::find_by_id(req.id as i64)
-            .one(&self.state.db)
-            .await
-            .map_err(db_status)?
-            .ok_or_else(|| not_found("tag"))?;
+        let row = repo::tag_by_id(&self.state.db, req.id as i64).await?;
         let mut a: tags::ActiveModel = row.into();
         if let Some(data) = req.data {
             if let Some(v) = data.status {
@@ -830,17 +810,14 @@ impl contentv1::tag_service_server::TagService for TagServiceImpl {
         let Some(contentv1::delete_tag_request::QueryBy::Id(id)) = req.query_by else {
             return Err(bad("query_by required"));
         };
-        tags::Entity::delete_by_id(id as i64)
-            .exec(&self.state.db)
-            .await
-            .map_err(db_status)?;
+        repo::delete_tag(&self.state.db, id as i64).await?;
         Ok(Response::new(pbjson_types::Empty {}))
     }
 }
 
 // ── Page ─────────────────────────────────────────────────────────────
 
-fn page_translation_proto(r: page_translations::Model) -> contentv1::PageTranslation {
+pub(crate) fn page_translation_proto(r: page_translations::Model) -> contentv1::PageTranslation {
     contentv1::PageTranslation {
         id: Some(r.id as u32),
         page_id: r.page_id.map(|v| v as u32),
@@ -856,7 +833,10 @@ fn page_translation_proto(r: page_translations::Model) -> contentv1::PageTransla
     }
 }
 
-fn page_proto(r: pages::Model, translations: Vec<page_translations::Model>) -> contentv1::Page {
+pub(crate) fn page_proto(
+    r: pages::Model,
+    translations: Vec<page_translations::Model>,
+) -> contentv1::Page {
     let available_languages = translations
         .iter()
         .filter_map(|t| t.language_code.clone())
@@ -927,11 +907,7 @@ impl contentv1::page_service_server::PageService for PageServiceImpl {
         let Some(contentv1::get_page_request::QueryBy::Id(id)) = req.query_by else {
             return Err(bad("query_by required"));
         };
-        let row = pages::Entity::find_by_id(id as i64)
-            .one(&self.state.db)
-            .await
-            .map_err(db_status)?
-            .ok_or_else(|| not_found("page"))?;
+        let row = repo::page_by_id(&self.state.db, id as i64).await?;
         let translations = page_translations::Entity::find()
             .filter(page_translations::Column::PageId.eq(row.id))
             .all(&self.state.db)
@@ -997,11 +973,7 @@ impl contentv1::page_service_server::PageService for PageServiceImpl {
         request: Request<contentv1::UpdatePageRequest>,
     ) -> Result<Response<contentv1::Page>, Status> {
         let req = request.into_inner();
-        let row = pages::Entity::find_by_id(req.id as i64)
-            .one(&self.state.db)
-            .await
-            .map_err(db_status)?
-            .ok_or_else(|| not_found("page"))?;
+        let row = repo::page_by_id(&self.state.db, req.id as i64).await?;
         let mut a: pages::ActiveModel = row.into();
         if let Some(data) = req.data {
             if let Some(v) = data.status {
@@ -1038,10 +1010,7 @@ impl contentv1::page_service_server::PageService for PageServiceImpl {
         let Some(contentv1::delete_page_request::QueryBy::Id(id)) = req.query_by else {
             return Err(bad("query_by required"));
         };
-        pages::Entity::delete_by_id(id as i64)
-            .exec(&self.state.db)
-            .await
-            .map_err(db_status)?;
+        repo::delete_page(&self.state.db, id as i64).await?;
         Ok(Response::new(pbjson_types::Empty {}))
     }
 }

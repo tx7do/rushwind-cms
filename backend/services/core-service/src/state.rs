@@ -120,3 +120,11 @@ pub fn ts_from_proto(
         .single()
         .map(|dt| dt.fixed_offset())
 }
+
+/// The repo-layer result alias (the tonic Status error channel).
+pub type StatusResult<T> = Result<T, tonic::Status>;
+
+/// NOT_FOUND with the resource label (the repo-layer form).
+pub fn not_found_status(what: &str) -> tonic::Status {
+    tonic::Status::not_found(format!("{what} not found"))
+}

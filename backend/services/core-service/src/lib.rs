@@ -4,6 +4,8 @@
 
 pub mod config;
 pub mod data;
+
+pub use state::{db_status, not_found_status, StatusResult};
 pub mod server;
 pub mod service;
 pub mod state;

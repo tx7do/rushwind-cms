@@ -4,4 +4,5 @@
 //! ent-generated code); this layer adds the repos whose query shape
 //! spans tables or needs raw SQL.
 
+pub mod content_repo;
 pub mod helpers;
