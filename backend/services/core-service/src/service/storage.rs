@@ -83,6 +83,32 @@ fn oss_provider_name(v: i32) -> Option<String> {
     )
 }
 
+fn mime_of(ext: &str) -> &'static str {
+    match ext.to_ascii_lowercase().as_str() {
+        "png" => "image/png",
+        "jpg" | "jpeg" => "image/jpeg",
+        "gif" => "image/gif",
+        "svg" => "image/svg+xml",
+        "webp" => "image/webp",
+        "pdf" => "application/pdf",
+        "json" => "application/json",
+        "txt" | "md" => "text/plain",
+        "mp4" => "video/mp4",
+        "mp3" => "audio/mpeg",
+        "zip" => "application/zip",
+        _ => "application/octet-stream",
+    }
+}
+
+fn metadata_str<T>(request: &tonic::Request<T>, name: &str) -> String {
+    request
+        .metadata()
+        .get(name)
+        .and_then(|v| v.to_str().ok())
+        .unwrap_or_default()
+        .to_string()
+}
+
 pub struct FileServiceImpl {
     pub state: Arc<AppState>,
 }
@@ -109,7 +135,7 @@ fn tenant_of<T>(request: &tonic::Request<T>) -> i64 {
 
 impl FileServiceImpl {
     /// Writes an object to the local store + the metadata row (the
-    /// upload transport bridge calls this; JSON/base64 for now).
+    /// streaming upload face's landing point).
     pub async fn put(
         &self,
         uploader: i64,
@@ -174,6 +200,57 @@ impl FileServiceImpl {
             .map_err(|_| Status::not_found("object bytes missing"))?;
         Ok((row, bytes))
     }
+
+    /// The upload streams' shared body: the bytes off the HttpBody
+    /// chunks into the local store; the file name and mime ride the
+    /// request metadata beside the operator headers.
+    async fn upload_stream(
+        &self,
+        request: Request<tonic::Streaming<proto::proto::google::api::HttpBody>>,
+    ) -> Result<Response<storagev1::UploadFileResponse>, Status> {
+        let uploader = operator_of(&request)?;
+        let tenant = tenant_of(&request);
+        let file_name = metadata_str(&request, "x-file-name");
+        let mime = metadata_str(&request, "x-mime");
+        let mut bytes = Vec::new();
+        let mut stream = request.into_inner();
+        use tokio_stream::StreamExt as _;
+        while let Some(chunk) = stream.next().await {
+            match chunk {
+                Ok(b) => bytes.extend_from_slice(&b.data),
+                Err(e) => return Err(e),
+            }
+        }
+        if bytes.is_empty() {
+            return Err(bad("empty payload"));
+        }
+        let row = self.put(uploader, tenant, &file_name, &mime, bytes).await?;
+        let mut resp = Response::new(storagev1::UploadFileResponse {
+            object_name: row.link_url.clone(),
+            ..Default::default()
+        });
+        // The created row's reference fields ride the response metadata
+        // — the wire response carries only the link, and the media
+        // library flow's row linkage (id/size/storage location) needs
+        // the rest. ASCII-only; dropped on encoding failure.
+        if let Ok(v) = tonic::metadata::MetadataValue::try_from(row.id.to_string().as_str()) {
+            resp.metadata_mut().insert("x-file-id", v);
+        }
+        if let Some(size) = row.size {
+            if let Ok(v) = tonic::metadata::MetadataValue::try_from(size.to_string().as_str()) {
+                resp.metadata_mut().insert("x-file-size", v);
+            }
+        }
+        let path = format!(
+            "{}/{}",
+            row.file_directory.clone().unwrap_or_default(),
+            row.save_file_name.clone().unwrap_or_default()
+        );
+        if let Ok(v) = tonic::metadata::MetadataValue::try_from(path.as_str()) {
+            resp.metadata_mut().insert("x-file-path", v);
+        }
+        Ok(resp)
+    }
 }
 
 #[async_trait::async_trait]
@@ -209,36 +286,34 @@ impl storagev1::file_service_server::FileService for FileServiceImpl {
         &self,
         request: Request<storagev1::CreateFileRequest>,
     ) -> Result<Response<storagev1::File>, Status> {
-        let uploader = operator_of(&request)?;
-        let tenant = tenant_of(&request);
         let req = request.into_inner();
         let Some(data) = req.data else {
             return Err(bad("data required"));
         };
-        // The upload transport bridge, interim shape: the BFF ships the
-        // object bytes base64-coded in `bucket_name` (the File message
-        // carries no byte field) through this unary metadata RPC; the
-        // proto's streaming channels land with the transport phase and
-        // replace the coding.
-        let payload = data.bucket_name.clone().unwrap_or_default();
-        let Ok(bytes) = base64::Engine::decode(
-            &base64::engine::general_purpose::STANDARD,
-            payload.as_bytes(),
-        ) else {
-            return Err(bad("payload decode failed"));
-        };
-        if bytes.is_empty() {
-            return Err(bad("empty payload"));
-        }
-        let row = self
-            .put(
-                uploader,
-                tenant,
-                &data.file_name.clone().unwrap_or_default(),
-                "",
-                bytes,
-            )
-            .await?;
+        // The plain metadata insert (the reference's FileRepo.Create) —
+        // the object bytes ride the streaming channel, never this face.
+        let size = data.size;
+        let row = repo::insert_files(
+            &self.state.db,
+            files::ActiveModel {
+                provider: Set(data.provider.and_then(oss_provider_name)),
+                bucket_name: Set(data.bucket_name),
+                file_directory: Set(data.file_directory),
+                file_guid: Set(data.file_guid),
+                save_file_name: Set(data.save_file_name),
+                file_name: Set(data.file_name),
+                extension: Set(data.extension),
+                size: Set(size.map(|v| v as i64)),
+                size_format: Set(size.map(|v| format_size(v as i64))),
+                link_url: Set(data.link_url),
+                content_hash: Set(data.content_hash),
+                tenant_id: Set(data.tenant_id.map(|v| v as i64)),
+                created_by: Set(data.created_by.map(|v| v as i64)),
+                created_at: Set(Some(store::now())),
+                ..Default::default()
+            },
+        )
+        .await?;
         Ok(Response::new(file_proto(row)))
     }
 
@@ -307,6 +382,62 @@ impl storagev1::file_service_server::FileService for FileServiceImpl {
         }
         repo::delete_files(&self.state.db, id).await?;
         Ok(Response::new(pbjson_types::Empty {}))
+    }
+}
+
+// ── FileTransferService (the streaming transport face) ──────────────
+
+#[async_trait::async_trait]
+impl storagev1::file_transfer_service_server::FileTransferService for FileServiceImpl {
+    /// The download stream: the object bytes + the extension-derived
+    /// content type as one HttpBody; the recorded display name rides
+    /// the response metadata for the BFF's disposition header. The
+    /// tenant ownership gate (the reference's DownloadFile check) sits
+    /// here — the row never leaves this service.
+    async fn download_file(
+        &self,
+        request: Request<storagev1::DownloadFileRequest>,
+    ) -> Result<Response<tonic::codegen::BoxStream<proto::proto::google::api::HttpBody>>, Status>
+    {
+        let tenant = tenant_of(&request);
+        let req = request.into_inner();
+        let Some(storagev1::download_file_request::Selector::FileId(id)) = req.selector else {
+            return Err(bad("file_id required"));
+        };
+        let (row, bytes) = self.get_object(id as i64).await?;
+        if row.tenant_id.unwrap_or(0) != tenant {
+            return Err(Status::permission_denied(
+                "forbidden: file does not belong to caller's tenant",
+            ));
+        }
+        let body = proto::proto::google::api::HttpBody {
+            content_type: mime_of(&row.extension.clone().unwrap_or_default()).to_string(),
+            data: bytes,
+            ..Default::default()
+        };
+        let stream: tonic::codegen::BoxStream<proto::proto::google::api::HttpBody> =
+            Box::pin(tokio_stream::iter(std::iter::once(Ok(body))));
+        let mut resp = Response::new(stream);
+        if let Ok(v) = tonic::metadata::MetadataValue::try_from(
+            row.file_name.clone().unwrap_or_default().as_str(),
+        ) {
+            resp.metadata_mut().insert("x-file-name", v);
+        }
+        Ok(resp)
+    }
+
+    async fn put_upload_file(
+        &self,
+        request: Request<tonic::Streaming<proto::proto::google::api::HttpBody>>,
+    ) -> Result<Response<storagev1::UploadFileResponse>, Status> {
+        self.upload_stream(request).await
+    }
+
+    async fn post_upload_file(
+        &self,
+        request: Request<tonic::Streaming<proto::proto::google::api::HttpBody>>,
+    ) -> Result<Response<storagev1::UploadFileResponse>, Status> {
+        self.upload_stream(request).await
     }
 }
 

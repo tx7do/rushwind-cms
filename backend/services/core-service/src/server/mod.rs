@@ -119,6 +119,11 @@ pub fn registry(state: Arc<AppState>) -> tonic::service::Routes {
         ),
     )
     .add_service(
+        proto::proto::storage::service::v1::file_transfer_service_server::FileTransferServiceServer::new(
+            service::storage::FileServiceImpl { state: Arc::clone(&state) },
+        ),
+    )
+    .add_service(
         proto::proto::permission::service::v1::role_service_server::RoleServiceServer::new(
             service::writes::RoleWriteServiceImpl { state: Arc::clone(&state) },
         ),

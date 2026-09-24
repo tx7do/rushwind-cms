@@ -30,7 +30,6 @@ uuid = { workspace = true }
 rand = "0.9"
 hex = "0.4"
 sha2 = "0.10"
-base64 = "0.22"
 pbjson-types = { workspace = true }
 async-trait = { workspace = true }
 tokio-stream = "0.1"

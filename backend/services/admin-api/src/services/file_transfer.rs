@@ -7,6 +7,14 @@
 //! gate as the generated protected subtree — the reference's hand
 //! registration sits inside the same server middleware chain.
 //!
+//! Transport: the object bytes ride the proto's streaming channels —
+//! upload as one HttpBody chunk (the file name and mime beside the
+//! operator in the gRPC metadata), download as a relayed HttpBody
+//! stream (the content type off the stream, the recorded display name
+//! off the response metadata for the disposition header). The BFF
+//! touches no disk and carries no storage-root knowledge; the tenant
+//! ownership gate sits core-side with the rows.
+//!
 //! Wire format (the admin-react uploader):
 //! * `POST|PUT /admin/v1/file/upload` — multipart fields: `file` (blob),
 //!   `sourceFileName`, `mime`, `size`, `method`, `storageObject`
@@ -16,19 +24,12 @@
 //!   the file part alone (its header carries the name and mime)
 //! * `GET /admin/v1/file/download?fileId=|fileGuid=` — streams the
 //!   object bytes back with the stored content type
-//!
-//! Interim transport: the object bytes bridge to the core store
-//! base64-coded through the unary metadata create (the proto's
-//! streaming channels land with the transport phase); the download
-//! stopgap reads the single-node store directly off the row's recorded
-//! location.
 
 use std::sync::Arc;
 
 use axum::extract::{FromRequest, Multipart, Request, State};
 use axum::http::header;
 use axum::response::{IntoResponse, Response};
-use base64::Engine as _;
 
 use crate::services::{map_status, with_operator_claims};
 use crate::state::{self, AppState};
@@ -40,6 +41,12 @@ fn core_file(
     channel: &tonic::transport::Channel,
 ) -> storagev1::file_service_client::FileServiceClient<tonic::transport::Channel> {
     storagev1::file_service_client::FileServiceClient::new(channel.clone())
+}
+
+fn core_transfer(
+    channel: &tonic::transport::Channel,
+) -> storagev1::file_transfer_service_client::FileTransferServiceClient<tonic::transport::Channel> {
+    storagev1::file_transfer_service_client::FileTransferServiceClient::new(channel.clone())
 }
 
 fn core_media_asset(
@@ -124,12 +131,95 @@ async fn read_upload(
     Ok((file_name, mime, bytes))
 }
 
-/// The multipart upload handler — parses the form, ships the bytes to
-/// the core object store through the interim base64 bridge, answers
-/// the contract's `UploadFileResponse` (the recorded download link).
+/// The streaming upload's parsed outcome: the contract JSON answer
+/// (`UploadFileResponse` — the recorded link) plus the created row's
+/// reference fields off the response metadata (the media library
+/// flow's row linkage; the wire response carries only the link).
+struct UploadedFileRef {
+    response: Response,
+    link: Option<String>,
+    file_id: Option<u32>,
+    size: Option<u64>,
+    storage_path: Option<String>,
+}
+
+/// Ships one blob through the streaming upload channel: the bytes as a
+/// single HttpBody chunk, the file name and mime (and the operator bag)
+/// as the call's gRPC metadata.
+async fn stream_upload(
+    state: &AppState,
+    claims: &Option<serde_json::Map<String, serde_json::Value>>,
+    method: &axum::http::Method,
+    file_name: String,
+    mime: String,
+    bytes: Vec<u8>,
+) -> UploadedFileRef {
+    let body = proto::proto::google::api::HttpBody {
+        content_type: mime.clone(),
+        data: bytes,
+        ..Default::default()
+    };
+    let mut req = with_operator_claims(claims, futures_util::stream::iter(std::iter::once(body)));
+    if let Ok(v) = tonic::metadata::MetadataValue::try_from(file_name.as_str()) {
+        req.metadata_mut().insert("x-file-name", v);
+    }
+    if let Ok(v) = tonic::metadata::MetadataValue::try_from(mime.as_str()) {
+        req.metadata_mut().insert("x-mime", v);
+    }
+    let mut core = core_transfer(&state.core_channel);
+    let call = if *method == axum::http::Method::PUT {
+        core.put_upload_file(req).await
+    } else {
+        core.post_upload_file(req).await
+    };
+    match call {
+        Ok(resp) => {
+            let file_id = resp
+                .metadata()
+                .get("x-file-id")
+                .and_then(|v| v.to_str().ok())
+                .and_then(|v| v.parse::<u32>().ok());
+            let size = resp
+                .metadata()
+                .get("x-file-size")
+                .and_then(|v| v.to_str().ok())
+                .and_then(|v| v.parse::<u64>().ok());
+            let storage_path = resp
+                .metadata()
+                .get("x-file-path")
+                .and_then(|v| v.to_str().ok())
+                .map(str::to_string);
+            let out = resp.into_inner();
+            let body = serde_json::json!({ "objectName": out.object_name.clone() });
+            let response = (
+                [(header::CONTENT_TYPE, "application/json")],
+                body.to_string(),
+            )
+                .into_response();
+            UploadedFileRef {
+                response,
+                link: out.object_name,
+                file_id,
+                size,
+                storage_path,
+            }
+        }
+        Err(e) => UploadedFileRef {
+            response: rushwind_http_binding::envelope::error_response(map_status(e)),
+            link: None,
+            file_id: None,
+            size: None,
+            storage_path: None,
+        },
+    }
+}
+
+/// The multipart upload handler — parses the form, ships the bytes
+/// through the streaming channel, answers the contract JSON.
 pub async fn upload(State(state): State<Arc<AppState>>, req: Request) -> Response {
     let claims = claims_of(&req);
-    let (file_name, _mime, bytes) = match read_upload(req, false).await {
+    let method = req.method().clone();
+    let (file_name, mime, bytes) = match read_upload(req, false).await {
         Ok(v) => v,
         Err(e) => return rushwind_http_binding::envelope::error_response(e),
     };
@@ -145,34 +235,18 @@ pub async fn upload(State(state): State<Arc<AppState>>, req: Request) -> Respons
             "empty file",
         ));
     }
-    let payload = storagev1::CreateFileRequest {
-        data: Some(storagev1::File {
-            file_name: Some(file_name),
-            // The interim bridge carrier — the core's create decodes it
-            // (the File message carries no byte field).
-            bucket_name: Some(base64::engine::general_purpose::STANDARD.encode(&bytes)),
-            ..Default::default()
-        }),
-    };
-    let mut core = core_file(&state.core_channel);
-    let file = match core.create(with_operator_claims(&claims, payload)).await {
-        Ok(resp) => resp.into_inner(),
-        Err(e) => return rushwind_http_binding::envelope::error_response(map_status(e)),
-    };
-    let body = serde_json::json!({ "objectName": file.link_url });
-    (
-        [(header::CONTENT_TYPE, "application/json")],
-        body.to_string(),
-    )
-        .into_response()
+    stream_upload(&state, &claims, &method, file_name, mime, bytes)
+        .await
+        .response
 }
 
 /// The media-library variant (the reference's `UploadMediaAsset`): the
-/// file part alone, then the file row through the bridge followed by
-/// the media-asset row (the asset classifier and the COMPLETED status
-/// mirror the reference's upload tail).
+/// file part alone through the streaming channel, then the media-asset
+/// row (the linkage fields off the upload's response metadata, the
+/// classifier and COMPLETED status mirroring the reference's tail).
 pub async fn upload_asset(State(state): State<Arc<AppState>>, req: Request) -> Response {
     let claims = claims_of(&req);
+    let method = req.method().clone();
     let (file_name, mime, bytes) = match read_upload(req, true).await {
         Ok(v) => v,
         Err(e) => return rushwind_http_binding::envelope::error_response(e),
@@ -189,35 +263,25 @@ pub async fn upload_asset(State(state): State<Arc<AppState>>, req: Request) -> R
             "empty file",
         ));
     }
-    let file_payload = storagev1::CreateFileRequest {
-        data: Some(storagev1::File {
-            file_name: Some(file_name.clone()),
-            bucket_name: Some(base64::engine::general_purpose::STANDARD.encode(&bytes)),
-            ..Default::default()
-        }),
-    };
-    let mut file_core = core_file(&state.core_channel);
-    let file = match file_core
-        .create(with_operator_claims(&claims, file_payload))
-        .await
-    {
-        Ok(resp) => resp.into_inner(),
-        Err(e) => return rushwind_http_binding::envelope::error_response(map_status(e)),
-    };
-    let storage_path = format!(
-        "{}/{}",
-        file.file_directory.clone().unwrap_or_default(),
-        file.save_file_name.clone().unwrap_or_default()
-    );
     let asset_type = asset_type_of(&mime);
+    let out = stream_upload(
+        &state,
+        &claims,
+        &method,
+        file_name.clone(),
+        mime.clone(),
+        bytes,
+    )
+    .await;
+    let mut asset_core = core_media_asset(&state.core_channel);
     let asset = mediav1::CreateMediaAssetRequest {
         data: Some(mediav1::MediaAsset {
-            file_id: file.id,
+            file_id: out.file_id,
             filename: Some(file_name),
             mime_type: Some(mime),
-            size: file.size,
-            url: file.link_url.clone(),
-            storage_path: Some(storage_path),
+            size: out.size,
+            url: out.link,
+            storage_path: out.storage_path,
             r#type: Some(asset_type),
             processing_status: Some(mediav1::media_asset::ProcessingStatus::Completed as i32),
             created_by: claims
@@ -228,19 +292,13 @@ pub async fn upload_asset(State(state): State<Arc<AppState>>, req: Request) -> R
             ..Default::default()
         }),
     };
-    let mut asset_core = core_media_asset(&state.core_channel);
     if let Err(e) = asset_core
         .create(with_operator_claims(&claims, asset))
         .await
     {
         return rushwind_http_binding::envelope::error_response(map_status(e));
     }
-    let body = serde_json::json!({ "objectName": file.link_url });
-    (
-        [(header::CONTENT_TYPE, "application/json")],
-        body.to_string(),
-    )
-        .into_response()
+    out.response
 }
 
 /// Query shape of the download endpoint.
@@ -261,22 +319,15 @@ pub async fn download_query(State(state): State<Arc<AppState>>, req: Request) ->
         .query()
         .and_then(|s| serde_urlencoded::from_str::<DownloadQuery>(s).ok())
         .unwrap_or_default();
-    let file_id = q.file_id.or(q.file_id_alias);
-    let file_guid = q.file_guid.or(q.file_guid_alias);
-
     let mut core = core_file(&state.core_channel);
-    // Look the file up (by id or guid — the recorded links carry the
-    // guid), then stream the object.
-    let lookup = if let Some(id) = file_id {
-        core.get(tonic::Request::new(storagev1::GetFileRequest {
-            query_by: Some(storagev1::get_file_request::QueryBy::Id(id)),
-            ..Default::default()
-        }))
-        .await
-    } else if let Some(guid) = file_guid {
-        // The generated face carries no by-guid query; list + match.
+    // Resolve the target row id: direct, or via the recorded link's
+    // guid (the generated face carries no by-guid query; list + match).
+    let id = if let Some(id) = q.file_id.or(q.file_id_alias) {
+        Some(id)
+    } else if let Some(guid) = q.file_guid.or(q.file_guid_alias) {
         let list = match core
-            .list(tonic::Request::new(
+            .list(with_operator_claims(
+                &claims,
                 proto::proto::pagination::PagingRequest {
                     no_paging: Some(true),
                     ..Default::default()
@@ -287,69 +338,73 @@ pub async fn download_query(State(state): State<Arc<AppState>>, req: Request) ->
             Ok(resp) => resp.into_inner().items,
             Err(e) => return rushwind_http_binding::envelope::error_response(map_status(e)),
         };
-        let Some(hit) = list
-            .into_iter()
+        list.into_iter()
             .find(|f| f.file_guid.as_deref() == Some(guid.as_str()))
-        else {
-            return rushwind_http_binding::envelope::error_response(state::not_found("file"));
-        };
-        core.get(tonic::Request::new(storagev1::GetFileRequest {
-            query_by: Some(storagev1::get_file_request::QueryBy::Id(
-                hit.id.unwrap_or(0),
-            )),
-            ..Default::default()
-        }))
-        .await
+            .and_then(|f| f.id)
     } else {
         return rushwind_http_binding::envelope::error_response(state::status_error(
             "BAD_REQUEST",
             "fileId or fileGuid required",
         ));
     };
+    let Some(id) = id else {
+        return rushwind_http_binding::envelope::error_response(state::not_found("file"));
+    };
 
-    let file = match lookup {
-        Ok(resp) => resp.into_inner(),
+    let mut transfer = core_transfer(&state.core_channel);
+    let resp = match transfer
+        .download_file(with_operator_claims(
+            &claims,
+            storagev1::DownloadFileRequest {
+                selector: Some(storagev1::download_file_request::Selector::FileId(id)),
+                ..Default::default()
+            },
+        ))
+        .await
+    {
+        Ok(r) => r,
         Err(e) => return rushwind_http_binding::envelope::error_response(map_status(e)),
     };
-    // The tenant ownership check (the reference's DownloadFile gate).
-    let row_tenant = file.tenant_id.unwrap_or(0);
-    let caller_tenant = claims
-        .as_ref()
-        .and_then(|c| c.get("tid"))
-        .and_then(|v| v.as_u64())
-        .unwrap_or(0) as u32;
-    if row_tenant != caller_tenant {
-        return rushwind_http_binding::envelope::error_response(state::status_error(
-            "FORBIDDEN",
-            "file does not belong to caller's tenant",
-        ));
-    }
-    let name = file.file_name.clone().unwrap_or_default();
-    let ext = file.extension.clone().unwrap_or_default();
-    let content_type = mime_of(&ext);
-    // The stopgap read: the single-node store recorded on the row (the
-    // streaming download channel lands with the transport phase).
-    let path = std::path::Path::new(&file.file_directory.clone().unwrap_or_default())
-        .join(file.save_file_name.clone().unwrap_or_default());
-    match tokio::fs::read(&path).await {
-        Ok(bytes) => {
-            let mut resp = Response::new(axum::body::Body::from(bytes));
-            let h = resp.headers_mut();
-            h.insert(
-                header::CONTENT_TYPE,
-                content_type
-                    .parse()
-                    .unwrap_or(axum::http::HeaderValue::from_static(
-                        "application/octet-stream",
-                    )),
-            );
-            if let Ok(v) = format!("attachment; filename=\"{}\"", sanitize(&name)).parse() {
-                h.insert(header::CONTENT_DISPOSITION, v);
+    // The display name off the response metadata (the disposition
+    // header's filename); the content type off the stream's chunks.
+    let display_name = resp
+        .metadata()
+        .get("x-file-name")
+        .and_then(|v| v.to_str().ok())
+        .unwrap_or("file")
+        .to_string();
+    let mut stream = resp.into_inner();
+    let mut bytes = Vec::new();
+    let mut content_type = String::new();
+    use futures_util::StreamExt as _;
+    while let Some(chunk) = stream.next().await {
+        match chunk {
+            Ok(b) => {
+                if content_type.is_empty() {
+                    content_type = b.content_type.clone();
+                }
+                bytes.extend_from_slice(&b.data);
             }
-            resp
+            Err(e) => return rushwind_http_binding::envelope::error_response(map_status(e)),
         }
-        Err(_) => rushwind_http_binding::envelope::error_response(state::not_found("object bytes")),
     }
+    if bytes.is_empty() {
+        return rushwind_http_binding::envelope::error_response(state::not_found("object bytes"));
+    }
+    let mut resp = Response::new(axum::body::Body::from(bytes));
+    let h = resp.headers_mut();
+    h.insert(
+        header::CONTENT_TYPE,
+        content_type
+            .parse()
+            .unwrap_or(axum::http::HeaderValue::from_static(
+                "application/octet-stream",
+            )),
+    );
+    if let Ok(v) = format!("attachment; filename=\"{}\"", sanitize(&display_name)).parse() {
+        h.insert(header::CONTENT_DISPOSITION, v);
+    }
+    resp
 }
 
 /// The asset classifier — the reference's mimeTypeToAssetType table
@@ -409,23 +464,6 @@ fn asset_type_of(mime: &str) -> i32 {
         return T::Document as i32;
     }
     T::Other as i32
-}
-
-fn mime_of(ext: &str) -> &'static str {
-    match ext.to_ascii_lowercase().as_str() {
-        "png" => "image/png",
-        "jpg" | "jpeg" => "image/jpeg",
-        "gif" => "image/gif",
-        "svg" => "image/svg+xml",
-        "webp" => "image/webp",
-        "pdf" => "application/pdf",
-        "json" => "application/json",
-        "txt" | "md" => "text/plain",
-        "mp4" => "video/mp4",
-        "mp3" => "audio/mpeg",
-        "zip" => "application/zip",
-        _ => "application/octet-stream",
-    }
 }
 
 fn sanitize(name: &str) -> String {
