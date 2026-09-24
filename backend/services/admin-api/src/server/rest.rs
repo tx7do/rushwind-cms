@@ -201,5 +201,12 @@ pub fn build_router(state: Arc<AppState>) -> axum::Router {
         mount_user_service => std::sync::Arc::new(crate::services::proxies::UserProxy { state: std::sync::Arc::clone(&state) }),
     );
 
-    router_pub.merge(router_gate)
+    let app = router_pub.merge(router_gate);
+
+    // The audit-write layer: post-handler persistence (api + operation
+    // logs), outermost so it sees final statuses.
+    app.layer(axum::middleware::from_fn_with_state(
+        Arc::clone(&state),
+        crate::audit::layer,
+    ))
 }

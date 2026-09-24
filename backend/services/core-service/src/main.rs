@@ -5,7 +5,7 @@
 //! face (:6602 by default).
 
 use core_service::config::Config;
-use core_service::services;
+use core_service::server;
 use core_service::state::AppState;
 
 use std::sync::Arc;
@@ -23,7 +23,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let listener = tokio::net::TcpListener::bind(addr).await?;
     eprintln!("[core-service] serving gRPC on {}", cfg.grpc_addr);
     tonic::transport::Server::builder()
-        .add_routes(services::registry(state))
+        .add_routes(server::registry(state))
         .serve_with_incoming(tokio_stream::wrappers::TcpListenerStream::new(listener))
         .await?;
     Ok(())

@@ -50,7 +50,6 @@ impl Default for Hub {
 impl Hub {
     /// Try-publish (non-blocking; a slow/full buffer drops for that
     /// receiver only).
-    #[allow(dead_code)] // the notification services publish when they land
     pub fn publish(&self, user_id: u32, payload: String) {
         let _ = self.tx.send((user_id, payload));
     }

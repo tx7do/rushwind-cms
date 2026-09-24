@@ -366,6 +366,55 @@ impl contentv1::post_service_server::PostService for PostServiceImpl {
         )))
     }
 
+    async fn search_posts(
+        &self,
+        request: Request<contentv1::SearchPostsRequest>,
+    ) -> Result<Response<contentv1::SearchPostsResponse>, Status> {
+        let req = request.into_inner();
+        let keyword = format!("%{}%", req.query.replace('%', ""));
+        // SQL full-text fallback (the OpenSearch bridge lands with the
+        // search phase): published posts whose any translation matches,
+        // returned as (post_id, language, title) hits.
+        let page = req.page.max(1) as u64;
+        let page_size = req.page_size.clamp(1, 50) as u64;
+        let offset = (page - 1) * page_size;
+        let db = &self.state.db;
+        use sea_orm::ConnectionTrait as _;
+        let rows = db
+            .query_all_raw(sea_orm::Statement::from_sql_and_values(
+                sea_orm::DatabaseBackend::Postgres,
+                r#"SELECT p.id AS post_id, t.language_code AS lang, t.title AS title
+                   FROM posts p
+                   JOIN post_translations t ON t.post_id = p.id
+                   WHERE p.status = 'POST_STATUS_PUBLISHED'
+                     AND (t.title ILIKE $1 OR t.content ILIKE $1 OR t.summary ILIKE $1)
+                     AND ($2 = '' OR t.language_code = $2)
+                   ORDER BY p.created_at DESC
+                   LIMIT $3 OFFSET $4"#,
+                [
+                    keyword.into(),
+                    req.language.clone().into(),
+                    (page_size as i64).into(),
+                    (offset as i64).into(),
+                ],
+            ))
+            .await
+            .map_err(db_status)?;
+        let items: Vec<contentv1::SearchPostHit> = rows
+            .into_iter()
+            .map(|r| contentv1::SearchPostHit {
+                post_id: r.try_get::<i64>("", "post_id").unwrap_or(0) as u32,
+                language: r.try_get::<String>("", "lang").unwrap_or_default(),
+                title: r.try_get::<String>("", "title").unwrap_or_default(),
+            })
+            .collect();
+        let total = items.len() as i32;
+        Ok(Response::new(contentv1::SearchPostsResponse {
+            items,
+            total,
+        }))
+    }
+
     async fn delete(
         &self,
         request: Request<contentv1::DeletePostRequest>,

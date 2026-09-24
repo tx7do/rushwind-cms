@@ -1,0 +1,70 @@
+//! Generated sea-orm entity modules — one file per table of the
+//! golden DDL (sql/schema.sql). DO NOT EDIT; regenerate via
+//! scripts/gen-entities.py when the schema is re-dumped.
+#![allow(clippy::all)]
+#![allow(missing_docs)]
+
+pub mod categories;
+pub mod category_translations;
+pub mod comment_likes;
+pub mod comments;
+pub mod content_model_translations;
+pub mod content_models;
+pub mod field_definition_translations;
+pub mod field_definitions;
+pub mod files;
+pub mod interaction_counters;
+pub mod internal_message_categories;
+pub mod internal_message_recipients;
+pub mod internal_messages;
+pub mod media_assets;
+pub mod media_variants;
+pub mod navigation_items;
+pub mod navigations;
+pub mod page_translations;
+pub mod pages;
+pub mod post_categories;
+pub mod post_likes;
+pub mod post_tags;
+pub mod post_translations;
+pub mod post_watches;
+pub mod posts;
+pub mod section_translations;
+pub mod sections;
+pub mod site_settings;
+pub mod sites;
+pub mod sys_api_audit_logs;
+pub mod sys_apis;
+pub mod sys_data_access_audit_logs;
+pub mod sys_dict_entries;
+pub mod sys_dict_types;
+pub mod sys_languages;
+pub mod sys_login_audit_logs;
+pub mod sys_login_policies;
+pub mod sys_membership_org_units;
+pub mod sys_membership_positions;
+pub mod sys_membership_roles;
+pub mod sys_memberships;
+pub mod sys_menus;
+pub mod sys_operation_audit_logs;
+pub mod sys_org_units;
+pub mod sys_permission_apis;
+pub mod sys_permission_audit_logs;
+pub mod sys_permission_groups;
+pub mod sys_permission_menus;
+pub mod sys_permission_policies;
+pub mod sys_permissions;
+pub mod sys_policy_evaluation_logs;
+pub mod sys_positions;
+pub mod sys_role_metadata;
+pub mod sys_role_permissions;
+pub mod sys_roles;
+pub mod sys_tasks;
+pub mod sys_tenants;
+pub mod sys_user_credentials;
+pub mod sys_user_org_units;
+pub mod sys_user_positions;
+pub mod sys_user_roles;
+pub mod sys_users;
+pub mod tag_translations;
+pub mod tags;

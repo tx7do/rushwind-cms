@@ -20,6 +20,8 @@ pub const SCHEMA_SQL: &str = include_str!("../../../sql/schema.sql");
 pub const SEED_SQL: &str = include_str!("../../../sql/seed.sql");
 /// The demo seed data, embedded.
 pub const DEMO_DATA_SQL: &str = include_str!("../../../sql/demo-data.sql");
+/// The menu seed (the admin-react route tree), embedded.
+pub const MENUS_SEED_SQL: &str = include_str!("../../../sql/menus-seed.sql");
 
 /// DB failure → the Unknown envelope shape (500, empty reason).
 pub fn db_err(e: sea_orm::DbErr) -> rushwind_http_binding::envelope::StatusError {

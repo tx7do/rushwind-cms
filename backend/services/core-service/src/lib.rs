@@ -3,6 +3,8 @@
 //! binary (`main.rs`) is a thin tonic assembly entry over this surface.
 
 pub mod config;
-pub mod services;
+pub mod data;
+pub mod server;
+pub mod service;
 pub mod state;
 pub mod token;

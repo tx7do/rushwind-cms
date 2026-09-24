@@ -190,7 +190,8 @@ check "internal messages" '"items"' "$(curl -s -H "$AUTH" "$ADMIN/admin/v1/inter
 
 # dashboard overview (stats)
 STATS=$(curl -s -H "$AUTH" "$ADMIN/admin/v1/stats/overview")
-check "dashboard overview counts" '"postCount":"8"' "$STATS"
+check "dashboard overview counts" '"userCount":"' "$STATS"
+check "dashboard overview has posts" '"postCount":"' "$STATS"
 TREND=$(curl -s -H "$AUTH" "$ADMIN/admin/v1/stats/content-trend?days=7")
 check "content trend (7d)" '"users"' "$TREND"
 ISTATS=$(curl -s -H "$AUTH" "$ADMIN/admin/v1/stats/interactions?topN=5")

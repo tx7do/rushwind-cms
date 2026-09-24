@@ -18,8 +18,8 @@ use proto::proto::identity::service::v1 as identityv1;
 use proto::proto::permission::service::v1 as permissionv1;
 use proto::proto::translator::service::v1 as translatorv1;
 
-use crate::services::identity::role_proto;
-use crate::services::identity::user_proto;
+use crate::service::identity::role_proto;
+use crate::service::identity::user_proto;
 
 /// Insert a USERNAME credential for a user (bcrypt of the given
 /// password; no AES layer — administrative sets arrive in plaintext).
@@ -505,7 +505,7 @@ pub struct TenantWriteServiceImpl {
     pub state: Arc<AppState>,
 }
 
-use crate::services::identity::tenant_proto;
+use crate::service::identity::tenant_proto;
 
 #[async_trait::async_trait]
 impl identityv1::tenant_service_server::TenantService for TenantWriteServiceImpl {

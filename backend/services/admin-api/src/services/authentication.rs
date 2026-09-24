@@ -85,12 +85,75 @@ impl proto::gen_admin::services::AuthenticationServiceHandlers for Authenticatio
         // Pin the client type (admin) and forward to core.
         let mut req = req;
         req.client_type = Some(0);
+        let login_username = req
+            .identifier
+            .as_ref()
+            .map(|i| match i {
+                proto::proto::authentication::service::v1::login_request::Identifier::Username(
+                    u,
+                ) => u.clone(),
+                proto::proto::authentication::service::v1::login_request::Identifier::Email(e) => {
+                    e.clone()
+                }
+                proto::proto::authentication::service::v1::login_request::Identifier::Mobile(m) => {
+                    m.clone()
+                }
+            })
+            .unwrap_or_default();
+        let audit_ip = ctx
+            .headers
+            .get("x-forwarded-for")
+            .cloned()
+            .or_else(|| ctx.headers.get("x-real-ip").cloned())
+            .unwrap_or_default();
+        let audit_rid = ctx.headers.get("x-request-id").cloned().unwrap_or_default();
+        let audit_state = Arc::clone(&self.state);
         let mut core = self.state.core.clone();
-        let mut resp = core
-            .login(tonic::Request::new(req))
-            .await
-            .map_err(map_status)?
-            .into_inner();
+        let login_result = core.login(tonic::Request::new(req)).await;
+        // The login audit — verdict + reason, success and failure alike.
+        {
+            let (ok, reason, uid, tid) = match &login_result {
+                Ok(resp) => {
+                    use base64::Engine as _;
+                    let claims = base64::engine::general_purpose::URL_SAFE_NO_PAD
+                        .decode(
+                            resp.get_ref()
+                                .access_token
+                                .split('.')
+                                .nth(1)
+                                .unwrap_or_default(),
+                        )
+                        .ok()
+                        .and_then(|b| serde_json::from_slice::<serde_json::Value>(&b).ok());
+                    let uid = claims
+                        .as_ref()
+                        .and_then(|c| c.get("uid"))
+                        .and_then(|v| v.as_u64())
+                        .unwrap_or(0) as u32;
+                    let tid = claims
+                        .as_ref()
+                        .and_then(|c| c.get("tid"))
+                        .and_then(|v| v.as_u64())
+                        .unwrap_or(0) as u32;
+                    (true, String::new(), uid, tid)
+                }
+                Err(e) => (false, e.message().to_string(), 0, 0),
+            };
+            crate::audit::write_login_audit(
+                &audit_state,
+                crate::audit::LoginAudit {
+                    username: &login_username,
+                    user_id: uid,
+                    tenant_id: tid,
+                    success: ok,
+                    failure_reason: &reason,
+                    ip: &audit_ip,
+                    request_id: &audit_rid,
+                },
+            )
+            .await;
+        }
+        let mut resp = login_result.map_err(map_status)?.into_inner();
 
         // The refresh token rides the HttpOnly cookie pair instead of
         // the body.

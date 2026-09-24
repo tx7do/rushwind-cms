@@ -70,7 +70,6 @@ SKIP_BY_FACE = {"app": set(), "admin": set()}
 #   ApiService.SyncApis：BFF Empty ↔ 领域 SyncApisRequest
 STUB_METHODS = {
     ("Api", "get_walk_route_data"),
-    ("Api", "sync_apis"),
     ("File", "create"),
     ("Menu", "sync_menus"),
     ("Permission", "sync_permissions"),
@@ -168,7 +167,30 @@ def main():
             out.append("        _ctx: rushwind_http_binding::ctx::RequestContext,")
             out.append(f"        req: {req_ty},")
             out.append(f"    ) -> Result<{resp_ty}, StatusError> {{")
-            if (service, method) in EXPLICIT_METHODS:
+            if (service, method) == ("Api", "sync_apis"):
+                out.append("        let _ = req;")
+                out.append("        // Sync the generated route table into sys_apis (the route")
+                out.append("        // corpus this very binary was generated from).")
+                out.append("        let mut req = proto::proto::permission::service::v1::SyncApisRequest::default();")
+                out.append("        for r in proto::gen_admin::routes::ROUTES {")
+                out.append("            if r.shadowed { continue; }")
+                out.append("            req.apis.push(proto::proto::permission::service::v1::Api {")
+                out.append("                operation: Some(r.operation_id.to_string()),")
+                out.append("                path: Some(r.path.to_string()),")
+                out.append("                method: Some(r.method.to_string()),")
+                out.append("                module: Some(r.service_fq.split('.').next().unwrap_or_default().to_string()),")
+                out.append("                ..Default::default()")
+                out.append("            });")
+                out.append("        }")
+                out.append("        let mut core = proto::proto::permission::service::v1::api_service_client::ApiServiceClient::new(")
+                out.append("            self.state.core_channel.clone(),")
+                out.append("        );")
+                out.append("        core")
+                out.append("            .sync_apis(tonic::Request::new(req))")
+                out.append("            .await")
+                out.append("            .map_err(map_status)?;")
+                out.append("        Ok(pbjson_types::Empty {})")
+            elif (service, method) in EXPLICIT_METHODS:
                 out.append("        let mut core = proto::proto::identity::service::v1::user_service_client::UserServiceClient::new(")
                 out.append("            self.state.core_channel.clone(),")
                 out.append("        );")

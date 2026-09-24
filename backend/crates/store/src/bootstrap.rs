@@ -15,6 +15,7 @@ pub async fn run(db: &DatabaseConnection) -> Result<(), sea_orm::DbErr> {
     }
     exec_statements(db, crate::SCHEMA_SQL).await?;
     exec_statements(db, crate::SEED_SQL).await?;
+    exec_statements(db, crate::MENUS_SEED_SQL).await?;
     exec_statements(db, crate::DEMO_DATA_SQL).await?;
     Ok(())
 }

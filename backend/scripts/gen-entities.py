@@ -45,7 +45,7 @@ def map_type(coltype: str) -> str:
     return None
 
 
-def main(schema_path: str, out_path: str) -> None:
+def main(schema_path: str, out_dir: str) -> None:
     with open(schema_path, encoding="utf-8") as f:
         sql = f.read()
 
@@ -64,14 +64,16 @@ def main(schema_path: str, out_path: str) -> None:
             cols.append((col, coltype, "NOT NULL" in rest))
         tables[name] = cols
 
-    out = []
-    out.append("//! Generated sea-orm entity modules — one per table of the")
-    out.append("//! golden DDL (sql/schema.sql). DO NOT EDIT; regenerate via")
-    out.append("//! scripts/gen-entities.py when the schema is re-dumped.")
-    out.append("")
-    out.append("#![allow(clippy::all)]")
-    out.append("#![allow(missing_docs)]")
-    out.append("")
+    import os
+    os.makedirs(out_dir, exist_ok=True)
+    mod_lines = [
+        "//! Generated sea-orm entity modules — one file per table of the",
+        "//! golden DDL (sql/schema.sql). DO NOT EDIT; regenerate via",
+        "//! scripts/gen-entities.py when the schema is re-dumped.",
+        "#![allow(clippy::all)]",
+        "#![allow(missing_docs)]",
+        "",
+    ]
 
     pk = {}
     for m in re.finditer(
@@ -83,41 +85,47 @@ def main(schema_path: str, out_path: str) -> None:
     for name in sorted(tables):
         cols = tables[name]
         pk_col = pk.get(name, "id")
-        out.append(f"pub mod {name} {{")
-        out.append("    use sea_orm::entity::prelude::*;")
+        out = []
+        out.append("//! Generated from the golden DDL (sql/schema.sql) — DO NOT EDIT.")
         out.append("")
-        out.append("    #[derive(Clone, Debug, PartialEq, DeriveEntityModel)]")
-        out.append(f'    #[sea_orm(table_name = "{name}")]')
-        out.append("    pub struct Model {")
+        out.append("use sea_orm::entity::prelude::*;")
+        out.append("")
+        out.append("#[derive(Clone, Debug, PartialEq, DeriveEntityModel)]")
+        out.append('#[sea_orm(table_name = "%s")]' % name)
+        out.append("pub struct Model {")
         for col, coltype, notnull in cols:
             rust = map_type(coltype)
             if rust is None:
-                raise SystemExit(f"unmapped type {coltype!r} on {name}.{col}")
+                raise SystemExit("unmapped type %r on %s.%s" % (coltype, name, col))
             if col == pk_col:
                 if rust != "i64":
-                    raise SystemExit(f"unexpected pk type {rust} on {name}.{col}")
-                out.append("        #[sea_orm(primary_key)]")
-                out.append(f"        pub {rust_field(col)}: i64,")
+                    raise SystemExit("unexpected pk type %s on %s.%s" % (rust, name, col))
+                out.append("    #[sea_orm(primary_key)]")
+                out.append("    pub %s: i64," % rust_field(col))
                 continue
             if rust == "String":
-                field = f"String" if notnull else "Option<String>"
+                field = "String" if notnull else "Option<String>"
             elif notnull:
                 field = rust
             else:
-                field = f"Option<{rust}>"
-            out.append(f"        pub {rust_field(col)}: {field},")
-        out.append("    }")
-        out.append("")
-        out.append("    #[derive(Copy, Clone, Debug, EnumIter, DeriveRelation)]")
-        out.append("    pub enum Relation {}")
-        out.append("")
-        out.append("    impl ActiveModelBehavior for ActiveModel {}")
+                field = "Option<%s>" % rust
+            out.append("    pub %s: %s," % (rust_field(col), field))
         out.append("}")
         out.append("")
+        out.append("#[derive(Copy, Clone, Debug, EnumIter, DeriveRelation)]")
+        out.append("pub enum Relation {}")
+        out.append("")
+        out.append("impl ActiveModelBehavior for ActiveModel {}")
+        out.append("")
+        with open(os.path.join(out_dir, "%s.rs" % name), "w", encoding="utf-8") as f:
+            f.write("\n".join(out))
+        mod_lines.append("pub mod %s;" % name)
 
-    with open(out_path, "w", encoding="utf-8") as f:
-        f.write("\n".join(out))
-    print(f"generated {len(tables)} entity modules -> {out_path}")
+    mod_path = os.path.join(out_dir, "mod.rs")
+    with open(mod_path, "w", encoding="utf-8") as f:
+        f.write("\n".join(mod_lines) + "\n")
+    print("generated %d entity files -> %s" % (len(tables), out_dir))
+
 
 
 if __name__ == "__main__":

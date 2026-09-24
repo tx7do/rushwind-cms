@@ -144,8 +144,36 @@ impl proto::gen_admin::services::ApiServiceHandlers for ApiProxy {
         _ctx: rushwind_http_binding::ctx::RequestContext,
         req: pbjson_types::Empty,
     ) -> Result<pbjson_types::Empty, StatusError> {
-        let _ = (req, &self.state);
-        Err(crate::state::internal_error("not implemented"))
+        let _ = req;
+        // Sync the generated route table into sys_apis (the route
+        // corpus this very binary was generated from).
+        let mut req = proto::proto::permission::service::v1::SyncApisRequest::default();
+        for r in proto::gen_admin::routes::ROUTES {
+            if r.shadowed {
+                continue;
+            }
+            req.apis.push(proto::proto::permission::service::v1::Api {
+                operation: Some(r.operation_id.to_string()),
+                path: Some(r.path.to_string()),
+                method: Some(r.method.to_string()),
+                module: Some(
+                    r.service_fq
+                        .split('.')
+                        .next()
+                        .unwrap_or_default()
+                        .to_string(),
+                ),
+                ..Default::default()
+            });
+        }
+        let mut core =
+            proto::proto::permission::service::v1::api_service_client::ApiServiceClient::new(
+                self.state.core_channel.clone(),
+            );
+        core.sync_apis(tonic::Request::new(req))
+            .await
+            .map_err(map_status)?;
+        Ok(pbjson_types::Empty {})
     }
 
     async fn get_walk_route_data(
