@@ -11,6 +11,7 @@
 use std::sync::Arc;
 
 use crate::services::map_status;
+use crate::services::with_operator;
 use crate::state::{AppState, StatusError};
 
 /// The pass-through proxy of `ApiAuditLogServiceHandlers`.
@@ -29,7 +30,7 @@ impl proto::gen_admin::services::ApiAuditLogServiceHandlers for ApiAuditLogProxy
             self.state.core_channel.clone(),
         );
         Ok(core
-            .list(tonic::Request::new(req))
+            .list(with_operator(&_ctx, req))
             .await
             .map_err(map_status)?
             .into_inner())
@@ -44,7 +45,7 @@ impl proto::gen_admin::services::ApiAuditLogServiceHandlers for ApiAuditLogProxy
             self.state.core_channel.clone(),
         );
         Ok(core
-            .get(tonic::Request::new(req))
+            .get(with_operator(&_ctx, req))
             .await
             .map_err(map_status)?
             .into_inner())
@@ -68,7 +69,7 @@ impl proto::gen_admin::services::ApiServiceHandlers for ApiProxy {
                 self.state.core_channel.clone(),
             );
         Ok(core
-            .list(tonic::Request::new(req))
+            .list(with_operator(&_ctx, req))
             .await
             .map_err(map_status)?
             .into_inner())
@@ -84,7 +85,7 @@ impl proto::gen_admin::services::ApiServiceHandlers for ApiProxy {
                 self.state.core_channel.clone(),
             );
         Ok(core
-            .get(tonic::Request::new(req))
+            .get(with_operator(&_ctx, req))
             .await
             .map_err(map_status)?
             .into_inner())
@@ -100,7 +101,7 @@ impl proto::gen_admin::services::ApiServiceHandlers for ApiProxy {
                 self.state.core_channel.clone(),
             );
         Ok(core
-            .create(tonic::Request::new(req))
+            .create(with_operator(&_ctx, req))
             .await
             .map_err(map_status)?
             .into_inner())
@@ -116,7 +117,7 @@ impl proto::gen_admin::services::ApiServiceHandlers for ApiProxy {
                 self.state.core_channel.clone(),
             );
         Ok(core
-            .update(tonic::Request::new(req))
+            .update(with_operator(&_ctx, req))
             .await
             .map_err(map_status)?
             .into_inner())
@@ -132,7 +133,7 @@ impl proto::gen_admin::services::ApiServiceHandlers for ApiProxy {
                 self.state.core_channel.clone(),
             );
         Ok(core
-            .delete(tonic::Request::new(req))
+            .delete(with_operator(&_ctx, req))
             .await
             .map_err(map_status)?
             .into_inner())
@@ -174,7 +175,7 @@ impl proto::gen_admin::services::CategoryServiceHandlers for CategoryProxy {
                 self.state.core_channel.clone(),
             );
         Ok(core
-            .list(tonic::Request::new(req))
+            .list(with_operator(&_ctx, req))
             .await
             .map_err(map_status)?
             .into_inner())
@@ -190,7 +191,7 @@ impl proto::gen_admin::services::CategoryServiceHandlers for CategoryProxy {
                 self.state.core_channel.clone(),
             );
         Ok(core
-            .get(tonic::Request::new(req))
+            .get(with_operator(&_ctx, req))
             .await
             .map_err(map_status)?
             .into_inner())
@@ -206,7 +207,7 @@ impl proto::gen_admin::services::CategoryServiceHandlers for CategoryProxy {
                 self.state.core_channel.clone(),
             );
         Ok(core
-            .create(tonic::Request::new(req))
+            .create(with_operator(&_ctx, req))
             .await
             .map_err(map_status)?
             .into_inner())
@@ -222,7 +223,7 @@ impl proto::gen_admin::services::CategoryServiceHandlers for CategoryProxy {
                 self.state.core_channel.clone(),
             );
         Ok(core
-            .update(tonic::Request::new(req))
+            .update(with_operator(&_ctx, req))
             .await
             .map_err(map_status)?
             .into_inner())
@@ -238,7 +239,7 @@ impl proto::gen_admin::services::CategoryServiceHandlers for CategoryProxy {
                 self.state.core_channel.clone(),
             );
         Ok(core
-            .delete(tonic::Request::new(req))
+            .delete(with_operator(&_ctx, req))
             .await
             .map_err(map_status)?
             .into_inner())
@@ -262,7 +263,7 @@ impl proto::gen_admin::services::CommentServiceHandlers for CommentProxy {
                 self.state.core_channel.clone(),
             );
         Ok(core
-            .list(tonic::Request::new(req))
+            .list(with_operator(&_ctx, req))
             .await
             .map_err(map_status)?
             .into_inner())
@@ -278,7 +279,7 @@ impl proto::gen_admin::services::CommentServiceHandlers for CommentProxy {
                 self.state.core_channel.clone(),
             );
         Ok(core
-            .get(tonic::Request::new(req))
+            .get(with_operator(&_ctx, req))
             .await
             .map_err(map_status)?
             .into_inner())
@@ -294,7 +295,7 @@ impl proto::gen_admin::services::CommentServiceHandlers for CommentProxy {
                 self.state.core_channel.clone(),
             );
         Ok(core
-            .create(tonic::Request::new(req))
+            .create(with_operator(&_ctx, req))
             .await
             .map_err(map_status)?
             .into_inner())
@@ -310,7 +311,7 @@ impl proto::gen_admin::services::CommentServiceHandlers for CommentProxy {
                 self.state.core_channel.clone(),
             );
         Ok(core
-            .update(tonic::Request::new(req))
+            .update(with_operator(&_ctx, req))
             .await
             .map_err(map_status)?
             .into_inner())
@@ -326,7 +327,7 @@ impl proto::gen_admin::services::CommentServiceHandlers for CommentProxy {
                 self.state.core_channel.clone(),
             );
         Ok(core
-            .delete(tonic::Request::new(req))
+            .delete(with_operator(&_ctx, req))
             .await
             .map_err(map_status)?
             .into_inner())
@@ -349,7 +350,7 @@ impl proto::gen_admin::services::ContentModelServiceHandlers for ContentModelPro
             self.state.core_channel.clone(),
         );
         Ok(core
-            .list(tonic::Request::new(req))
+            .list(with_operator(&_ctx, req))
             .await
             .map_err(map_status)?
             .into_inner())
@@ -364,7 +365,7 @@ impl proto::gen_admin::services::ContentModelServiceHandlers for ContentModelPro
             self.state.core_channel.clone(),
         );
         Ok(core
-            .get(tonic::Request::new(req))
+            .get(with_operator(&_ctx, req))
             .await
             .map_err(map_status)?
             .into_inner())
@@ -379,7 +380,7 @@ impl proto::gen_admin::services::ContentModelServiceHandlers for ContentModelPro
             self.state.core_channel.clone(),
         );
         Ok(core
-            .create(tonic::Request::new(req))
+            .create(with_operator(&_ctx, req))
             .await
             .map_err(map_status)?
             .into_inner())
@@ -394,7 +395,7 @@ impl proto::gen_admin::services::ContentModelServiceHandlers for ContentModelPro
             self.state.core_channel.clone(),
         );
         Ok(core
-            .update(tonic::Request::new(req))
+            .update(with_operator(&_ctx, req))
             .await
             .map_err(map_status)?
             .into_inner())
@@ -409,7 +410,7 @@ impl proto::gen_admin::services::ContentModelServiceHandlers for ContentModelPro
             self.state.core_channel.clone(),
         );
         Ok(core
-            .delete(tonic::Request::new(req))
+            .delete(with_operator(&_ctx, req))
             .await
             .map_err(map_status)?
             .into_inner())
@@ -424,7 +425,7 @@ impl proto::gen_admin::services::ContentModelServiceHandlers for ContentModelPro
             self.state.core_channel.clone(),
         );
         Ok(core
-            .list_field_definitions(tonic::Request::new(req))
+            .list_field_definitions(with_operator(&_ctx, req))
             .await
             .map_err(map_status)?
             .into_inner())
@@ -447,7 +448,7 @@ impl proto::gen_admin::services::DataAccessAuditLogServiceHandlers for DataAcces
             self.state.core_channel.clone(),
         );
         Ok(core
-            .list(tonic::Request::new(req))
+            .list(with_operator(&_ctx, req))
             .await
             .map_err(map_status)?
             .into_inner())
@@ -462,7 +463,7 @@ impl proto::gen_admin::services::DataAccessAuditLogServiceHandlers for DataAcces
             self.state.core_channel.clone(),
         );
         Ok(core
-            .get(tonic::Request::new(req))
+            .get(with_operator(&_ctx, req))
             .await
             .map_err(map_status)?
             .into_inner())
@@ -486,7 +487,7 @@ impl proto::gen_admin::services::DictEntryServiceHandlers for DictEntryProxy {
                 self.state.core_channel.clone(),
             );
         Ok(core
-            .list(tonic::Request::new(req))
+            .list(with_operator(&_ctx, req))
             .await
             .map_err(map_status)?
             .into_inner())
@@ -502,7 +503,7 @@ impl proto::gen_admin::services::DictEntryServiceHandlers for DictEntryProxy {
                 self.state.core_channel.clone(),
             );
         Ok(core
-            .create(tonic::Request::new(req))
+            .create(with_operator(&_ctx, req))
             .await
             .map_err(map_status)?
             .into_inner())
@@ -518,7 +519,7 @@ impl proto::gen_admin::services::DictEntryServiceHandlers for DictEntryProxy {
                 self.state.core_channel.clone(),
             );
         Ok(core
-            .update(tonic::Request::new(req))
+            .update(with_operator(&_ctx, req))
             .await
             .map_err(map_status)?
             .into_inner())
@@ -534,7 +535,7 @@ impl proto::gen_admin::services::DictEntryServiceHandlers for DictEntryProxy {
                 self.state.core_channel.clone(),
             );
         Ok(core
-            .delete(tonic::Request::new(req))
+            .delete(with_operator(&_ctx, req))
             .await
             .map_err(map_status)?
             .into_inner())
@@ -550,7 +551,7 @@ impl proto::gen_admin::services::DictEntryServiceHandlers for DictEntryProxy {
                 self.state.core_channel.clone(),
             );
         Ok(core
-            .list_by_type_code(tonic::Request::new(req))
+            .list_by_type_code(with_operator(&_ctx, req))
             .await
             .map_err(map_status)?
             .into_inner())
@@ -574,7 +575,7 @@ impl proto::gen_admin::services::DictTypeServiceHandlers for DictTypeProxy {
                 self.state.core_channel.clone(),
             );
         Ok(core
-            .list(tonic::Request::new(req))
+            .list(with_operator(&_ctx, req))
             .await
             .map_err(map_status)?
             .into_inner())
@@ -590,7 +591,7 @@ impl proto::gen_admin::services::DictTypeServiceHandlers for DictTypeProxy {
                 self.state.core_channel.clone(),
             );
         Ok(core
-            .get(tonic::Request::new(req))
+            .get(with_operator(&_ctx, req))
             .await
             .map_err(map_status)?
             .into_inner())
@@ -606,7 +607,7 @@ impl proto::gen_admin::services::DictTypeServiceHandlers for DictTypeProxy {
                 self.state.core_channel.clone(),
             );
         Ok(core
-            .create(tonic::Request::new(req))
+            .create(with_operator(&_ctx, req))
             .await
             .map_err(map_status)?
             .into_inner())
@@ -622,7 +623,7 @@ impl proto::gen_admin::services::DictTypeServiceHandlers for DictTypeProxy {
                 self.state.core_channel.clone(),
             );
         Ok(core
-            .update(tonic::Request::new(req))
+            .update(with_operator(&_ctx, req))
             .await
             .map_err(map_status)?
             .into_inner())
@@ -638,7 +639,7 @@ impl proto::gen_admin::services::DictTypeServiceHandlers for DictTypeProxy {
                 self.state.core_channel.clone(),
             );
         Ok(core
-            .delete(tonic::Request::new(req))
+            .delete(with_operator(&_ctx, req))
             .await
             .map_err(map_status)?
             .into_inner())
@@ -662,7 +663,7 @@ impl proto::gen_admin::services::FileServiceHandlers for FileProxy {
                 self.state.core_channel.clone(),
             );
         Ok(core
-            .list(tonic::Request::new(req))
+            .list(with_operator(&_ctx, req))
             .await
             .map_err(map_status)?
             .into_inner())
@@ -678,7 +679,7 @@ impl proto::gen_admin::services::FileServiceHandlers for FileProxy {
                 self.state.core_channel.clone(),
             );
         Ok(core
-            .get(tonic::Request::new(req))
+            .get(with_operator(&_ctx, req))
             .await
             .map_err(map_status)?
             .into_inner())
@@ -703,7 +704,7 @@ impl proto::gen_admin::services::FileServiceHandlers for FileProxy {
                 self.state.core_channel.clone(),
             );
         Ok(core
-            .update(tonic::Request::new(req))
+            .update(with_operator(&_ctx, req))
             .await
             .map_err(map_status)?
             .into_inner())
@@ -719,7 +720,7 @@ impl proto::gen_admin::services::FileServiceHandlers for FileProxy {
                 self.state.core_channel.clone(),
             );
         Ok(core
-            .delete(tonic::Request::new(req))
+            .delete(with_operator(&_ctx, req))
             .await
             .map_err(map_status)?
             .into_inner())
@@ -743,7 +744,7 @@ impl proto::gen_admin::services::InteractionAdminServiceHandlers for Interaction
             self.state.core_channel.clone(),
         );
         Ok(core
-            .purge_target_interactions(tonic::Request::new(req))
+            .purge_target_interactions(with_operator(&_ctx, req))
             .await
             .map_err(map_status)?
             .into_inner())
@@ -759,7 +760,7 @@ impl proto::gen_admin::services::InteractionAdminServiceHandlers for Interaction
             self.state.core_channel.clone(),
         );
         Ok(core
-            .purge_user_interactions(tonic::Request::new(req))
+            .purge_user_interactions(with_operator(&_ctx, req))
             .await
             .map_err(map_status)?
             .into_inner())
@@ -774,7 +775,7 @@ impl proto::gen_admin::services::InteractionAdminServiceHandlers for Interaction
             self.state.core_channel.clone(),
         );
         Ok(core
-            .reset_counter(tonic::Request::new(req))
+            .reset_counter(with_operator(&_ctx, req))
             .await
             .map_err(map_status)?
             .into_inner())
@@ -802,7 +803,7 @@ impl proto::gen_admin::services::InternalMessageCategoryServiceHandlers
             self.state.core_channel.clone(),
         );
         Ok(core
-            .list(tonic::Request::new(req))
+            .list(with_operator(&_ctx, req))
             .await
             .map_err(map_status)?
             .into_inner())
@@ -818,7 +819,7 @@ impl proto::gen_admin::services::InternalMessageCategoryServiceHandlers
             self.state.core_channel.clone(),
         );
         Ok(core
-            .get(tonic::Request::new(req))
+            .get(with_operator(&_ctx, req))
             .await
             .map_err(map_status)?
             .into_inner())
@@ -833,7 +834,7 @@ impl proto::gen_admin::services::InternalMessageCategoryServiceHandlers
             self.state.core_channel.clone(),
         );
         Ok(core
-            .create(tonic::Request::new(req))
+            .create(with_operator(&_ctx, req))
             .await
             .map_err(map_status)?
             .into_inner())
@@ -848,7 +849,7 @@ impl proto::gen_admin::services::InternalMessageCategoryServiceHandlers
             self.state.core_channel.clone(),
         );
         Ok(core
-            .update(tonic::Request::new(req))
+            .update(with_operator(&_ctx, req))
             .await
             .map_err(map_status)?
             .into_inner())
@@ -863,7 +864,7 @@ impl proto::gen_admin::services::InternalMessageCategoryServiceHandlers
             self.state.core_channel.clone(),
         );
         Ok(core
-            .delete(tonic::Request::new(req))
+            .delete(with_operator(&_ctx, req))
             .await
             .map_err(map_status)?
             .into_inner())
@@ -889,7 +890,7 @@ impl proto::gen_admin::services::InternalMessageRecipientServiceHandlers
             self.state.core_channel.clone(),
         );
         Ok(core
-            .list_user_inbox(tonic::Request::new(req))
+            .list_user_inbox(with_operator(&_ctx, req))
             .await
             .map_err(map_status)?
             .into_inner())
@@ -904,7 +905,7 @@ impl proto::gen_admin::services::InternalMessageRecipientServiceHandlers
             self.state.core_channel.clone(),
         );
         Ok(core
-            .delete_notification_from_inbox(tonic::Request::new(req))
+            .delete_notification_from_inbox(with_operator(&_ctx, req))
             .await
             .map_err(map_status)?
             .into_inner())
@@ -919,7 +920,7 @@ impl proto::gen_admin::services::InternalMessageRecipientServiceHandlers
             self.state.core_channel.clone(),
         );
         Ok(core
-            .mark_notification_as_read(tonic::Request::new(req))
+            .mark_notification_as_read(with_operator(&_ctx, req))
             .await
             .map_err(map_status)?
             .into_inner())
@@ -943,7 +944,7 @@ impl proto::gen_admin::services::InternalMessageServiceHandlers for InternalMess
             self.state.core_channel.clone(),
         );
         Ok(core
-            .list_message(tonic::Request::new(req))
+            .list_message(with_operator(&_ctx, req))
             .await
             .map_err(map_status)?
             .into_inner())
@@ -958,7 +959,7 @@ impl proto::gen_admin::services::InternalMessageServiceHandlers for InternalMess
             self.state.core_channel.clone(),
         );
         Ok(core
-            .get_message(tonic::Request::new(req))
+            .get_message(with_operator(&_ctx, req))
             .await
             .map_err(map_status)?
             .into_inner())
@@ -973,7 +974,7 @@ impl proto::gen_admin::services::InternalMessageServiceHandlers for InternalMess
             self.state.core_channel.clone(),
         );
         Ok(core
-            .update_message(tonic::Request::new(req))
+            .update_message(with_operator(&_ctx, req))
             .await
             .map_err(map_status)?
             .into_inner())
@@ -988,7 +989,7 @@ impl proto::gen_admin::services::InternalMessageServiceHandlers for InternalMess
             self.state.core_channel.clone(),
         );
         Ok(core
-            .delete_message(tonic::Request::new(req))
+            .delete_message(with_operator(&_ctx, req))
             .await
             .map_err(map_status)?
             .into_inner())
@@ -1003,7 +1004,7 @@ impl proto::gen_admin::services::InternalMessageServiceHandlers for InternalMess
             self.state.core_channel.clone(),
         );
         Ok(core
-            .send_message(tonic::Request::new(req))
+            .send_message(with_operator(&_ctx, req))
             .await
             .map_err(map_status)?
             .into_inner())
@@ -1018,7 +1019,7 @@ impl proto::gen_admin::services::InternalMessageServiceHandlers for InternalMess
             self.state.core_channel.clone(),
         );
         Ok(core
-            .revoke_message(tonic::Request::new(req))
+            .revoke_message(with_operator(&_ctx, req))
             .await
             .map_err(map_status)?
             .into_inner())
@@ -1042,7 +1043,7 @@ impl proto::gen_admin::services::LanguageServiceHandlers for LanguageProxy {
                 self.state.core_channel.clone(),
             );
         Ok(core
-            .list(tonic::Request::new(req))
+            .list(with_operator(&_ctx, req))
             .await
             .map_err(map_status)?
             .into_inner())
@@ -1058,7 +1059,7 @@ impl proto::gen_admin::services::LanguageServiceHandlers for LanguageProxy {
                 self.state.core_channel.clone(),
             );
         Ok(core
-            .get(tonic::Request::new(req))
+            .get(with_operator(&_ctx, req))
             .await
             .map_err(map_status)?
             .into_inner())
@@ -1074,7 +1075,7 @@ impl proto::gen_admin::services::LanguageServiceHandlers for LanguageProxy {
                 self.state.core_channel.clone(),
             );
         Ok(core
-            .create(tonic::Request::new(req))
+            .create(with_operator(&_ctx, req))
             .await
             .map_err(map_status)?
             .into_inner())
@@ -1090,7 +1091,7 @@ impl proto::gen_admin::services::LanguageServiceHandlers for LanguageProxy {
                 self.state.core_channel.clone(),
             );
         Ok(core
-            .update(tonic::Request::new(req))
+            .update(with_operator(&_ctx, req))
             .await
             .map_err(map_status)?
             .into_inner())
@@ -1106,7 +1107,7 @@ impl proto::gen_admin::services::LanguageServiceHandlers for LanguageProxy {
                 self.state.core_channel.clone(),
             );
         Ok(core
-            .delete(tonic::Request::new(req))
+            .delete(with_operator(&_ctx, req))
             .await
             .map_err(map_status)?
             .into_inner())
@@ -1122,7 +1123,7 @@ impl proto::gen_admin::services::LanguageServiceHandlers for LanguageProxy {
                 self.state.core_channel.clone(),
             );
         Ok(core
-            .batch_create(tonic::Request::new(req))
+            .batch_create(with_operator(&_ctx, req))
             .await
             .map_err(map_status)?
             .into_inner())
@@ -1145,7 +1146,7 @@ impl proto::gen_admin::services::LoginAuditLogServiceHandlers for LoginAuditLogP
             self.state.core_channel.clone(),
         );
         Ok(core
-            .list(tonic::Request::new(req))
+            .list(with_operator(&_ctx, req))
             .await
             .map_err(map_status)?
             .into_inner())
@@ -1160,7 +1161,7 @@ impl proto::gen_admin::services::LoginAuditLogServiceHandlers for LoginAuditLogP
             self.state.core_channel.clone(),
         );
         Ok(core
-            .get(tonic::Request::new(req))
+            .get(with_operator(&_ctx, req))
             .await
             .map_err(map_status)?
             .into_inner())
@@ -1184,7 +1185,7 @@ impl proto::gen_admin::services::LoginPolicyServiceHandlers for LoginPolicyProxy
             self.state.core_channel.clone(),
         );
         Ok(core
-            .list(tonic::Request::new(req))
+            .list(with_operator(&_ctx, req))
             .await
             .map_err(map_status)?
             .into_inner())
@@ -1199,7 +1200,7 @@ impl proto::gen_admin::services::LoginPolicyServiceHandlers for LoginPolicyProxy
             self.state.core_channel.clone(),
         );
         Ok(core
-            .get(tonic::Request::new(req))
+            .get(with_operator(&_ctx, req))
             .await
             .map_err(map_status)?
             .into_inner())
@@ -1214,7 +1215,7 @@ impl proto::gen_admin::services::LoginPolicyServiceHandlers for LoginPolicyProxy
             self.state.core_channel.clone(),
         );
         Ok(core
-            .create(tonic::Request::new(req))
+            .create(with_operator(&_ctx, req))
             .await
             .map_err(map_status)?
             .into_inner())
@@ -1229,7 +1230,7 @@ impl proto::gen_admin::services::LoginPolicyServiceHandlers for LoginPolicyProxy
             self.state.core_channel.clone(),
         );
         Ok(core
-            .update(tonic::Request::new(req))
+            .update(with_operator(&_ctx, req))
             .await
             .map_err(map_status)?
             .into_inner())
@@ -1244,7 +1245,7 @@ impl proto::gen_admin::services::LoginPolicyServiceHandlers for LoginPolicyProxy
             self.state.core_channel.clone(),
         );
         Ok(core
-            .delete(tonic::Request::new(req))
+            .delete(with_operator(&_ctx, req))
             .await
             .map_err(map_status)?
             .into_inner())
@@ -1267,7 +1268,7 @@ impl proto::gen_admin::services::MediaAssetServiceHandlers for MediaAssetProxy {
             self.state.core_channel.clone(),
         );
         Ok(core
-            .list(tonic::Request::new(req))
+            .list(with_operator(&_ctx, req))
             .await
             .map_err(map_status)?
             .into_inner())
@@ -1282,7 +1283,7 @@ impl proto::gen_admin::services::MediaAssetServiceHandlers for MediaAssetProxy {
             self.state.core_channel.clone(),
         );
         Ok(core
-            .get(tonic::Request::new(req))
+            .get(with_operator(&_ctx, req))
             .await
             .map_err(map_status)?
             .into_inner())
@@ -1297,7 +1298,7 @@ impl proto::gen_admin::services::MediaAssetServiceHandlers for MediaAssetProxy {
             self.state.core_channel.clone(),
         );
         Ok(core
-            .create(tonic::Request::new(req))
+            .create(with_operator(&_ctx, req))
             .await
             .map_err(map_status)?
             .into_inner())
@@ -1312,7 +1313,7 @@ impl proto::gen_admin::services::MediaAssetServiceHandlers for MediaAssetProxy {
             self.state.core_channel.clone(),
         );
         Ok(core
-            .update(tonic::Request::new(req))
+            .update(with_operator(&_ctx, req))
             .await
             .map_err(map_status)?
             .into_inner())
@@ -1327,7 +1328,7 @@ impl proto::gen_admin::services::MediaAssetServiceHandlers for MediaAssetProxy {
             self.state.core_channel.clone(),
         );
         Ok(core
-            .delete(tonic::Request::new(req))
+            .delete(with_operator(&_ctx, req))
             .await
             .map_err(map_status)?
             .into_inner())
@@ -1351,7 +1352,7 @@ impl proto::gen_admin::services::MenuServiceHandlers for MenuProxy {
                 self.state.core_channel.clone(),
             );
         Ok(core
-            .list(tonic::Request::new(req))
+            .list(with_operator(&_ctx, req))
             .await
             .map_err(map_status)?
             .into_inner())
@@ -1367,7 +1368,7 @@ impl proto::gen_admin::services::MenuServiceHandlers for MenuProxy {
                 self.state.core_channel.clone(),
             );
         Ok(core
-            .get(tonic::Request::new(req))
+            .get(with_operator(&_ctx, req))
             .await
             .map_err(map_status)?
             .into_inner())
@@ -1383,7 +1384,7 @@ impl proto::gen_admin::services::MenuServiceHandlers for MenuProxy {
                 self.state.core_channel.clone(),
             );
         Ok(core
-            .create(tonic::Request::new(req))
+            .create(with_operator(&_ctx, req))
             .await
             .map_err(map_status)?
             .into_inner())
@@ -1399,7 +1400,7 @@ impl proto::gen_admin::services::MenuServiceHandlers for MenuProxy {
                 self.state.core_channel.clone(),
             );
         Ok(core
-            .update(tonic::Request::new(req))
+            .update(with_operator(&_ctx, req))
             .await
             .map_err(map_status)?
             .into_inner())
@@ -1415,7 +1416,7 @@ impl proto::gen_admin::services::MenuServiceHandlers for MenuProxy {
                 self.state.core_channel.clone(),
             );
         Ok(core
-            .delete(tonic::Request::new(req))
+            .delete(with_operator(&_ctx, req))
             .await
             .map_err(map_status)?
             .into_inner())
@@ -1438,7 +1439,7 @@ impl proto::gen_admin::services::NavigationItemServiceHandlers for NavigationIte
             self.state.core_channel.clone(),
         );
         Ok(core
-            .list(tonic::Request::new(req))
+            .list(with_operator(&_ctx, req))
             .await
             .map_err(map_status)?
             .into_inner())
@@ -1453,7 +1454,7 @@ impl proto::gen_admin::services::NavigationItemServiceHandlers for NavigationIte
             self.state.core_channel.clone(),
         );
         Ok(core
-            .get(tonic::Request::new(req))
+            .get(with_operator(&_ctx, req))
             .await
             .map_err(map_status)?
             .into_inner())
@@ -1468,7 +1469,7 @@ impl proto::gen_admin::services::NavigationItemServiceHandlers for NavigationIte
             self.state.core_channel.clone(),
         );
         Ok(core
-            .create(tonic::Request::new(req))
+            .create(with_operator(&_ctx, req))
             .await
             .map_err(map_status)?
             .into_inner())
@@ -1483,7 +1484,7 @@ impl proto::gen_admin::services::NavigationItemServiceHandlers for NavigationIte
             self.state.core_channel.clone(),
         );
         Ok(core
-            .update(tonic::Request::new(req))
+            .update(with_operator(&_ctx, req))
             .await
             .map_err(map_status)?
             .into_inner())
@@ -1498,7 +1499,7 @@ impl proto::gen_admin::services::NavigationItemServiceHandlers for NavigationIte
             self.state.core_channel.clone(),
         );
         Ok(core
-            .delete(tonic::Request::new(req))
+            .delete(with_operator(&_ctx, req))
             .await
             .map_err(map_status)?
             .into_inner())
@@ -1521,7 +1522,7 @@ impl proto::gen_admin::services::NavigationServiceHandlers for NavigationProxy {
             self.state.core_channel.clone(),
         );
         Ok(core
-            .list(tonic::Request::new(req))
+            .list(with_operator(&_ctx, req))
             .await
             .map_err(map_status)?
             .into_inner())
@@ -1536,7 +1537,7 @@ impl proto::gen_admin::services::NavigationServiceHandlers for NavigationProxy {
             self.state.core_channel.clone(),
         );
         Ok(core
-            .get(tonic::Request::new(req))
+            .get(with_operator(&_ctx, req))
             .await
             .map_err(map_status)?
             .into_inner())
@@ -1551,7 +1552,7 @@ impl proto::gen_admin::services::NavigationServiceHandlers for NavigationProxy {
             self.state.core_channel.clone(),
         );
         Ok(core
-            .create(tonic::Request::new(req))
+            .create(with_operator(&_ctx, req))
             .await
             .map_err(map_status)?
             .into_inner())
@@ -1566,7 +1567,7 @@ impl proto::gen_admin::services::NavigationServiceHandlers for NavigationProxy {
             self.state.core_channel.clone(),
         );
         Ok(core
-            .update(tonic::Request::new(req))
+            .update(with_operator(&_ctx, req))
             .await
             .map_err(map_status)?
             .into_inner())
@@ -1581,7 +1582,7 @@ impl proto::gen_admin::services::NavigationServiceHandlers for NavigationProxy {
             self.state.core_channel.clone(),
         );
         Ok(core
-            .delete(tonic::Request::new(req))
+            .delete(with_operator(&_ctx, req))
             .await
             .map_err(map_status)?
             .into_inner())
@@ -1604,7 +1605,7 @@ impl proto::gen_admin::services::OperationAuditLogServiceHandlers for OperationA
             self.state.core_channel.clone(),
         );
         Ok(core
-            .list(tonic::Request::new(req))
+            .list(with_operator(&_ctx, req))
             .await
             .map_err(map_status)?
             .into_inner())
@@ -1619,7 +1620,7 @@ impl proto::gen_admin::services::OperationAuditLogServiceHandlers for OperationA
             self.state.core_channel.clone(),
         );
         Ok(core
-            .get(tonic::Request::new(req))
+            .get(with_operator(&_ctx, req))
             .await
             .map_err(map_status)?
             .into_inner())
@@ -1643,7 +1644,7 @@ impl proto::gen_admin::services::OrgUnitServiceHandlers for OrgUnitProxy {
                 self.state.core_channel.clone(),
             );
         Ok(core
-            .list(tonic::Request::new(req))
+            .list(with_operator(&_ctx, req))
             .await
             .map_err(map_status)?
             .into_inner())
@@ -1659,7 +1660,7 @@ impl proto::gen_admin::services::OrgUnitServiceHandlers for OrgUnitProxy {
                 self.state.core_channel.clone(),
             );
         Ok(core
-            .get(tonic::Request::new(req))
+            .get(with_operator(&_ctx, req))
             .await
             .map_err(map_status)?
             .into_inner())
@@ -1675,7 +1676,7 @@ impl proto::gen_admin::services::OrgUnitServiceHandlers for OrgUnitProxy {
                 self.state.core_channel.clone(),
             );
         Ok(core
-            .create(tonic::Request::new(req))
+            .create(with_operator(&_ctx, req))
             .await
             .map_err(map_status)?
             .into_inner())
@@ -1691,7 +1692,7 @@ impl proto::gen_admin::services::OrgUnitServiceHandlers for OrgUnitProxy {
                 self.state.core_channel.clone(),
             );
         Ok(core
-            .update(tonic::Request::new(req))
+            .update(with_operator(&_ctx, req))
             .await
             .map_err(map_status)?
             .into_inner())
@@ -1707,7 +1708,7 @@ impl proto::gen_admin::services::OrgUnitServiceHandlers for OrgUnitProxy {
                 self.state.core_channel.clone(),
             );
         Ok(core
-            .delete(tonic::Request::new(req))
+            .delete(with_operator(&_ctx, req))
             .await
             .map_err(map_status)?
             .into_inner())
@@ -1731,7 +1732,7 @@ impl proto::gen_admin::services::PageServiceHandlers for PageProxy {
                 self.state.core_channel.clone(),
             );
         Ok(core
-            .list(tonic::Request::new(req))
+            .list(with_operator(&_ctx, req))
             .await
             .map_err(map_status)?
             .into_inner())
@@ -1747,7 +1748,7 @@ impl proto::gen_admin::services::PageServiceHandlers for PageProxy {
                 self.state.core_channel.clone(),
             );
         Ok(core
-            .get(tonic::Request::new(req))
+            .get(with_operator(&_ctx, req))
             .await
             .map_err(map_status)?
             .into_inner())
@@ -1763,7 +1764,7 @@ impl proto::gen_admin::services::PageServiceHandlers for PageProxy {
                 self.state.core_channel.clone(),
             );
         Ok(core
-            .create(tonic::Request::new(req))
+            .create(with_operator(&_ctx, req))
             .await
             .map_err(map_status)?
             .into_inner())
@@ -1779,7 +1780,7 @@ impl proto::gen_admin::services::PageServiceHandlers for PageProxy {
                 self.state.core_channel.clone(),
             );
         Ok(core
-            .update(tonic::Request::new(req))
+            .update(with_operator(&_ctx, req))
             .await
             .map_err(map_status)?
             .into_inner())
@@ -1795,7 +1796,7 @@ impl proto::gen_admin::services::PageServiceHandlers for PageProxy {
                 self.state.core_channel.clone(),
             );
         Ok(core
-            .delete(tonic::Request::new(req))
+            .delete(with_operator(&_ctx, req))
             .await
             .map_err(map_status)?
             .into_inner())
@@ -1818,7 +1819,7 @@ impl proto::gen_admin::services::PermissionAuditLogServiceHandlers for Permissio
             self.state.core_channel.clone(),
         );
         Ok(core
-            .list(tonic::Request::new(req))
+            .list(with_operator(&_ctx, req))
             .await
             .map_err(map_status)?
             .into_inner())
@@ -1833,7 +1834,7 @@ impl proto::gen_admin::services::PermissionAuditLogServiceHandlers for Permissio
             self.state.core_channel.clone(),
         );
         Ok(core
-            .get(tonic::Request::new(req))
+            .get(with_operator(&_ctx, req))
             .await
             .map_err(map_status)?
             .into_inner())
@@ -1857,7 +1858,7 @@ impl proto::gen_admin::services::PermissionGroupServiceHandlers for PermissionGr
             self.state.core_channel.clone(),
         );
         Ok(core
-            .list(tonic::Request::new(req))
+            .list(with_operator(&_ctx, req))
             .await
             .map_err(map_status)?
             .into_inner())
@@ -1872,7 +1873,7 @@ impl proto::gen_admin::services::PermissionGroupServiceHandlers for PermissionGr
             self.state.core_channel.clone(),
         );
         Ok(core
-            .get(tonic::Request::new(req))
+            .get(with_operator(&_ctx, req))
             .await
             .map_err(map_status)?
             .into_inner())
@@ -1887,7 +1888,7 @@ impl proto::gen_admin::services::PermissionGroupServiceHandlers for PermissionGr
             self.state.core_channel.clone(),
         );
         Ok(core
-            .create(tonic::Request::new(req))
+            .create(with_operator(&_ctx, req))
             .await
             .map_err(map_status)?
             .into_inner())
@@ -1902,7 +1903,7 @@ impl proto::gen_admin::services::PermissionGroupServiceHandlers for PermissionGr
             self.state.core_channel.clone(),
         );
         Ok(core
-            .update(tonic::Request::new(req))
+            .update(with_operator(&_ctx, req))
             .await
             .map_err(map_status)?
             .into_inner())
@@ -1917,7 +1918,7 @@ impl proto::gen_admin::services::PermissionGroupServiceHandlers for PermissionGr
             self.state.core_channel.clone(),
         );
         Ok(core
-            .delete(tonic::Request::new(req))
+            .delete(with_operator(&_ctx, req))
             .await
             .map_err(map_status)?
             .into_inner())
@@ -1940,7 +1941,7 @@ impl proto::gen_admin::services::PermissionServiceHandlers for PermissionProxy {
             self.state.core_channel.clone(),
         );
         Ok(core
-            .list(tonic::Request::new(req))
+            .list(with_operator(&_ctx, req))
             .await
             .map_err(map_status)?
             .into_inner())
@@ -1955,7 +1956,7 @@ impl proto::gen_admin::services::PermissionServiceHandlers for PermissionProxy {
             self.state.core_channel.clone(),
         );
         Ok(core
-            .get(tonic::Request::new(req))
+            .get(with_operator(&_ctx, req))
             .await
             .map_err(map_status)?
             .into_inner())
@@ -1970,7 +1971,7 @@ impl proto::gen_admin::services::PermissionServiceHandlers for PermissionProxy {
             self.state.core_channel.clone(),
         );
         Ok(core
-            .create(tonic::Request::new(req))
+            .create(with_operator(&_ctx, req))
             .await
             .map_err(map_status)?
             .into_inner())
@@ -1985,7 +1986,7 @@ impl proto::gen_admin::services::PermissionServiceHandlers for PermissionProxy {
             self.state.core_channel.clone(),
         );
         Ok(core
-            .update(tonic::Request::new(req))
+            .update(with_operator(&_ctx, req))
             .await
             .map_err(map_status)?
             .into_inner())
@@ -2000,7 +2001,7 @@ impl proto::gen_admin::services::PermissionServiceHandlers for PermissionProxy {
             self.state.core_channel.clone(),
         );
         Ok(core
-            .delete(tonic::Request::new(req))
+            .delete(with_operator(&_ctx, req))
             .await
             .map_err(map_status)?
             .into_inner())
@@ -2033,7 +2034,7 @@ impl proto::gen_admin::services::PolicyEvaluationLogServiceHandlers for PolicyEv
             self.state.core_channel.clone(),
         );
         Ok(core
-            .list(tonic::Request::new(req))
+            .list(with_operator(&_ctx, req))
             .await
             .map_err(map_status)?
             .into_inner())
@@ -2048,7 +2049,7 @@ impl proto::gen_admin::services::PolicyEvaluationLogServiceHandlers for PolicyEv
             self.state.core_channel.clone(),
         );
         Ok(core
-            .get(tonic::Request::new(req))
+            .get(with_operator(&_ctx, req))
             .await
             .map_err(map_status)?
             .into_inner())
@@ -2071,7 +2072,7 @@ impl proto::gen_admin::services::PositionServiceHandlers for PositionProxy {
             self.state.core_channel.clone(),
         );
         Ok(core
-            .list(tonic::Request::new(req))
+            .list(with_operator(&_ctx, req))
             .await
             .map_err(map_status)?
             .into_inner())
@@ -2086,7 +2087,7 @@ impl proto::gen_admin::services::PositionServiceHandlers for PositionProxy {
             self.state.core_channel.clone(),
         );
         Ok(core
-            .get(tonic::Request::new(req))
+            .get(with_operator(&_ctx, req))
             .await
             .map_err(map_status)?
             .into_inner())
@@ -2101,7 +2102,7 @@ impl proto::gen_admin::services::PositionServiceHandlers for PositionProxy {
             self.state.core_channel.clone(),
         );
         Ok(core
-            .create(tonic::Request::new(req))
+            .create(with_operator(&_ctx, req))
             .await
             .map_err(map_status)?
             .into_inner())
@@ -2116,7 +2117,7 @@ impl proto::gen_admin::services::PositionServiceHandlers for PositionProxy {
             self.state.core_channel.clone(),
         );
         Ok(core
-            .update(tonic::Request::new(req))
+            .update(with_operator(&_ctx, req))
             .await
             .map_err(map_status)?
             .into_inner())
@@ -2131,7 +2132,7 @@ impl proto::gen_admin::services::PositionServiceHandlers for PositionProxy {
             self.state.core_channel.clone(),
         );
         Ok(core
-            .delete(tonic::Request::new(req))
+            .delete(with_operator(&_ctx, req))
             .await
             .map_err(map_status)?
             .into_inner())
@@ -2155,7 +2156,7 @@ impl proto::gen_admin::services::PostServiceHandlers for PostProxy {
                 self.state.core_channel.clone(),
             );
         Ok(core
-            .list(tonic::Request::new(req))
+            .list(with_operator(&_ctx, req))
             .await
             .map_err(map_status)?
             .into_inner())
@@ -2171,7 +2172,7 @@ impl proto::gen_admin::services::PostServiceHandlers for PostProxy {
                 self.state.core_channel.clone(),
             );
         Ok(core
-            .get(tonic::Request::new(req))
+            .get(with_operator(&_ctx, req))
             .await
             .map_err(map_status)?
             .into_inner())
@@ -2187,7 +2188,7 @@ impl proto::gen_admin::services::PostServiceHandlers for PostProxy {
                 self.state.core_channel.clone(),
             );
         Ok(core
-            .create(tonic::Request::new(req))
+            .create(with_operator(&_ctx, req))
             .await
             .map_err(map_status)?
             .into_inner())
@@ -2203,7 +2204,7 @@ impl proto::gen_admin::services::PostServiceHandlers for PostProxy {
                 self.state.core_channel.clone(),
             );
         Ok(core
-            .update(tonic::Request::new(req))
+            .update(with_operator(&_ctx, req))
             .await
             .map_err(map_status)?
             .into_inner())
@@ -2219,7 +2220,7 @@ impl proto::gen_admin::services::PostServiceHandlers for PostProxy {
                 self.state.core_channel.clone(),
             );
         Ok(core
-            .delete(tonic::Request::new(req))
+            .delete(with_operator(&_ctx, req))
             .await
             .map_err(map_status)?
             .into_inner())
@@ -2236,7 +2237,7 @@ impl proto::gen_admin::services::PostServiceHandlers for PostProxy {
                 self.state.core_channel.clone(),
             );
         Ok(core
-            .translation_exists(tonic::Request::new(req))
+            .translation_exists(with_operator(&_ctx, req))
             .await
             .map_err(map_status)?
             .into_inner())
@@ -2260,7 +2261,7 @@ impl proto::gen_admin::services::RoleServiceHandlers for RoleProxy {
                 self.state.core_channel.clone(),
             );
         Ok(core
-            .list(tonic::Request::new(req))
+            .list(with_operator(&_ctx, req))
             .await
             .map_err(map_status)?
             .into_inner())
@@ -2276,7 +2277,7 @@ impl proto::gen_admin::services::RoleServiceHandlers for RoleProxy {
                 self.state.core_channel.clone(),
             );
         Ok(core
-            .get(tonic::Request::new(req))
+            .get(with_operator(&_ctx, req))
             .await
             .map_err(map_status)?
             .into_inner())
@@ -2292,7 +2293,7 @@ impl proto::gen_admin::services::RoleServiceHandlers for RoleProxy {
                 self.state.core_channel.clone(),
             );
         Ok(core
-            .create(tonic::Request::new(req))
+            .create(with_operator(&_ctx, req))
             .await
             .map_err(map_status)?
             .into_inner())
@@ -2308,7 +2309,7 @@ impl proto::gen_admin::services::RoleServiceHandlers for RoleProxy {
                 self.state.core_channel.clone(),
             );
         Ok(core
-            .update(tonic::Request::new(req))
+            .update(with_operator(&_ctx, req))
             .await
             .map_err(map_status)?
             .into_inner())
@@ -2324,7 +2325,7 @@ impl proto::gen_admin::services::RoleServiceHandlers for RoleProxy {
                 self.state.core_channel.clone(),
             );
         Ok(core
-            .delete(tonic::Request::new(req))
+            .delete(with_operator(&_ctx, req))
             .await
             .map_err(map_status)?
             .into_inner())
@@ -2347,7 +2348,7 @@ impl proto::gen_admin::services::SiteServiceHandlers for SiteProxy {
             self.state.core_channel.clone(),
         );
         Ok(core
-            .list(tonic::Request::new(req))
+            .list(with_operator(&_ctx, req))
             .await
             .map_err(map_status)?
             .into_inner())
@@ -2362,7 +2363,7 @@ impl proto::gen_admin::services::SiteServiceHandlers for SiteProxy {
             self.state.core_channel.clone(),
         );
         Ok(core
-            .get(tonic::Request::new(req))
+            .get(with_operator(&_ctx, req))
             .await
             .map_err(map_status)?
             .into_inner())
@@ -2377,7 +2378,7 @@ impl proto::gen_admin::services::SiteServiceHandlers for SiteProxy {
             self.state.core_channel.clone(),
         );
         Ok(core
-            .create(tonic::Request::new(req))
+            .create(with_operator(&_ctx, req))
             .await
             .map_err(map_status)?
             .into_inner())
@@ -2401,7 +2402,7 @@ impl proto::gen_admin::services::SiteServiceHandlers for SiteProxy {
             self.state.core_channel.clone(),
         );
         Ok(core
-            .delete(tonic::Request::new(req))
+            .delete(with_operator(&_ctx, req))
             .await
             .map_err(map_status)?
             .into_inner())
@@ -2424,7 +2425,7 @@ impl proto::gen_admin::services::SiteSettingServiceHandlers for SiteSettingProxy
             self.state.core_channel.clone(),
         );
         Ok(core
-            .list(tonic::Request::new(req))
+            .list(with_operator(&_ctx, req))
             .await
             .map_err(map_status)?
             .into_inner())
@@ -2439,7 +2440,7 @@ impl proto::gen_admin::services::SiteSettingServiceHandlers for SiteSettingProxy
             self.state.core_channel.clone(),
         );
         Ok(core
-            .get(tonic::Request::new(req))
+            .get(with_operator(&_ctx, req))
             .await
             .map_err(map_status)?
             .into_inner())
@@ -2454,7 +2455,7 @@ impl proto::gen_admin::services::SiteSettingServiceHandlers for SiteSettingProxy
             self.state.core_channel.clone(),
         );
         Ok(core
-            .create(tonic::Request::new(req))
+            .create(with_operator(&_ctx, req))
             .await
             .map_err(map_status)?
             .into_inner())
@@ -2469,7 +2470,7 @@ impl proto::gen_admin::services::SiteSettingServiceHandlers for SiteSettingProxy
             self.state.core_channel.clone(),
         );
         Ok(core
-            .update(tonic::Request::new(req))
+            .update(with_operator(&_ctx, req))
             .await
             .map_err(map_status)?
             .into_inner())
@@ -2484,7 +2485,7 @@ impl proto::gen_admin::services::SiteSettingServiceHandlers for SiteSettingProxy
             self.state.core_channel.clone(),
         );
         Ok(core
-            .delete(tonic::Request::new(req))
+            .delete(with_operator(&_ctx, req))
             .await
             .map_err(map_status)?
             .into_inner())
@@ -2508,7 +2509,7 @@ impl proto::gen_admin::services::StatsServiceHandlers for StatsProxy {
                 self.state.core_channel.clone(),
             );
         Ok(core
-            .get_dashboard_overview(tonic::Request::new(req))
+            .get_dashboard_overview(with_operator(&_ctx, req))
             .await
             .map_err(map_status)?
             .into_inner())
@@ -2524,7 +2525,7 @@ impl proto::gen_admin::services::StatsServiceHandlers for StatsProxy {
                 self.state.core_channel.clone(),
             );
         Ok(core
-            .get_content_trend(tonic::Request::new(req))
+            .get_content_trend(with_operator(&_ctx, req))
             .await
             .map_err(map_status)?
             .into_inner())
@@ -2540,7 +2541,7 @@ impl proto::gen_admin::services::StatsServiceHandlers for StatsProxy {
                 self.state.core_channel.clone(),
             );
         Ok(core
-            .get_interaction_stats(tonic::Request::new(req))
+            .get_interaction_stats(with_operator(&_ctx, req))
             .await
             .map_err(map_status)?
             .into_inner())
@@ -2556,7 +2557,7 @@ impl proto::gen_admin::services::StatsServiceHandlers for StatsProxy {
                 self.state.core_channel.clone(),
             );
         Ok(core
-            .get_login_activity(tonic::Request::new(req))
+            .get_login_activity(with_operator(&_ctx, req))
             .await
             .map_err(map_status)?
             .into_inner())
@@ -2580,7 +2581,7 @@ impl proto::gen_admin::services::TagServiceHandlers for TagProxy {
                 self.state.core_channel.clone(),
             );
         Ok(core
-            .list(tonic::Request::new(req))
+            .list(with_operator(&_ctx, req))
             .await
             .map_err(map_status)?
             .into_inner())
@@ -2596,7 +2597,7 @@ impl proto::gen_admin::services::TagServiceHandlers for TagProxy {
                 self.state.core_channel.clone(),
             );
         Ok(core
-            .get(tonic::Request::new(req))
+            .get(with_operator(&_ctx, req))
             .await
             .map_err(map_status)?
             .into_inner())
@@ -2612,7 +2613,7 @@ impl proto::gen_admin::services::TagServiceHandlers for TagProxy {
                 self.state.core_channel.clone(),
             );
         Ok(core
-            .create(tonic::Request::new(req))
+            .create(with_operator(&_ctx, req))
             .await
             .map_err(map_status)?
             .into_inner())
@@ -2628,7 +2629,7 @@ impl proto::gen_admin::services::TagServiceHandlers for TagProxy {
                 self.state.core_channel.clone(),
             );
         Ok(core
-            .update(tonic::Request::new(req))
+            .update(with_operator(&_ctx, req))
             .await
             .map_err(map_status)?
             .into_inner())
@@ -2644,7 +2645,7 @@ impl proto::gen_admin::services::TagServiceHandlers for TagProxy {
                 self.state.core_channel.clone(),
             );
         Ok(core
-            .delete(tonic::Request::new(req))
+            .delete(with_operator(&_ctx, req))
             .await
             .map_err(map_status)?
             .into_inner())
@@ -2667,7 +2668,7 @@ impl proto::gen_admin::services::TaskServiceHandlers for TaskProxy {
             self.state.core_channel.clone(),
         );
         Ok(core
-            .list(tonic::Request::new(req))
+            .list(with_operator(&_ctx, req))
             .await
             .map_err(map_status)?
             .into_inner())
@@ -2682,7 +2683,7 @@ impl proto::gen_admin::services::TaskServiceHandlers for TaskProxy {
             self.state.core_channel.clone(),
         );
         Ok(core
-            .get(tonic::Request::new(req))
+            .get(with_operator(&_ctx, req))
             .await
             .map_err(map_status)?
             .into_inner())
@@ -2697,7 +2698,7 @@ impl proto::gen_admin::services::TaskServiceHandlers for TaskProxy {
             self.state.core_channel.clone(),
         );
         Ok(core
-            .create(tonic::Request::new(req))
+            .create(with_operator(&_ctx, req))
             .await
             .map_err(map_status)?
             .into_inner())
@@ -2712,7 +2713,7 @@ impl proto::gen_admin::services::TaskServiceHandlers for TaskProxy {
             self.state.core_channel.clone(),
         );
         Ok(core
-            .update(tonic::Request::new(req))
+            .update(with_operator(&_ctx, req))
             .await
             .map_err(map_status)?
             .into_inner())
@@ -2727,7 +2728,7 @@ impl proto::gen_admin::services::TaskServiceHandlers for TaskProxy {
             self.state.core_channel.clone(),
         );
         Ok(core
-            .delete(tonic::Request::new(req))
+            .delete(with_operator(&_ctx, req))
             .await
             .map_err(map_status)?
             .into_inner())
@@ -2742,7 +2743,7 @@ impl proto::gen_admin::services::TaskServiceHandlers for TaskProxy {
             self.state.core_channel.clone(),
         );
         Ok(core
-            .list_task_type_name(tonic::Request::new(req))
+            .list_task_type_name(with_operator(&_ctx, req))
             .await
             .map_err(map_status)?
             .into_inner())
@@ -2757,7 +2758,7 @@ impl proto::gen_admin::services::TaskServiceHandlers for TaskProxy {
             self.state.core_channel.clone(),
         );
         Ok(core
-            .restart_all_task(tonic::Request::new(req))
+            .restart_all_task(with_operator(&_ctx, req))
             .await
             .map_err(map_status)?
             .into_inner())
@@ -2772,7 +2773,7 @@ impl proto::gen_admin::services::TaskServiceHandlers for TaskProxy {
             self.state.core_channel.clone(),
         );
         Ok(core
-            .start_all_task(tonic::Request::new(req))
+            .start_all_task(with_operator(&_ctx, req))
             .await
             .map_err(map_status)?
             .into_inner())
@@ -2787,7 +2788,7 @@ impl proto::gen_admin::services::TaskServiceHandlers for TaskProxy {
             self.state.core_channel.clone(),
         );
         Ok(core
-            .stop_all_task(tonic::Request::new(req))
+            .stop_all_task(with_operator(&_ctx, req))
             .await
             .map_err(map_status)?
             .into_inner())
@@ -2802,7 +2803,7 @@ impl proto::gen_admin::services::TaskServiceHandlers for TaskProxy {
             self.state.core_channel.clone(),
         );
         Ok(core
-            .control_task(tonic::Request::new(req))
+            .control_task(with_operator(&_ctx, req))
             .await
             .map_err(map_status)?
             .into_inner())
@@ -2817,7 +2818,7 @@ impl proto::gen_admin::services::TaskServiceHandlers for TaskProxy {
             self.state.core_channel.clone(),
         );
         Ok(core
-            .list_task_executions(tonic::Request::new(req))
+            .list_task_executions(with_operator(&_ctx, req))
             .await
             .map_err(map_status)?
             .into_inner())
@@ -2841,7 +2842,7 @@ impl proto::gen_admin::services::TenantServiceHandlers for TenantProxy {
                 self.state.core_channel.clone(),
             );
         Ok(core
-            .list(tonic::Request::new(req))
+            .list(with_operator(&_ctx, req))
             .await
             .map_err(map_status)?
             .into_inner())
@@ -2857,7 +2858,7 @@ impl proto::gen_admin::services::TenantServiceHandlers for TenantProxy {
                 self.state.core_channel.clone(),
             );
         Ok(core
-            .get(tonic::Request::new(req))
+            .get(with_operator(&_ctx, req))
             .await
             .map_err(map_status)?
             .into_inner())
@@ -2882,7 +2883,7 @@ impl proto::gen_admin::services::TenantServiceHandlers for TenantProxy {
                 self.state.core_channel.clone(),
             );
         Ok(core
-            .update(tonic::Request::new(req))
+            .update(with_operator(&_ctx, req))
             .await
             .map_err(map_status)?
             .into_inner())
@@ -2898,7 +2899,7 @@ impl proto::gen_admin::services::TenantServiceHandlers for TenantProxy {
                 self.state.core_channel.clone(),
             );
         Ok(core
-            .delete(tonic::Request::new(req))
+            .delete(with_operator(&_ctx, req))
             .await
             .map_err(map_status)?
             .into_inner())
@@ -2914,7 +2915,7 @@ impl proto::gen_admin::services::TenantServiceHandlers for TenantProxy {
                 self.state.core_channel.clone(),
             );
         Ok(core
-            .create_tenant_with_admin_user(tonic::Request::new(req))
+            .create_tenant_with_admin_user(with_operator(&_ctx, req))
             .await
             .map_err(map_status)?
             .into_inner())
@@ -2930,7 +2931,7 @@ impl proto::gen_admin::services::TenantServiceHandlers for TenantProxy {
                 self.state.core_channel.clone(),
             );
         Ok(core
-            .tenant_exists(tonic::Request::new(req))
+            .tenant_exists(with_operator(&_ctx, req))
             .await
             .map_err(map_status)?
             .into_inner())
@@ -2953,7 +2954,7 @@ impl proto::gen_admin::services::TranslatorServiceHandlers for TranslatorProxy {
             self.state.core_channel.clone(),
         );
         Ok(core
-            .translate(tonic::Request::new(req))
+            .translate(with_operator(&_ctx, req))
             .await
             .map_err(map_status)?
             .into_inner())
@@ -2976,7 +2977,7 @@ impl proto::gen_admin::services::UserProfileServiceHandlers for UserProfileProxy
             self.state.core_channel.clone(),
         );
         Ok(core
-            .get_user(tonic::Request::new(req))
+            .get_user(with_operator(&_ctx, req))
             .await
             .map_err(map_status)?
             .into_inner())
@@ -2991,7 +2992,7 @@ impl proto::gen_admin::services::UserProfileServiceHandlers for UserProfileProxy
             self.state.core_channel.clone(),
         );
         Ok(core
-            .update_user(tonic::Request::new(req))
+            .update_user(with_operator(&_ctx, req))
             .await
             .map_err(map_status)?
             .into_inner())
@@ -3042,7 +3043,7 @@ impl proto::gen_admin::services::UserServiceHandlers for UserProxy {
                 self.state.core_channel.clone(),
             );
         Ok(core
-            .list(tonic::Request::new(req))
+            .list(with_operator(&_ctx, req))
             .await
             .map_err(map_status)?
             .into_inner())
@@ -3058,7 +3059,7 @@ impl proto::gen_admin::services::UserServiceHandlers for UserProxy {
                 self.state.core_channel.clone(),
             );
         Ok(core
-            .get(tonic::Request::new(req))
+            .get(with_operator(&_ctx, req))
             .await
             .map_err(map_status)?
             .into_inner())
@@ -3074,7 +3075,7 @@ impl proto::gen_admin::services::UserServiceHandlers for UserProxy {
                 self.state.core_channel.clone(),
             );
         Ok(core
-            .create(tonic::Request::new(req))
+            .create(with_operator(&_ctx, req))
             .await
             .map_err(map_status)?
             .into_inner())
@@ -3090,7 +3091,7 @@ impl proto::gen_admin::services::UserServiceHandlers for UserProxy {
                 self.state.core_channel.clone(),
             );
         Ok(core
-            .update(tonic::Request::new(req))
+            .update(with_operator(&_ctx, req))
             .await
             .map_err(map_status)?
             .into_inner())
@@ -3106,7 +3107,7 @@ impl proto::gen_admin::services::UserServiceHandlers for UserProxy {
                 self.state.core_channel.clone(),
             );
         Ok(core
-            .delete(tonic::Request::new(req))
+            .delete(with_operator(&_ctx, req))
             .await
             .map_err(map_status)?
             .into_inner())
@@ -3122,7 +3123,7 @@ impl proto::gen_admin::services::UserServiceHandlers for UserProxy {
                 self.state.core_channel.clone(),
             );
         Ok(core
-            .user_exists(tonic::Request::new(req))
+            .user_exists(with_operator(&_ctx, req))
             .await
             .map_err(map_status)?
             .into_inner())

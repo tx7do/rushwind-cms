@@ -165,7 +165,53 @@ check "app comments (public)" '"items"' "$R"
 R=$(curl -s -X POST -H "Content-Type: application/json" -d '{"data":{"contentType":1,"objectId":1,"content":"e2e 评论","authorName":"游客"}}' "$APP/app/v1/comments")
 check "app guest comment create" '"content":"e2e 评论"' "$R"
 
-echo "── 7. SSE 与 CORS ──────────────────────"
+echo "── 7. 新模块（权限/审计/统计/互动写/杂项） ──────────────────────"
+# 上一节登出吊销了管理员全部令牌——重新登录取新令牌
+CAP=$(curl -s "$ADMIN/admin/v1/captcha"); CID=$(echo "$CAP" | python3 -c "import json,sys; print(json.load(sys.stdin)['captchaId'])"); ANS=$(redis_cmd GET "cms:captcha:$CID")
+RESP=$(curl -s -X POST -H "Content-Type: application/json" -H "X-Captcha-Id: $CID" -H "X-Captcha-Value: $ANS" \
+  -d "{\"grant_type\":0,\"username\":\"admin\",\"password\":\"$PASS_ENC\"}" "$ADMIN/admin/v1/login")
+TOKEN=$(echo "$RESP" | python3 -c "import json,sys; print(json.load(sys.stdin).get('access_token',''))")
+AUTH="Authorization: Bearer $TOKEN"
+check "menus list" '"items"' "$(curl -s -H "$AUTH" "$ADMIN/admin/v1/menus?page=1&pageSize=3")"
+check "apis list" '"items"' "$(curl -s -H "$AUTH" "$ADMIN/admin/v1/apis?page=1&pageSize=3")"
+check "permission groups" '"name":"系统管理"' "$(curl -s -H "$AUTH" "$ADMIN/admin/v1/permission-groups?page=1&pageSize=5")"
+check "permissions" '"code":"sys:access_backend"' "$(curl -s -H "$AUTH" "$ADMIN/admin/v1/permissions?page=1&pageSize=10")"
+check "api audit logs" '"items"' "$(curl -s -H "$AUTH" "$ADMIN/admin/v1/api-audit-logs?page=1&pageSize=2")"
+check "login audit logs" '"items"' "$(curl -s -H "$AUTH" "$ADMIN/admin/v1/login-audit-logs?page=1&pageSize=2")"
+check "operation audit logs" '"items"' "$(curl -s -H "$AUTH" "$ADMIN/admin/v1/operation-audit-logs?page=1&pageSize=2")"
+check "data access audit logs" '"items"' "$(curl -s -H "$AUTH" "$ADMIN/admin/v1/data-access-audit-logs?page=1&pageSize=2")"
+check "org units" '"name":"XX集团总部"' "$(curl -s -H "$AUTH" "$ADMIN/admin/v1/org-units?page=1&pageSize=3")"
+check "positions" '"items"' "$(curl -s -H "$AUTH" "$ADMIN/admin/v1/positions?page=1&pageSize=3")"
+check "login policies" '"items"' "$(curl -s -H "$AUTH" "$ADMIN/admin/v1/login-policies?page=1&pageSize=3")"
+check "content models" '"items"' "$(curl -s -H "$AUTH" "$ADMIN/admin/v1/content-models?page=1&pageSize=3")"
+check "media assets" '"items"' "$(curl -s -H "$AUTH" "$ADMIN/admin/v1/media-assets?page=1&pageSize=3")"
+check "tasks" '"items"' "$(curl -s -H "$AUTH" "$ADMIN/admin/v1/tasks?page=1&pageSize=3")"
+check "internal messages" '"items"' "$(curl -s -H "$AUTH" "$ADMIN/admin/v1/internal-message/messages?page=1&pageSize=3")"
+
+# dashboard overview (stats)
+STATS=$(curl -s -H "$AUTH" "$ADMIN/admin/v1/stats/overview")
+check "dashboard overview counts" '"postCount":"8"' "$STATS"
+TREND=$(curl -s -H "$AUTH" "$ADMIN/admin/v1/stats/content-trend?days=7")
+check "content trend (7d)" '"users"' "$TREND"
+ISTATS=$(curl -s -H "$AUTH" "$ADMIN/admin/v1/stats/interactions?topN=5")
+check "interaction stats" '"totalLikes"' "$ISTATS"
+
+# interaction write path: like → unlike via app token
+APPTOKEN2=$(curl -s -X POST -H "Content-Type: application/json" -d "{\"grant_type\":0,\"username\":\"e2e_app_$$\",\"password\":\"$PASS_ENC2\"}" "$APP/app/v1/login" | python3 -c "import json,sys; print(json.load(sys.stdin).get('access_token',''))")
+LIKE=$(curl -s -X POST -H "Authorization: Bearer $APPTOKEN2" -H "Content-Type: application/json" -d '{"targetType":1,"targetId":1}' "$APP/app/v1/interactions/like")
+check "post like (returns liked+count)" '"liked":true' "$LIKE"
+LIKE2=$(curl -s -X POST -H "Authorization: Bearer $APPTOKEN2" -H "Content-Type: application/json" -d '{"targetType":1,"targetId":1}' "$APP/app/v1/interactions/like")
+check "like idempotent" '"liked":true' "$LIKE2"
+UNLIKE=$(curl -s -X POST -H "Authorization: Bearer $APPTOKEN2" -H "Content-Type: application/json" -d '{"targetType":1,"targetId":1}' "$APP/app/v1/interactions/unlike")
+check "post unlike" '"liked":false' "$UNLIKE"
+WATCH=$(curl -s -X POST -H "Authorization: Bearer $APPTOKEN2" -H "Content-Type: application/json" -d '{"postId":1}' "$APP/app/v1/interactions/watch")
+check "post watch" '"watched":true' "$WATCH"
+UNWATCH=$(curl -s -X POST -H "Authorization: Bearer $APPTOKEN2" -H "Content-Type: application/json" -d '{"postId":1}' "$APP/app/v1/interactions/unwatch")
+check "post unwatch" '"watched":false' "$UNWATCH"
+R=$(curl -s -X POST -H "Content-Type: application/json" -d '{"targetType":1,"targetId":1}' "$APP/app/v1/interactions/like")
+check "like without token → 401" '401' "$(curl -s -o /dev/null -w '%{http_code}' -X POST -H 'Content-Type: application/json' -d '{"targetType":1,"targetId":1}' "$APP/app/v1/interactions/like")"
+
+echo "── 8. SSE 与 CORS ──────────────────────"
 R=$(curl -s -o /dev/null -w "%{http_code}" -X OPTIONS "http://127.0.0.1:6601/events")
 check "SSE preflight 204" "204" "$R"
 R=$(curl -s -i -X OPTIONS -H "Origin: http://localhost:5999" -H "Access-Control-Request-Method: POST" "$ADMIN/admin/v1/login" 2>&1 | grep -i "access-control-allow-origin" | head -1)

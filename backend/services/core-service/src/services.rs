@@ -3,12 +3,16 @@
 //! Unimplemented — the reference's servers register every module the
 //! same way and land their logic module by module.
 
+pub mod audit;
 pub mod authentication;
 pub mod content;
 pub mod dict;
 pub mod identity;
+pub mod misc;
+pub mod permission;
 pub mod site;
 pub mod social;
+pub mod stats;
 
 use std::sync::Arc;
 
@@ -108,6 +112,101 @@ pub fn registry(state: Arc<AppState>) -> tonic::service::Routes {
     .add_service(
         proto::proto::permission::service::v1::role_service_server::RoleServiceServer::new(
             identity::RoleServiceImpl { state: Arc::clone(&state) },
+        ),
+    )
+    .add_service(
+        proto::proto::permission::service::v1::menu_service_server::MenuServiceServer::new(
+            permission::MenuServiceImpl { state: Arc::clone(&state) },
+        ),
+    )
+    .add_service(
+        proto::proto::permission::service::v1::api_service_server::ApiServiceServer::new(
+            permission::ApiServiceImpl { state: Arc::clone(&state) },
+        ),
+    )
+    .add_service(
+        proto::proto::permission::service::v1::permission_group_service_server::PermissionGroupServiceServer::new(
+            permission::PermissionGroupServiceImpl { state: Arc::clone(&state) },
+        ),
+    )
+    .add_service(
+        proto::proto::permission::service::v1::permission_service_server::PermissionServiceServer::new(
+            permission::PermissionServiceImpl { state: Arc::clone(&state) },
+        ),
+    )
+    .add_service(
+        proto::proto::audit::service::v1::api_audit_log_service_server::ApiAuditLogServiceServer::new(
+            audit::ApiAuditLogServiceImpl { state: Arc::clone(&state) },
+        ),
+    )
+    .add_service(
+        proto::proto::audit::service::v1::login_audit_log_service_server::LoginAuditLogServiceServer::new(
+            audit::LoginAuditLogServiceImpl { state: Arc::clone(&state) },
+        ),
+    )
+    .add_service(
+        proto::proto::audit::service::v1::operation_audit_log_service_server::OperationAuditLogServiceServer::new(
+            audit::OperationAuditLogServiceImpl { state: Arc::clone(&state) },
+        ),
+    )
+    .add_service(
+        proto::proto::audit::service::v1::data_access_audit_log_service_server::DataAccessAuditLogServiceServer::new(
+            audit::DataAccessAuditLogServiceImpl { state: Arc::clone(&state) },
+        ),
+    )
+    .add_service(
+        proto::proto::audit::service::v1::permission_audit_log_service_server::PermissionAuditLogServiceServer::new(
+            audit::PermissionAuditLogServiceImpl { state: Arc::clone(&state) },
+        ),
+    )
+    .add_service(
+        proto::proto::stats::service::v1::stats_service_server::StatsServiceServer::new(
+            stats::StatsServiceImpl { state: Arc::clone(&state) },
+        ),
+    )
+    .add_service(
+        proto::proto::identity::service::v1::org_unit_service_server::OrgUnitServiceServer::new(
+            misc::OrgUnitServiceImpl { state: Arc::clone(&state) },
+        ),
+    )
+    .add_service(
+        proto::proto::identity::service::v1::position_service_server::PositionServiceServer::new(
+            misc::PositionServiceImpl { state: Arc::clone(&state) },
+        ),
+    )
+    .add_service(
+        proto::proto::authentication::service::v1::login_policy_service_server::LoginPolicyServiceServer::new(
+            misc::LoginPolicyServiceImpl { state: Arc::clone(&state) },
+        ),
+    )
+    .add_service(
+        proto::proto::content::service::v1::content_model_service_server::ContentModelServiceServer::new(
+            misc::ContentModelServiceImpl { state: Arc::clone(&state) },
+        ),
+    )
+    .add_service(
+        proto::proto::media::service::v1::media_asset_service_server::MediaAssetServiceServer::new(
+            misc::MediaAssetServiceImpl { state: Arc::clone(&state) },
+        ),
+    )
+    .add_service(
+        proto::proto::task::service::v1::task_service_server::TaskServiceServer::new(
+            misc::TaskServiceImpl { state: Arc::clone(&state) },
+        ),
+    )
+    .add_service(
+        proto::proto::internal_message::service::v1::internal_message_service_server::InternalMessageServiceServer::new(
+            misc::InternalMessageServiceImpl { state: Arc::clone(&state) },
+        ),
+    )
+    .add_service(
+        proto::proto::internal_message::service::v1::internal_message_category_service_server::InternalMessageCategoryServiceServer::new(
+            misc::InternalMessageCategoryServiceImpl { state: Arc::clone(&state) },
+        ),
+    )
+    .add_service(
+        proto::proto::internal_message::service::v1::internal_message_recipient_service_server::InternalMessageRecipientServiceServer::new(
+            misc::InternalMessageRecipientServiceImpl { state: Arc::clone(&state) },
         ),
     )
 }

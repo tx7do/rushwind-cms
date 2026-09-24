@@ -24,3 +24,26 @@ pub fn map_status(e: tonic::Status) -> StatusError {
         crate::state::status_error(reason, e.message())
     }
 }
+
+/// Wraps the outbound message with the operator metadata (uid/tid from
+/// the verified claims) — the core service reads it where the proto
+/// carries no user field (the interaction ledger writes).
+pub fn with_operator<T>(
+    ctx: &rushwind_http_binding::ctx::RequestContext,
+    msg: T,
+) -> tonic::Request<T> {
+    let mut req = tonic::Request::new(msg);
+    if let Some(claims) = &ctx.claims {
+        if let Some(uid) = claims.get("uid").and_then(|v| v.as_u64()) {
+            if let Ok(v) = uid.to_string().parse() {
+                req.metadata_mut().insert("x-user-id", v);
+            }
+        }
+        if let Some(tid) = claims.get("tid").and_then(|v| v.as_u64()) {
+            if let Ok(v) = tid.to_string().parse() {
+                req.metadata_mut().insert("x-tenant-id", v);
+            }
+        }
+    }
+    req
+}

@@ -134,6 +134,7 @@ def main():
     out.append("")
     out.append("use crate::state::{AppState, StatusError};")
     out.append("use crate::services::map_status;")
+    out.append("use crate::services::with_operator;")
     out.append("")
 
     emitted = 0
@@ -173,7 +174,7 @@ def main():
                 out.append("            self.state.core_channel.clone(),")
                 out.append("        );")
                 out.append("        Ok(core")
-                out.append(f"            .{method}(tonic::Request::new(req))")
+                out.append(f"            .{method}(with_operator(&_ctx, req))")
                 out.append("            .await")
                 out.append("            .map_err(map_status)?")
                 out.append("            .into_inner())")

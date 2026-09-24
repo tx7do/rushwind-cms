@@ -13,6 +13,18 @@ use store::paging::fetch_paged;
 use proto::proto::comment::service::v1 as commentv1;
 use proto::proto::interaction::service::v1 as interactionv1;
 
+/// The operator user id off the gRPC metadata the BFF forwards
+/// (`x-user-id` from the verified claims).
+fn operator_of<T>(request: &tonic::Request<T>) -> Result<i64, Status> {
+    request
+        .metadata()
+        .get("x-user-id")
+        .and_then(|v| v.to_str().ok())
+        .and_then(|v| v.parse::<i64>().ok())
+        .filter(|v| *v > 0)
+        .ok_or_else(|| tonic::Status::unauthenticated("user identity required"))
+}
+
 fn content_type_num(name: &str) -> Option<i32> {
     Some(match name {
         "POST" => 1,
@@ -281,8 +293,158 @@ pub struct InteractionServiceImpl {
     pub state: Arc<AppState>,
 }
 
+/// Like a post (the C-side user ledger row + counter bump, idempotent).
+async fn like_post(
+    db: &sea_orm::DatabaseConnection,
+    user_id: i64,
+    post_id: i64,
+    on: bool,
+) -> Result<bool, Status> {
+    use sea_orm::ActiveModelTrait;
+    use store::entities::post_likes;
+    let existing = post_likes::Entity::find()
+        .filter(
+            sea_orm::Condition::all()
+                .add(post_likes::Column::UserId.eq(user_id))
+                .add(post_likes::Column::PostId.eq(post_id)),
+        )
+        .one(db)
+        .await
+        .map_err(db_status)?;
+    let changed = match (&existing, on) {
+        (None, true) => {
+            post_likes::ActiveModel {
+                user_id: Set(Some(user_id)),
+                post_id: Set(Some(post_id)),
+                tenant_id: Set(Some(0)),
+                created_at: Set(Some(store::now())),
+                ..Default::default()
+            }
+            .insert(db)
+            .await
+            .map_err(db_status)?;
+            true
+        }
+        (Some(row), false) => {
+            post_likes::Entity::delete_by_id(row.id)
+                .exec(db)
+                .await
+                .map_err(db_status)?;
+            true
+        }
+        _ => false,
+    };
+    if changed {
+        bump_counter(db, 0, "", post_id, 1, if on { 1 } else { -1 }).await?;
+    }
+    Ok(on)
+}
+
+/// Watch/unwatch mirrors the like ledger.
+async fn watch_post(
+    db: &sea_orm::DatabaseConnection,
+    user_id: i64,
+    post_id: i64,
+    on: bool,
+) -> Result<bool, Status> {
+    use sea_orm::ActiveModelTrait;
+    use store::entities::post_watches;
+    let existing = post_watches::Entity::find()
+        .filter(
+            sea_orm::Condition::all()
+                .add(post_watches::Column::UserId.eq(user_id))
+                .add(post_watches::Column::PostId.eq(post_id)),
+        )
+        .one(db)
+        .await
+        .map_err(db_status)?;
+    let changed = match (&existing, on) {
+        (None, true) => {
+            post_watches::ActiveModel {
+                user_id: Set(Some(user_id)),
+                post_id: Set(Some(post_id)),
+                tenant_id: Set(Some(0)),
+                created_at: Set(Some(store::now())),
+                ..Default::default()
+            }
+            .insert(db)
+            .await
+            .map_err(db_status)?;
+            true
+        }
+        (Some(row), false) => {
+            post_watches::Entity::delete_by_id(row.id)
+                .exec(db)
+                .await
+                .map_err(db_status)?;
+            true
+        }
+        _ => false,
+    };
+    if changed {
+        bump_counter(db, 0, "", post_id, 2, if on { 1 } else { -1 }).await?;
+    }
+    Ok(on)
+}
+
 #[async_trait::async_trait]
 impl interactionv1::interaction_service_server::InteractionService for InteractionServiceImpl {
+    async fn like(
+        &self,
+        request: Request<interactionv1::LikeRequest>,
+    ) -> Result<Response<interactionv1::LikeResponse>, Status> {
+        let user_id = operator_of(&request)?;
+        let req = request.into_inner();
+        let liked = like_post(&self.state.db, user_id, req.target_id as i64, true).await?;
+        let count = read_counter(&self.state.db, "", req.target_id as i64, 1).await;
+        Ok(Response::new(interactionv1::LikeResponse {
+            liked,
+            like_count: count as i32,
+        }))
+    }
+
+    async fn unlike(
+        &self,
+        request: Request<interactionv1::LikeRequest>,
+    ) -> Result<Response<interactionv1::LikeResponse>, Status> {
+        let user_id = operator_of(&request)?;
+        let req = request.into_inner();
+        let liked = like_post(&self.state.db, user_id, req.target_id as i64, false).await?;
+        let count = read_counter(&self.state.db, "", req.target_id as i64, 1).await;
+        Ok(Response::new(interactionv1::LikeResponse {
+            liked,
+            like_count: count as i32,
+        }))
+    }
+
+    async fn watch(
+        &self,
+        request: Request<interactionv1::WatchRequest>,
+    ) -> Result<Response<interactionv1::WatchResponse>, Status> {
+        let user_id = operator_of(&request)?;
+        let req = request.into_inner();
+        let watched = watch_post(&self.state.db, user_id, req.post_id as i64, true).await?;
+        let count = read_counter(&self.state.db, "", req.post_id as i64, 2).await;
+        Ok(Response::new(interactionv1::WatchResponse {
+            watched,
+            watch_count: count as i32,
+        }))
+    }
+
+    async fn unwatch(
+        &self,
+        request: Request<interactionv1::WatchRequest>,
+    ) -> Result<Response<interactionv1::WatchResponse>, Status> {
+        let user_id = operator_of(&request)?;
+        let req = request.into_inner();
+        let watched = watch_post(&self.state.db, user_id, req.post_id as i64, false).await?;
+        let count = read_counter(&self.state.db, "", req.post_id as i64, 2).await;
+        Ok(Response::new(interactionv1::WatchResponse {
+            watched,
+            watch_count: count as i32,
+        }))
+    }
+
     async fn get_counts(
         &self,
         request: Request<interactionv1::GetCountsRequest>,
