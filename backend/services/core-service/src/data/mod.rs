@@ -11,6 +11,8 @@ pub mod identity_repo;
 pub mod messaging_repo;
 pub mod misc_repo;
 pub mod permission_repo;
+pub mod policy_evaluation_log_repo;
 pub mod site_repo;
 pub mod social_repo;
 pub mod storage_repo;
+pub mod user_credential_repo;

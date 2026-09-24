@@ -181,8 +181,8 @@ impl proto::gen_admin::services::ApiServiceHandlers for ApiProxy {
         _ctx: rushwind_http_binding::ctx::RequestContext,
         req: pbjson_types::Empty,
     ) -> Result<proto::proto::permission::service::v1::ListApiResponse, StatusError> {
-        let _ = (req, &self.state);
-        Err(crate::state::internal_error("not implemented"))
+        // The face's hand-written behavior (see the module docs).
+        crate::services::behaviors::walk_route_data(&self.state, &_ctx, req).await
     }
 }
 
@@ -718,8 +718,8 @@ impl proto::gen_admin::services::FileServiceHandlers for FileProxy {
         _ctx: rushwind_http_binding::ctx::RequestContext,
         req: proto::proto::storage::service::v1::CreateFileRequest,
     ) -> Result<pbjson_types::Empty, StatusError> {
-        let _ = (req, &self.state);
-        Err(crate::state::internal_error("not implemented"))
+        // The face's hand-written behavior (see the module docs).
+        crate::services::behaviors::file_create(&self.state, &_ctx, req).await
     }
 
     async fn update(
@@ -2040,8 +2040,8 @@ impl proto::gen_admin::services::PermissionServiceHandlers for PermissionProxy {
         _ctx: rushwind_http_binding::ctx::RequestContext,
         req: pbjson_types::Empty,
     ) -> Result<pbjson_types::Empty, StatusError> {
-        let _ = (req, &self.state);
-        Err(crate::state::internal_error("not implemented"))
+        // The face's hand-written behavior (see the module docs).
+        crate::services::behaviors::sync_permissions(&self.state, &_ctx, req).await
     }
 }
 
@@ -3044,8 +3044,8 @@ impl proto::gen_admin::services::UserProfileServiceHandlers for UserProfileProxy
         _ctx: rushwind_http_binding::ctx::RequestContext,
         req: proto::proto::identity::service::v1::ChangePasswordRequest,
     ) -> Result<pbjson_types::Empty, StatusError> {
-        let _ = (req, &self.state);
-        Err(crate::state::internal_error("not implemented"))
+        // The face's hand-written behavior (see the module docs).
+        crate::services::behaviors::change_password(&self.state, &_ctx, req).await
     }
 
     async fn bind_contact(
@@ -3053,8 +3053,8 @@ impl proto::gen_admin::services::UserProfileServiceHandlers for UserProfileProxy
         _ctx: rushwind_http_binding::ctx::RequestContext,
         req: proto::proto::identity::service::v1::BindContactRequest,
     ) -> Result<pbjson_types::Empty, StatusError> {
-        let _ = (req, &self.state);
-        Err(crate::state::internal_error("not implemented"))
+        // The face's hand-written behavior (see the module docs).
+        crate::services::behaviors::bind_contact(&self.state, &_ctx, req).await
     }
 
     async fn verify_contact(
@@ -3062,8 +3062,8 @@ impl proto::gen_admin::services::UserProfileServiceHandlers for UserProfileProxy
         _ctx: rushwind_http_binding::ctx::RequestContext,
         req: proto::proto::identity::service::v1::VerifyContactRequest,
     ) -> Result<pbjson_types::Empty, StatusError> {
-        let _ = (req, &self.state);
-        Err(crate::state::internal_error("not implemented"))
+        // The face's hand-written behavior (see the module docs).
+        crate::services::behaviors::verify_contact(&self.state, &_ctx, req).await
     }
 }
 

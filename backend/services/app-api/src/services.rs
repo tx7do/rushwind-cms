@@ -3,7 +3,9 @@
 //! placeholders.
 
 pub mod authentication;
+pub mod file_transfer;
 pub mod proxies;
+pub mod public;
 
 use crate::state::StatusError;
 
@@ -46,4 +48,18 @@ pub fn with_operator<T>(
         }
     }
     req
+}
+
+/// Wraps the outbound message with the operator metadata carried by a
+/// raw claim bag (the hand-mounted faces read the bag off the request
+/// extensions, not a RequestContext).
+pub fn with_operator_claims<T>(
+    claims: &Option<serde_json::Map<String, serde_json::Value>>,
+    msg: T,
+) -> tonic::Request<T> {
+    let ctx = rushwind_http_binding::ctx::RequestContext {
+        claims: claims.clone(),
+        ..Default::default()
+    };
+    with_operator(&ctx, msg)
 }

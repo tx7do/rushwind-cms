@@ -1,8 +1,9 @@
 //! AuthenticationService — the app (C-side) BFF face of the login
 //! chain. The domain logic lives in the core service; this BFF layer
-//! carries the client-facing concerns: the app client-type pin (1),
-//! the short-lived app token profile (refresh disabled), and the
-//! cookie pair (path-narrowed to the app refresh endpoint).
+//! carries the client-facing concerns: the app client-type pin (1), the
+//! refresh binding's uid/jti fallback off the (possibly expired) bearer
+//! JWT, and the body-borne refresh token (the reference's app BFF sets
+//! no cookies — the refresh token stays in the JSON body).
 
 use std::sync::Arc;
 
@@ -14,64 +15,38 @@ use crate::state::{operator_of, AppState, StatusError};
 
 type Ctx = rushwind_http_binding::ctx::RequestContext;
 
-/// The app client's refresh-expiry stamp (the authenticator's app
-/// profile disables refresh — the cookie mirror stays for shape
-/// parity; the core store writes no RT row under a 0s expiry).
-const REFRESH_TTL_SECS: i64 = 0;
-
 pub struct AuthenticationService {
     pub state: Arc<AppState>,
 }
 
-impl AuthenticationService {
-    fn set_refresh_cookies(&self, ctx: &Ctx, refresh: &str, secure: bool) {
-        if refresh.is_empty() {
-            return;
-        }
-        let (rt, exp) = crate::token::refresh_cookie_values(refresh, secure, REFRESH_TTL_SECS);
-        ctx.add_reply_header("Set-Cookie", &rt);
-        ctx.add_reply_header("Set-Cookie", &exp);
-    }
-
-    fn clear_refresh_cookies(&self, ctx: &Ctx, secure: bool) {
-        let (rt, exp) = crate::token::clear_cookie_values(secure);
-        ctx.add_reply_header("Set-Cookie", &rt);
-        ctx.add_reply_header("Set-Cookie", &exp);
-    }
-
-    fn cookie_secure(ctx: &Ctx) -> bool {
-        ctx.headers
-            .get("x-forwarded-proto")
-            .map(|v| v.eq_ignore_ascii_case("https"))
-            .unwrap_or(false)
-    }
+/// The bearer credential off the request headers (the refresh
+/// binding's fallback key source when no verified operator rides).
+fn bearer_of(ctx: &Ctx) -> Option<String> {
+    let auth = ctx.headers.get("authorization")?;
+    let token = auth
+        .strip_prefix("Bearer ")
+        .or_else(|| auth.strip_prefix("bearer "))?;
+    (!token.is_empty()).then(|| token.to_string())
 }
 
 #[async_trait::async_trait]
 impl proto::gen_app::services::AuthenticationServiceHandlers for AuthenticationService {
-    async fn login(&self, ctx: Ctx, req: LoginRequest) -> Result<LoginResponse, StatusError> {
+    async fn login(&self, ctx: Ctx, mut req: LoginRequest) -> Result<LoginResponse, StatusError> {
+        let _ = ctx;
         // Pin the client type (app) and forward to core. The app login
         // carries no captcha gate (the reference gates only the admin
-        // form).
-        let mut req = req;
+        // form), and the refresh token stays in the response body.
         req.client_type = Some(1);
         let mut core = self.state.core.clone();
-        let mut resp = core
+        Ok(core
             .login(tonic::Request::new(req))
             .await
             .map_err(map_status)?
-            .into_inner();
-
-        let secure = Self::cookie_secure(&ctx);
-        if let Some(rt) = resp.refresh_token.take() {
-            self.set_refresh_cookies(&ctx, &rt, secure);
-        }
-        Ok(resp)
+            .into_inner())
     }
 
     async fn logout(&self, ctx: Ctx, _req: Empty) -> Result<Empty, StatusError> {
         let payload = operator_of(&ctx)?;
-        self.clear_refresh_cookies(&ctx, Self::cookie_secure(&ctx));
         let mut core = self.state.core.clone();
         core.logout(tonic::Request::new(
             proto::proto::authentication::service::v1::LogoutRequest {
@@ -87,38 +62,36 @@ impl proto::gen_app::services::AuthenticationServiceHandlers for AuthenticationS
     async fn refresh_token(
         &self,
         ctx: Ctx,
-        req: LoginRequest,
+        mut req: LoginRequest,
     ) -> Result<LoginResponse, StatusError> {
-        let mut req = req;
-        if req.refresh_token.as_deref().unwrap_or("").is_empty() {
-            if let Some(cv) = ctx.cookies.get("refresh_token") {
-                req.refresh_token = Some(cv.clone());
-            }
-        }
+        // The regular path: the gate injected the operator while the
+        // access token was still valid. The fallback path: the access
+        // token is already expired (this route is whitelisted — no
+        // operator injection happened), so the uid/jti binding key is
+        // sniffed off the expired JWT's payload — the core validates
+        // the refresh token value itself.
         let operator = ctx
             .claims
             .as_ref()
             .and_then(crate::token::UserTokenPayload::from_claims);
-        if req.user_id.is_none() {
-            req.user_id = operator.as_ref().map(|o| o.user_id);
+        if let Some(op) = &operator {
+            req.user_id = Some(op.user_id);
+            req.jti = Some(op.jti.clone());
+        } else if let Some(token) = bearer_of(&ctx) {
+            if let Some((uid, jti)) = auth::parse_unverified_bearer_jwt(&token) {
+                req.user_id.get_or_insert(uid);
+                req.jti.get_or_insert(jti);
+            }
         }
-        if req.jti.as_deref().unwrap_or("").is_empty() {
-            req.jti = operator.as_ref().map(|o| o.jti.clone());
-        }
+        // The grant type stays caller-borne (the reference pins only
+        // the client type).
         req.client_type = Some(1);
-        req.grant_type = proto::proto::authentication::service::v1::GrantType::RefreshToken as i32;
 
         let mut core = self.state.core.clone();
-        let mut resp = core
+        Ok(core
             .refresh_token(tonic::Request::new(req))
             .await
             .map_err(map_status)?
-            .into_inner();
-
-        let secure = Self::cookie_secure(&ctx);
-        if let Some(rt) = resp.refresh_token.take() {
-            self.set_refresh_cookies(&ctx, &rt, secure);
-        }
-        Ok(resp)
+            .into_inner())
     }
 }

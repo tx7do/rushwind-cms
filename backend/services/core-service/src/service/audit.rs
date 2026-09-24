@@ -1,4 +1,4 @@
-//! The five audit-log query services — list/get/create over the audit
+//! The five audit-log services — list/get/create over the audit
 //! tables. One macro stamps the triplet per log family; the mapping
 //! covers the fields the golden schema carries (geo/device sub-messages
 //! stay unmapped until the audit write pipeline lands).
@@ -137,7 +137,8 @@ fn permission_audit_proto(
 
 macro_rules! audit_impl {
     ($svc:ident, $server_mod:ident, $trait_:ident, $entity:ident, $proto:ident,
-     $list_resp:ident, $get_req:ident, $get_req_mod:ident, $mapper:ident) => {
+     $list_resp:ident, $get_req:ident, $get_req_mod:ident, $mapper:ident,
+     $create_req:ident, $insert:ident) => {
         pub struct $svc {
             pub state: std::sync::Arc<crate::state::AppState>,
         }
@@ -180,6 +181,18 @@ macro_rules! audit_impl {
                     .map_err(db_status)?
                     .ok_or_else(|| not_found("audit log"))?;
                 Ok(Response::new($mapper(row)))
+            }
+
+            async fn create(
+                &self,
+                request: Request<proto::proto::audit::service::v1::$create_req>,
+            ) -> Result<Response<pbjson_types::Empty>, Status> {
+                let req = request.into_inner();
+                let Some(data) = req.data else {
+                    return Err(bad("data required"));
+                };
+                $insert(&self.state.db, data).await?;
+                Ok(Response::new(pbjson_types::Empty {}))
             }
         }
     };
@@ -299,6 +312,99 @@ pub async fn insert_operation_audit(
     Ok(())
 }
 
+/// The proto enum ordinals → the varchar value names the golden schema
+/// stores (the EnumTypeConverter name-map behavior; unknown ordinals
+/// stay unset).
+fn data_access_type_name(v: i32) -> Option<String> {
+    auditv1::data_access_audit_log::AccessType::try_from(v)
+        .ok()
+        .map(|e| e.as_str_name().to_string())
+}
+
+fn sensitive_level_name(v: i32) -> Option<String> {
+    auditv1::SensitiveLevel::try_from(v)
+        .ok()
+        .map(|e| e.as_str_name().to_string())
+}
+
+fn permission_action_name(v: i32) -> Option<String> {
+    auditv1::permission_audit_log::ActionType::try_from(v)
+        .ok()
+        .map(|e| e.as_str_name().to_string())
+}
+
+/// The old/new value text → the JSON column (valid JSON keeps its
+/// shape; free text lands as a JSON string).
+fn audit_json_text(v: Option<String>) -> Option<serde_json::Value> {
+    v.map(|v| serde_json::from_str(&v).unwrap_or(serde_json::Value::String(v.clone())))
+}
+
+/// Inserts one data-access-audit row.
+pub async fn insert_data_access_audit(
+    db: &sea_orm::DatabaseConnection,
+    d: auditv1::DataAccessAuditLog,
+) -> Result<(), Status> {
+    use sea_orm::ActiveModelTrait;
+    store::entities::sys_data_access_audit_logs::ActiveModel {
+        tenant_id: Set(d.tenant_id.map(|v| v as i64)),
+        user_id: Set(d.user_id.map(|v| v as i64)),
+        username: Set(d.username),
+        ip_address: Set(d.ip_address),
+        request_id: Set(d.request_id),
+        data_source: Set(d.data_source),
+        table_name: Set(d.table_name),
+        data_id: Set(d.data_id),
+        access_type: Set(d.access_type.and_then(data_access_type_name)),
+        sql_digest: Set(d.sql_digest),
+        sql_text: Set(d.sql_text),
+        affected_rows: Set(d.affected_rows.map(|v| v as i64)),
+        latency_ms: Set(d.latency_ms.map(|v| v as i64)),
+        success: Set(d.success),
+        sensitive_level: Set(d.sensitive_level.and_then(sensitive_level_name)),
+        data_masked: Set(d.data_masked),
+        masking_rules: Set(d.masking_rules),
+        business_purpose: Set(d.business_purpose),
+        data_category: Set(d.data_category),
+        db_user: Set(d.db_user),
+        log_hash: Set(d.log_hash),
+        signature: Set(d.signature),
+        created_at: Set(Some(store::now())),
+        ..Default::default()
+    }
+    .insert(db)
+    .await
+    .map_err(db_status)?;
+    Ok(())
+}
+
+/// Inserts one permission-audit row.
+pub async fn insert_permission_audit(
+    db: &sea_orm::DatabaseConnection,
+    d: auditv1::PermissionAuditLog,
+) -> Result<(), Status> {
+    use sea_orm::ActiveModelTrait;
+    store::entities::sys_permission_audit_logs::ActiveModel {
+        tenant_id: Set(d.tenant_id.map(|v| v as i64)),
+        operator_id: Set(d.operator_id.map(|v| v as i64)),
+        target_type: Set(d.target_type),
+        target_id: Set(d.target_id),
+        action: Set(d.action.and_then(permission_action_name)),
+        old_value: Set(audit_json_text(d.old_value)),
+        new_value: Set(audit_json_text(d.new_value)),
+        ip_address: Set(d.ip_address.unwrap_or_default()),
+        request_id: Set(d.request_id.unwrap_or_default()),
+        reason: Set(d.reason.unwrap_or_default()),
+        log_hash: Set(d.log_hash),
+        signature: Set(d.signature),
+        created_at: Set(Some(store::now())),
+        ..Default::default()
+    }
+    .insert(db)
+    .await
+    .map_err(db_status)?;
+    Ok(())
+}
+
 audit_impl!(
     DataAccessAuditLogServiceImpl,
     data_access_audit_log_service_server,
@@ -308,7 +414,9 @@ audit_impl!(
     ListDataAccessAuditLogResponse,
     GetDataAccessAuditLogRequest,
     get_data_access_audit_log_request,
-    data_access_audit_proto
+    data_access_audit_proto,
+    CreateDataAccessAuditLogRequest,
+    insert_data_access_audit
 );
 audit_impl!(
     PermissionAuditLogServiceImpl,
@@ -319,7 +427,9 @@ audit_impl!(
     ListPermissionAuditLogResponse,
     GetPermissionAuditLogRequest,
     get_permission_audit_log_request,
-    permission_audit_proto
+    permission_audit_proto,
+    CreatePermissionAuditLogRequest,
+    insert_permission_audit
 );
 
 pub struct ApiAuditLogServiceImpl {

@@ -20,6 +20,7 @@
 
 use std::sync::Arc;
 
+use axum::response::IntoResponse;
 use axum::routing::MethodRouter;
 
 use crate::state::AppState;
@@ -138,12 +139,6 @@ pub fn build_router(state: Arc<AppState>) -> axum::Router {
     };
 }
 
-    macro_rules! null {
-        ($svc:ident) => {
-            proto::gen_admin::nulls::$svc()
-        };
-    }
-
     mount_services!(
         mount_admin_portal_service => std::sync::Arc::new(
             crate::services::admin_portal::AdminPortalService {
@@ -165,13 +160,11 @@ pub fn build_router(state: Arc<AppState>) -> axum::Router {
         mount_dict_type_service => std::sync::Arc::new(crate::services::proxies::DictTypeProxy { state: std::sync::Arc::clone(&state) }),
         mount_file_service => std::sync::Arc::new(crate::services::proxies::FileProxy { state: std::sync::Arc::clone(&state) }),
         mount_interaction_admin_service => std::sync::Arc::new(crate::services::proxies::InteractionAdminProxy { state: std::sync::Arc::clone(&state) }),
-        mount_internal_message_category_service => null!(
-            null_internal_message_category_service
-        ),
-        mount_internal_message_recipient_service => null!(
-            null_internal_message_recipient_service
-        ),
-        mount_internal_message_service => std::sync::Arc::new(crate::services::proxies::InternalMessageProxy { state: std::sync::Arc::clone(&state) }),
+        mount_internal_message_category_service => std::sync::Arc::new(crate::services::proxies::InternalMessageCategoryProxy { state: std::sync::Arc::clone(&state) }),
+        mount_internal_message_recipient_service => std::sync::Arc::new(crate::services::proxies::InternalMessageRecipientProxy { state: std::sync::Arc::clone(&state) }),
+        // The hand impl (not the generated proxy): send_message fans the
+        // notification payload out over the SSE hub after the core RPC.
+        mount_internal_message_service => std::sync::Arc::new(crate::services::internal_message::InternalMessageService { state: std::sync::Arc::clone(&state) }),
         mount_language_service => std::sync::Arc::new(crate::services::proxies::LanguageProxy { state: std::sync::Arc::clone(&state) }),
         mount_login_audit_log_service => std::sync::Arc::new(crate::services::proxies::LoginAuditLogProxy { state: std::sync::Arc::clone(&state) }),
         mount_login_policy_service => std::sync::Arc::new(crate::services::proxies::LoginPolicyProxy { state: std::sync::Arc::clone(&state) }),
@@ -209,17 +202,67 @@ pub fn build_router(state: Arc<AppState>) -> axum::Router {
     // route of the face is gated: the same auth gate the generated
     // protected subtree rides — the reference's hand registration sits
     // inside the same server middleware chain.
-    let hand_gate = axum::middleware::from_fn({
+    // The hand faces' gate — a factory, since each layered router
+    // consumes its own middleware instance.
+    let mk_hand_gate = || {
         let auth = Arc::clone(&authenticator);
         let checker = Arc::clone(&checker);
-        move |req, next| {
+        axum::middleware::from_fn(move |req, next| {
             let auth = Arc::clone(&auth);
             let checker = Arc::clone(&checker);
             async move { auth::auth_gate(auth, checker, PACKAGE, req, next).await }
-        }
-    });
-    let hand = crate::services::file_transfer::router(Arc::clone(&state)).layer(hand_gate);
+        })
+    };
+    let hand = crate::services::file_transfer::router(Arc::clone(&state)).layer(mk_hand_gate());
     app = app.merge(hand);
+
+    // The walk-route debug dump: the generated registration of this
+    // route is skipped (its static segment loses the generated mux's
+    // first-match analysis to `/apis/{id}`), while the reference's radix
+    // router serves it — hand-mounted here; matchit resolves the static
+    // segment ahead of the parameter route. Gated like the faces above.
+    let walk_state = Arc::clone(&state);
+    let walk = axum::Router::new()
+        .route(
+            "/admin/v1/apis/walk-route",
+            axum::routing::get(move |req: axum::extract::Request| {
+                let state = Arc::clone(&walk_state);
+                async move {
+                    let ctx = rushwind_http_binding::ctx::RequestContext {
+                        claims: req
+                            .extensions()
+                            .get::<auth::AuthClaims>()
+                            .map(|c| c.0.clone()),
+                        ..Default::default()
+                    };
+                    match crate::services::behaviors::walk_route_data(
+                        &state,
+                        &ctx,
+                        pbjson_types::Empty {},
+                    )
+                    .await
+                    {
+                        Ok(resp) => {
+                            let body = rushwind_http_binding::codec::serialize_response(
+                                pool(),
+                                "permission.service.v1.ListApiResponse",
+                                &resp,
+                            )
+                            .map_err(rushwind_http_binding::envelope::error_response)
+                            .unwrap_or_default();
+                            (
+                                [(axum::http::header::CONTENT_TYPE, "application/json")],
+                                body,
+                            )
+                                .into_response()
+                        }
+                        Err(e) => rushwind_http_binding::envelope::error_response(e),
+                    }
+                }
+            }),
+        )
+        .layer(mk_hand_gate());
+    app = app.merge(walk);
 
     // The audit-write layer: post-handler persistence (api + operation
     // logs), outermost so it sees final statuses.

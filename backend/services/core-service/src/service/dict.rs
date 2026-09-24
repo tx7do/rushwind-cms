@@ -388,6 +388,19 @@ impl proto::proto::dict::service::v1::dict_entry_service_server::DictEntryServic
         ))
     }
 
+    async fn count(
+        &self,
+        _request: Request<proto::proto::pagination::PagingRequest>,
+    ) -> Result<Response<proto::proto::dict::service::v1::CountDictEntryResponse>, Status> {
+        let total = sys_dict_entries::Entity::find()
+            .count(&self.state.db)
+            .await
+            .map_err(db_status)?;
+        Ok(Response::new(
+            proto::proto::dict::service::v1::CountDictEntryResponse { count: total },
+        ))
+    }
+
     async fn list_by_type_code(
         &self,
         request: Request<proto::proto::dict::service::v1::ListDictEntryByTypeCodeRequest>,

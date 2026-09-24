@@ -170,6 +170,7 @@ dependencies = [
  "rushwind-transport-axum",
  "serde",
  "serde_json",
+ "serde_urlencoded",
  "serde_yaml",
  "store",
  "tokio",
@@ -547,9 +548,11 @@ version = "0.0.1"
 dependencies = [
  "async-trait",
  "axum",
+ "base64 0.22.1",
  "proto",
  "rushwind-authn",
  "rushwind-http-binding",
+ "serde_json",
 ]
 
 [[package]]

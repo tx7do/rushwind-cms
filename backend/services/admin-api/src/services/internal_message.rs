@@ -5,7 +5,7 @@
 
 use std::sync::Arc;
 
-use crate::services::map_status;
+use crate::services::{map_status, with_operator};
 use crate::state::{AppState, StatusError};
 
 use proto::proto::internal_message::service::v1 as imv1;
@@ -20,14 +20,14 @@ pub struct InternalMessageService {
 impl proto::gen_admin::services::InternalMessageServiceHandlers for InternalMessageService {
     async fn list_message(
         &self,
-        _ctx: Ctx,
+        ctx: Ctx,
         req: proto::proto::pagination::PagingRequest,
     ) -> Result<imv1::ListInternalMessageResponse, StatusError> {
         let mut core = imv1::internal_message_service_client::InternalMessageServiceClient::new(
             self.state.core_channel.clone(),
         );
         Ok(core
-            .list_message(tonic::Request::new(req))
+            .list_message(with_operator(&ctx, req))
             .await
             .map_err(map_status)?
             .into_inner())
@@ -35,14 +35,14 @@ impl proto::gen_admin::services::InternalMessageServiceHandlers for InternalMess
 
     async fn get_message(
         &self,
-        _ctx: Ctx,
+        ctx: Ctx,
         req: imv1::GetInternalMessageRequest,
     ) -> Result<imv1::InternalMessage, StatusError> {
         let mut core = imv1::internal_message_service_client::InternalMessageServiceClient::new(
             self.state.core_channel.clone(),
         );
         Ok(core
-            .get_message(tonic::Request::new(req))
+            .get_message(with_operator(&ctx, req))
             .await
             .map_err(map_status)?
             .into_inner())
@@ -50,13 +50,13 @@ impl proto::gen_admin::services::InternalMessageServiceHandlers for InternalMess
 
     async fn update_message(
         &self,
-        _ctx: Ctx,
+        ctx: Ctx,
         req: imv1::UpdateInternalMessageRequest,
     ) -> Result<pbjson_types::Empty, StatusError> {
         let mut core = imv1::internal_message_service_client::InternalMessageServiceClient::new(
             self.state.core_channel.clone(),
         );
-        core.update_message(tonic::Request::new(req))
+        core.update_message(with_operator(&ctx, req))
             .await
             .map_err(map_status)?;
         Ok(pbjson_types::Empty {})
@@ -64,13 +64,13 @@ impl proto::gen_admin::services::InternalMessageServiceHandlers for InternalMess
 
     async fn delete_message(
         &self,
-        _ctx: Ctx,
+        ctx: Ctx,
         req: imv1::DeleteInternalMessageRequest,
     ) -> Result<pbjson_types::Empty, StatusError> {
         let mut core = imv1::internal_message_service_client::InternalMessageServiceClient::new(
             self.state.core_channel.clone(),
         );
-        core.delete_message(tonic::Request::new(req))
+        core.delete_message(with_operator(&ctx, req))
             .await
             .map_err(map_status)?;
         Ok(pbjson_types::Empty {})
@@ -78,14 +78,14 @@ impl proto::gen_admin::services::InternalMessageServiceHandlers for InternalMess
 
     async fn send_message(
         &self,
-        _ctx: Ctx,
+        ctx: Ctx,
         req: imv1::SendMessageRequest,
     ) -> Result<imv1::SendMessageResponse, StatusError> {
         let mut core = imv1::internal_message_service_client::InternalMessageServiceClient::new(
             self.state.core_channel.clone(),
         );
         let resp = core
-            .send_message(tonic::Request::new(req))
+            .send_message(with_operator(&ctx, req))
             .await
             .map_err(map_status)?;
         // The SSE fan-out: the payload metadata carries
@@ -123,14 +123,14 @@ impl proto::gen_admin::services::InternalMessageServiceHandlers for InternalMess
 
     async fn revoke_message(
         &self,
-        _ctx: Ctx,
+        ctx: Ctx,
         req: imv1::RevokeMessageRequest,
     ) -> Result<pbjson_types::Empty, StatusError> {
         let mut core = imv1::internal_message_service_client::InternalMessageServiceClient::new(
             self.state.core_channel.clone(),
         );
         Ok(core
-            .revoke_message(tonic::Request::new(req))
+            .revoke_message(with_operator(&ctx, req))
             .await
             .map_err(map_status)?
             .into_inner())

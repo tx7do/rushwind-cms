@@ -241,7 +241,13 @@ impl contentv1::post_service_server::PostService for PostServiceImpl {
         };
         let now = store::now();
         let row = posts::ActiveModel {
-            status: Set(status_from_i32("post", data.status.unwrap_or(1))),
+            // 新建文章状态缺省落草稿（显式携带状态则照收），发布仍以
+            // Update 为正式切换口
+            status: Set(Some(
+                data.status
+                    .and_then(|v| status_from_i32("post", v))
+                    .unwrap_or_else(|| "POST_STATUS_DRAFT".to_string()),
+            )),
             code: Set(data.code),
             disallow_comment: Set(data.disallow_comment),
             in_progress: Set(data.in_progress),
@@ -421,6 +427,122 @@ impl contentv1::post_service_server::PostService for PostServiceImpl {
             return Err(bad("query_by required"));
         };
         repo::delete_post(&self.state.db, id as i64).await?;
+        Ok(Response::new(pbjson_types::Empty {}))
+    }
+
+    async fn translation_exists(
+        &self,
+        request: Request<contentv1::PostTranslationExistsRequest>,
+    ) -> Result<Response<contentv1::PostTranslationExistsResponse>, Status> {
+        let req = request.into_inner();
+        let exists =
+            repo::post_translation_exists(&self.state.db, req.post_id as i64, &req.language_code)
+                .await?;
+        Ok(Response::new(contentv1::PostTranslationExistsResponse {
+            exists,
+        }))
+    }
+
+    async fn get_translation(
+        &self,
+        request: Request<contentv1::GetPostRequest>,
+    ) -> Result<Response<contentv1::PostTranslation>, Status> {
+        let req = request.into_inner();
+        // The reference reads req.GetId(): a code query degrades to id 0
+        // and thus the zero translation (a missing translation is not an
+        // error — the response is simply the empty message).
+        let id = match req.query_by {
+            Some(contentv1::get_post_request::QueryBy::Id(id)) => id as i64,
+            _ => 0,
+        };
+        let row =
+            repo::get_post_translation(&self.state.db, id, &req.locale.unwrap_or_default()).await?;
+        Ok(Response::new(
+            row.map(post_translation_proto).unwrap_or_default(),
+        ))
+    }
+
+    async fn create_translation(
+        &self,
+        request: Request<contentv1::CreatePostTranslationRequest>,
+    ) -> Result<Response<contentv1::PostTranslation>, Status> {
+        // The ES reindex enqueue the reference performs after every
+        // translation mutation (enqueuePostReindex) is skipped: no
+        // OpenSearch bridge in this port yet (known backlog).
+        let req = request.into_inner();
+        let Some(data) = req.data else {
+            return Err(bad("data required"));
+        };
+        let row = repo::create_post_translation(
+            &self.state.db,
+            req.post_id as i64,
+            repo::PostTranslationFields {
+                language_code: data.language_code,
+                title: data.title,
+                slug: data.slug,
+                summary: data.summary,
+                content: data.content,
+                original_content: data.original_content,
+                full_path: data.full_path,
+                seo: seo_to_json(data.seo),
+                created_by: data.created_by.map(|v| v as i64),
+            },
+        )
+        .await?;
+        Ok(Response::new(post_translation_proto(row)))
+    }
+
+    async fn update_translation(
+        &self,
+        request: Request<contentv1::UpdatePostTranslationRequest>,
+    ) -> Result<Response<contentv1::PostTranslation>, Status> {
+        // ES reindex enqueue skipped (see create_translation).
+        let req = request.into_inner();
+        let Some(data) = req.data else {
+            return Err(bad("data required"));
+        };
+        let row = repo::update_post_translation(
+            &self.state.db,
+            req.id as i64,
+            data.post_id.map(|v| v as i64).unwrap_or(0),
+            // update_mask is accepted but not applied, like the other
+            // update faces of this port.
+            repo::PostTranslationFields {
+                language_code: data.language_code,
+                title: data.title,
+                slug: data.slug,
+                summary: data.summary,
+                content: data.content,
+                original_content: data.original_content,
+                full_path: data.full_path,
+                seo: seo_to_json(data.seo),
+                created_by: data.created_by.map(|v| v as i64),
+            },
+            req.allow_missing.unwrap_or(false),
+        )
+        .await?;
+        Ok(Response::new(post_translation_proto(row)))
+    }
+
+    async fn delete_translation(
+        &self,
+        request: Request<contentv1::DeletePostTranslationRequest>,
+    ) -> Result<Response<pbjson_types::Empty>, Status> {
+        // ES reindex enqueue skipped (see create_translation).
+        let req = request.into_inner();
+        let query = match req.query_by {
+            Some(contentv1::delete_post_translation_request::QueryBy::Id(id)) => {
+                repo::PostTranslationQuery::Id(id as i64)
+            }
+            Some(contentv1::delete_post_translation_request::QueryBy::Identifier(identifier)) => {
+                repo::PostTranslationQuery::Identifier {
+                    post_id: identifier.post_id as i64,
+                    language_code: identifier.language_code,
+                }
+            }
+            None => return Err(bad("query_by required")),
+        };
+        repo::delete_post_translation(&self.state.db, query).await?;
         Ok(Response::new(pbjson_types::Empty {}))
     }
 }
@@ -623,6 +745,119 @@ impl contentv1::category_service_server::CategoryService for CategoryServiceImpl
         repo::delete_category(&self.state.db, id as i64).await?;
         Ok(Response::new(pbjson_types::Empty {}))
     }
+
+    async fn translation_exists(
+        &self,
+        request: Request<contentv1::CategoryTranslationExistsRequest>,
+    ) -> Result<Response<contentv1::CategoryTranslationExistsResponse>, Status> {
+        let req = request.into_inner();
+        let exists = repo::category_translation_exists(
+            &self.state.db,
+            req.category_id as i64,
+            &req.language_code,
+        )
+        .await?;
+        Ok(Response::new(
+            contentv1::CategoryTranslationExistsResponse { exists },
+        ))
+    }
+
+    async fn get_translation(
+        &self,
+        request: Request<contentv1::GetCategoryRequest>,
+    ) -> Result<Response<contentv1::CategoryTranslation>, Status> {
+        let req = request.into_inner();
+        // The reference reads req.GetId(): a code query degrades to id 0
+        // and thus the zero translation (a missing translation is not an
+        // error — the response is simply the empty message).
+        let id = match req.query_by {
+            Some(contentv1::get_category_request::QueryBy::Id(id)) => id as i64,
+            _ => 0,
+        };
+        let row =
+            repo::get_category_translation(&self.state.db, id, &req.locale.unwrap_or_default())
+                .await?;
+        Ok(Response::new(
+            row.map(category_translation_proto).unwrap_or_default(),
+        ))
+    }
+
+    async fn create_translation(
+        &self,
+        request: Request<contentv1::CreateCategoryTranslationRequest>,
+    ) -> Result<Response<contentv1::CategoryTranslation>, Status> {
+        let req = request.into_inner();
+        let Some(data) = req.data else {
+            return Err(bad("data required"));
+        };
+        let row = repo::create_category_translation(
+            &self.state.db,
+            req.category_id as i64,
+            repo::NamedTranslationFields {
+                language_code: data.language_code,
+                name: data.name,
+                slug: data.slug,
+                description: data.description,
+                cover_image: data.cover_image,
+                full_path: data.full_path,
+                seo: seo_to_json(data.seo),
+                created_by: data.created_by.map(|v| v as i64),
+            },
+        )
+        .await?;
+        Ok(Response::new(category_translation_proto(row)))
+    }
+
+    async fn update_translation(
+        &self,
+        request: Request<contentv1::UpdateCategoryTranslationRequest>,
+    ) -> Result<Response<contentv1::CategoryTranslation>, Status> {
+        let req = request.into_inner();
+        let Some(data) = req.data else {
+            return Err(bad("data required"));
+        };
+        let row = repo::update_category_translation(
+            &self.state.db,
+            req.id as i64,
+            data.category_id.map(|v| v as i64).unwrap_or(0),
+            // update_mask is accepted but not applied, like the other
+            // update faces of this port.
+            repo::NamedTranslationFields {
+                language_code: data.language_code,
+                name: data.name,
+                slug: data.slug,
+                description: data.description,
+                cover_image: data.cover_image,
+                full_path: data.full_path,
+                seo: seo_to_json(data.seo),
+                created_by: data.created_by.map(|v| v as i64),
+            },
+            req.allow_missing.unwrap_or(false),
+        )
+        .await?;
+        Ok(Response::new(category_translation_proto(row)))
+    }
+
+    async fn delete_translation(
+        &self,
+        request: Request<contentv1::DeleteCategoryTranslationRequest>,
+    ) -> Result<Response<pbjson_types::Empty>, Status> {
+        let req = request.into_inner();
+        let query = match req.query_by {
+            Some(contentv1::delete_category_translation_request::QueryBy::Id(id)) => {
+                repo::CategoryTranslationQuery::Id(id as i64)
+            }
+            Some(contentv1::delete_category_translation_request::QueryBy::Identifier(
+                identifier,
+            )) => repo::CategoryTranslationQuery::Identifier {
+                category_id: identifier.category_id as i64,
+                language_code: identifier.language_code,
+            },
+            None => return Err(bad("query_by required")),
+        };
+        repo::delete_category_translation(&self.state.db, query).await?;
+        Ok(Response::new(pbjson_types::Empty {}))
+    }
 }
 
 // ── Tag ──────────────────────────────────────────────────────────────
@@ -811,6 +1046,115 @@ impl contentv1::tag_service_server::TagService for TagServiceImpl {
             return Err(bad("query_by required"));
         };
         repo::delete_tag(&self.state.db, id as i64).await?;
+        Ok(Response::new(pbjson_types::Empty {}))
+    }
+
+    async fn translation_exists(
+        &self,
+        request: Request<contentv1::TagTranslationExistsRequest>,
+    ) -> Result<Response<contentv1::TagTranslationExistsResponse>, Status> {
+        let req = request.into_inner();
+        let exists =
+            repo::tag_translation_exists(&self.state.db, req.tag_id as i64, &req.language_code)
+                .await?;
+        Ok(Response::new(contentv1::TagTranslationExistsResponse {
+            exists,
+        }))
+    }
+
+    async fn get_translation(
+        &self,
+        request: Request<contentv1::GetTagRequest>,
+    ) -> Result<Response<contentv1::TagTranslation>, Status> {
+        let req = request.into_inner();
+        // The reference reads req.GetId(): a code query degrades to id 0
+        // and thus the zero translation (a missing translation is not an
+        // error — the response is simply the empty message).
+        let id = match req.query_by {
+            Some(contentv1::get_tag_request::QueryBy::Id(id)) => id as i64,
+            _ => 0,
+        };
+        let row =
+            repo::get_tag_translation(&self.state.db, id, &req.locale.unwrap_or_default()).await?;
+        Ok(Response::new(
+            row.map(tag_translation_proto).unwrap_or_default(),
+        ))
+    }
+
+    async fn create_translation(
+        &self,
+        request: Request<contentv1::CreateTagTranslationRequest>,
+    ) -> Result<Response<contentv1::TagTranslation>, Status> {
+        let req = request.into_inner();
+        let Some(data) = req.data else {
+            return Err(bad("data required"));
+        };
+        let row = repo::create_tag_translation(
+            &self.state.db,
+            req.tag_id as i64,
+            repo::NamedTranslationFields {
+                language_code: data.language_code,
+                name: data.name,
+                slug: data.slug,
+                description: data.description,
+                cover_image: data.cover_image,
+                full_path: data.full_path,
+                seo: seo_to_json(data.seo),
+                created_by: data.created_by.map(|v| v as i64),
+            },
+        )
+        .await?;
+        Ok(Response::new(tag_translation_proto(row)))
+    }
+
+    async fn update_translation(
+        &self,
+        request: Request<contentv1::UpdateTagTranslationRequest>,
+    ) -> Result<Response<contentv1::TagTranslation>, Status> {
+        let req = request.into_inner();
+        let Some(data) = req.data else {
+            return Err(bad("data required"));
+        };
+        let row = repo::update_tag_translation(
+            &self.state.db,
+            req.id as i64,
+            data.tag_id.map(|v| v as i64).unwrap_or(0),
+            // update_mask is accepted but not applied, like the other
+            // update faces of this port.
+            repo::NamedTranslationFields {
+                language_code: data.language_code,
+                name: data.name,
+                slug: data.slug,
+                description: data.description,
+                cover_image: data.cover_image,
+                full_path: data.full_path,
+                seo: seo_to_json(data.seo),
+                created_by: data.created_by.map(|v| v as i64),
+            },
+            req.allow_missing.unwrap_or(false),
+        )
+        .await?;
+        Ok(Response::new(tag_translation_proto(row)))
+    }
+
+    async fn delete_translation(
+        &self,
+        request: Request<contentv1::DeleteTagTranslationRequest>,
+    ) -> Result<Response<pbjson_types::Empty>, Status> {
+        let req = request.into_inner();
+        let query = match req.query_by {
+            Some(contentv1::delete_tag_translation_request::QueryBy::Id(id)) => {
+                repo::TagTranslationQuery::Id(id as i64)
+            }
+            Some(contentv1::delete_tag_translation_request::QueryBy::Identifier(identifier)) => {
+                repo::TagTranslationQuery::Identifier {
+                    tag_id: identifier.tag_id as i64,
+                    language_code: identifier.language_code,
+                }
+            }
+            None => return Err(bad("query_by required")),
+        };
+        repo::delete_tag_translation(&self.state.db, query).await?;
         Ok(Response::new(pbjson_types::Empty {}))
     }
 }
@@ -1013,10 +1357,194 @@ impl contentv1::page_service_server::PageService for PageServiceImpl {
         repo::delete_page(&self.state.db, id as i64).await?;
         Ok(Response::new(pbjson_types::Empty {}))
     }
+
+    async fn translation_exists(
+        &self,
+        request: Request<contentv1::PageTranslationExistsRequest>,
+    ) -> Result<Response<contentv1::PageTranslationExistsResponse>, Status> {
+        let req = request.into_inner();
+        let exists =
+            repo::page_translation_exists(&self.state.db, req.page_id as i64, &req.language_code)
+                .await?;
+        Ok(Response::new(contentv1::PageTranslationExistsResponse {
+            exists,
+        }))
+    }
+
+    async fn get_translation(
+        &self,
+        request: Request<contentv1::GetPageRequest>,
+    ) -> Result<Response<contentv1::PageTranslation>, Status> {
+        let req = request.into_inner();
+        // The reference reads req.GetId(): a slug query degrades to id 0
+        // and thus the zero translation (a missing translation is not an
+        // error — the response is simply the empty message).
+        let id = match req.query_by {
+            Some(contentv1::get_page_request::QueryBy::Id(id)) => id as i64,
+            _ => 0,
+        };
+        let row =
+            repo::get_page_translation(&self.state.db, id, &req.locale.unwrap_or_default()).await?;
+        Ok(Response::new(
+            row.map(page_translation_proto).unwrap_or_default(),
+        ))
+    }
+
+    async fn create_translation(
+        &self,
+        request: Request<contentv1::CreatePageTranslationRequest>,
+    ) -> Result<Response<contentv1::PageTranslation>, Status> {
+        let req = request.into_inner();
+        let Some(data) = req.data else {
+            return Err(bad("data required"));
+        };
+        let row = repo::create_page_translation(
+            &self.state.db,
+            req.page_id as i64,
+            repo::PageTranslationFields {
+                language_code: data.language_code,
+                title: data.title,
+                slug: data.slug,
+                cover_image: data.cover_image,
+                full_path: data.full_path,
+                seo: seo_to_json(data.seo),
+                created_by: data.created_by.map(|v| v as i64),
+            },
+        )
+        .await?;
+        Ok(Response::new(page_translation_proto(row)))
+    }
+
+    async fn update_translation(
+        &self,
+        request: Request<contentv1::UpdatePageTranslationRequest>,
+    ) -> Result<Response<contentv1::PageTranslation>, Status> {
+        let req = request.into_inner();
+        let Some(data) = req.data else {
+            return Err(bad("data required"));
+        };
+        let row = repo::update_page_translation(
+            &self.state.db,
+            req.id as i64,
+            data.page_id.map(|v| v as i64).unwrap_or(0),
+            // update_mask is accepted but not applied, like the other
+            // update faces of this port; the repo writes only the fields
+            // the reference's page-translation update writes.
+            repo::PageTranslationFields {
+                language_code: data.language_code,
+                title: data.title,
+                slug: data.slug,
+                cover_image: data.cover_image,
+                full_path: data.full_path,
+                seo: seo_to_json(data.seo),
+                created_by: data.created_by.map(|v| v as i64),
+            },
+            req.allow_missing.unwrap_or(false),
+        )
+        .await?;
+        Ok(Response::new(page_translation_proto(row)))
+    }
+
+    async fn delete_translation(
+        &self,
+        request: Request<contentv1::DeletePageTranslationRequest>,
+    ) -> Result<Response<pbjson_types::Empty>, Status> {
+        let req = request.into_inner();
+        let query = match req.query_by {
+            Some(contentv1::delete_page_translation_request::QueryBy::Id(id)) => {
+                repo::PageTranslationQuery::Id(id as i64)
+            }
+            Some(contentv1::delete_page_translation_request::QueryBy::Identifier(identifier)) => {
+                repo::PageTranslationQuery::Identifier {
+                    page_id: identifier.page_id as i64,
+                    language_code: identifier.language_code,
+                }
+            }
+            None => return Err(bad("query_by required")),
+        };
+        repo::delete_page_translation(&self.state.db, query).await?;
+        Ok(Response::new(pbjson_types::Empty {}))
+    }
 }
 
 // The condition helper keeps the import set honest for future filters.
 #[allow(dead_code)]
 fn _unused(c: Condition) -> Condition {
     c
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    // ── status_from_i32 ─────────────────────────────────────────────
+
+    #[test]
+    fn status_from_i32_maps_every_member_of_every_enum() {
+        let table = [
+            ("post", 1, "POST_STATUS_DRAFT"),
+            ("post", 2, "POST_STATUS_PUBLISHED"),
+            ("post", 3, "POST_STATUS_SCHEDULED"),
+            ("post", 4, "POST_STATUS_TRASHED"),
+            ("page", 1, "PAGE_STATUS_DRAFT"),
+            ("page", 2, "PAGE_STATUS_PUBLISHED"),
+            ("category", 1, "CATEGORY_STATUS_DRAFT"),
+            ("category", 2, "CATEGORY_STATUS_PUBLISHED"),
+            ("tag", 1, "TAG_STATUS_NORMAL"),
+            ("tag", 2, "TAG_STATUS_DISABLED"),
+        ];
+        for (prefix, v, want) in table {
+            assert_eq!(
+                status_from_i32(prefix, v).as_deref(),
+                Some(want),
+                "{prefix}/{v}"
+            );
+        }
+    }
+
+    #[test]
+    fn status_from_i32_unknown_values_and_prefixes_yield_none() {
+        // Out-of-range values.
+        for (prefix, v) in [
+            ("post", 0),
+            ("post", 5),
+            ("page", 0),
+            ("page", 3),
+            ("category", 0),
+            ("category", 3),
+            ("tag", 0),
+            ("tag", 3),
+        ] {
+            assert_eq!(status_from_i32(prefix, v), None, "{prefix}/{v}");
+        }
+        // Unknown enum families never map.
+        assert_eq!(status_from_i32("unknown", 1), None);
+        assert_eq!(status_from_i32("", 1), None);
+        assert_eq!(status_from_i32("POST", 1), None);
+    }
+
+    // ── status_to_i32 ───────────────────────────────────────────────
+
+    #[test]
+    fn status_to_i32_round_trips_the_from_i32_table() {
+        for prefix in ["post", "page", "category", "tag"] {
+            for v in 1..=4 {
+                if let Some(name) = status_from_i32(prefix, v) {
+                    assert_eq!(status_to_i32(prefix, Some(name)), Some(v), "{prefix}/{v}");
+                }
+            }
+        }
+    }
+
+    #[test]
+    fn status_to_i32_missing_name_is_none_and_unknown_name_is_zero() {
+        assert_eq!(status_to_i32("post", None), None);
+        // The unknown-name arm reads 0 (the proto's UNSPECIFIED), the
+        // prefix never disambiguates — the stored name decides.
+        assert_eq!(status_to_i32("post", Some("NOT_A_STATUS".into())), Some(0));
+        assert_eq!(
+            status_to_i32("tag", Some("POST_STATUS_DRAFT".into())),
+            Some(1)
+        );
+    }
 }

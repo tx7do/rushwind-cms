@@ -144,6 +144,10 @@ pub struct LoginAudit<'a> {
     pub failure_reason: &'a str,
     pub ip: &'a str,
     pub request_id: &'a str,
+    /// The grant the login rode (PASSWORD / REFRESH_TOKEN / …) — the
+    /// audit mirrors the caller's grant instead of assuming the password
+    /// form.
+    pub login_method: i32,
 }
 
 pub async fn write_login_audit(state: &AppState, a: LoginAudit<'_>) {
@@ -154,7 +158,7 @@ pub async fn write_login_audit(state: &AppState, a: LoginAudit<'_>) {
         ip_address: Some(a.ip.to_string()),
         action_type: Some(1), // LOGIN
         status: Some(if a.success { STATUS_OK } else { STATUS_FAILED }),
-        login_method: Some(1), // PASSWORD
+        login_method: Some(a.login_method),
         failure_reason: if a.success {
             None
         } else {
@@ -190,5 +194,29 @@ fn action_of(method: &str) -> i32 {
         "PUT" | "PATCH" => 2,
         "DELETE" => 3,
         _ => 0,
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn module_extracts_the_third_segment() {
+        assert_eq!(module_of("/admin/v1/users/42"), "users");
+        assert_eq!(module_of("/admin/v1/file/upload"), "file");
+        assert_eq!(module_of("/admin/v1/login"), "login");
+        // short shapes fall back to the admin label
+        assert_eq!(module_of("/admin"), "admin");
+        assert_eq!(module_of(""), "admin");
+    }
+
+    #[test]
+    fn action_maps_write_methods() {
+        assert_eq!(action_of("POST"), 1);
+        assert_eq!(action_of("PUT"), 2);
+        assert_eq!(action_of("PATCH"), 2);
+        assert_eq!(action_of("DELETE"), 3);
+        assert_eq!(action_of("GET"), 0);
     }
 }

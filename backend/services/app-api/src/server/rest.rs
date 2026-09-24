@@ -137,7 +137,6 @@ pub fn build_router(state: Arc<AppState>) -> axum::Router {
                 state: std::sync::Arc::clone(&state),
             },
         ),
-        mount_file_transfer_service => proto::gen_app::nulls::null_file_transfer_service(),
         mount_user_profile_service => std::sync::Arc::new(
             crate::services::proxies::UserProfileProxy {
                 state: std::sync::Arc::clone(&state),
@@ -156,10 +155,10 @@ pub fn build_router(state: Arc<AppState>) -> axum::Router {
     // ── Hand-mounted: the C-side register route (POST /app/v1/register) ──
     // The one app operation the proto contract does not declare; the
     // reference mounts it by hand next to the generated registrations,
-    // whitelisted ahead of the gate. The bind layer rides the same
-    // input contract (`RegisterUserRequest`, body `*`); the Phase-0
-    // handler answers the Unknown shape until the authentication
-    // service implementation lands.
+    // whitelisted ahead of the gate. The full chain (field gates,
+    // Host-resolved tenant ownership, password decode) lives in the
+    // behaviors module; the bind layer rides the same input contract
+    // (`RegisterUserRequest`, body `*`).
     let register_bind = axum::middleware::from_fn(move |req, next| {
         let fq = "authentication.service.v1.RegisterUserRequest";
         async move { bind_run(pool(), fq, true, REGISTERED_SUBTYPES, req, next).await }
@@ -170,44 +169,42 @@ pub fn build_router(state: Arc<AppState>) -> axum::Router {
         axum::routing::post(
             move |axum::Extension(bound): axum::Extension<
                 rushwind_http_binding::bindgate::BoundMessage,
-            >| {
+            >,
+                  http_req: axum::extract::Request| {
                 let state = std::sync::Arc::clone(&register_state);
                 async move {
-                    use rushwind_http_binding::envelope::StatusError;
-                    let err = |status: i32, reason: &'static str, msg: String| {
-                        rushwind_http_binding::envelope::error_response(StatusError::new(
-                            status, reason, msg,
-                        ))
-                    };
                     // The bind layer's DynamicMessage → the typed prost
                     // request (prost-reflect transcode).
                     let req: proto::proto::authentication::service::v1::RegisterUserRequest =
                         match bound.0.transcode_to() {
                             Ok(req) => req,
-                            Err(_) => return err(400, "CODEC", "body unmarshal".into()),
+                            Err(_) => {
+                                let e = rushwind_http_binding::envelope::StatusError::new(
+                                    400,
+                                    "BAD_REQUEST",
+                                    "body unmarshal",
+                                );
+                                return rushwind_http_binding::envelope::error_response(e);
+                            }
                         };
-                    let mut core = state.core.clone();
-                    match core.register_user(tonic::Request::new(req)).await {
-                        Ok(resp) => {
-                            let resp = resp.into_inner();
-                            let body = format!("{{\"userId\":{}}}", resp.user_id);
+                    // The behaviors read the Host (the tenant chain)
+                    // off a RequestContext form; the route is
+                    // whitelisted, so no claims ride.
+                    let mut ctx = rushwind_http_binding::ctx::RequestContext::default();
+                    for (name, value) in http_req.headers().iter() {
+                        if let Ok(v) = value.to_str() {
+                            ctx.headers.insert(name.as_str().to_string(), v.to_string());
+                        }
+                    }
+                    match crate::services::public::register(&state, &ctx, req).await {
+                        Ok(user_id) => {
+                            let body = format!("{{\"userId\":{user_id}}}");
                             axum::response::IntoResponse::into_response((
                                 [(axum::http::header::CONTENT_TYPE, "application/json")],
                                 body,
                             ))
                         }
-                        Err(e) => {
-                            let reason = match e.code() {
-                                tonic::Code::InvalidArgument => "BAD_REQUEST",
-                                tonic::Code::AlreadyExists | tonic::Code::Aborted => "CONFLICT",
-                                _ => "",
-                            };
-                            if reason.is_empty() {
-                                err(500, "", e.message().into())
-                            } else {
-                                err(400, reason, e.message().into())
-                            }
-                        }
+                        Err(e) => rushwind_http_binding::envelope::error_response(e),
                     }
                 }
             },
@@ -215,5 +212,23 @@ pub fn build_router(state: Arc<AppState>) -> axum::Router {
     );
     let register = register.layer(register_bind);
 
-    router_pub.merge(router_gate).merge(register)
+    // ── Hand-mounted: the file-transfer face (multipart, outside the
+    // bind layer), behind the same auth gate as the generated protected
+    // subtree — the reference's hand registration sits inside the same
+    // server middleware chain, and its generated registration for the
+    // face is skipped in kind. ──
+    let transfer_auth = Arc::clone(&authenticator);
+    let transfer_checker = Arc::clone(&checker);
+    let transfer_gate = axum::middleware::from_fn(move |req, next| {
+        let auth = Arc::clone(&transfer_auth);
+        let checker = Arc::clone(&transfer_checker);
+        async move { auth_gate(auth, checker, PACKAGE, req, next).await }
+    });
+    let transfer =
+        crate::services::file_transfer::router(std::sync::Arc::clone(&state)).layer(transfer_gate);
+
+    router_pub
+        .merge(router_gate)
+        .merge(register)
+        .merge(transfer)
 }

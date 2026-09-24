@@ -26,15 +26,8 @@ impl proto::gen_app::services::CategoryServiceHandlers for CategoryProxy {
         _ctx: rushwind_http_binding::ctx::RequestContext,
         req: proto::proto::pagination::PagingRequest,
     ) -> Result<proto::proto::content::service::v1::ListCategoryResponse, StatusError> {
-        let mut core =
-            proto::proto::content::service::v1::category_service_client::CategoryServiceClient::new(
-                self.state.core_channel.clone(),
-            );
-        Ok(core
-            .list(with_operator(&_ctx, req))
-            .await
-            .map_err(map_status)?
-            .into_inner())
+        // The face's hand-written behavior (see the module docs).
+        crate::services::public::category_list(&self.state, &_ctx, req).await
     }
 
     async fn get(
@@ -42,15 +35,8 @@ impl proto::gen_app::services::CategoryServiceHandlers for CategoryProxy {
         _ctx: rushwind_http_binding::ctx::RequestContext,
         req: proto::proto::content::service::v1::GetCategoryRequest,
     ) -> Result<proto::proto::content::service::v1::Category, StatusError> {
-        let mut core =
-            proto::proto::content::service::v1::category_service_client::CategoryServiceClient::new(
-                self.state.core_channel.clone(),
-            );
-        Ok(core
-            .get(with_operator(&_ctx, req))
-            .await
-            .map_err(map_status)?
-            .into_inner())
+        // The face's hand-written behavior (see the module docs).
+        crate::services::public::category_get(&self.state, &_ctx, req).await
     }
 
     async fn create(
@@ -58,15 +44,8 @@ impl proto::gen_app::services::CategoryServiceHandlers for CategoryProxy {
         _ctx: rushwind_http_binding::ctx::RequestContext,
         req: proto::proto::content::service::v1::CreateCategoryRequest,
     ) -> Result<proto::proto::content::service::v1::Category, StatusError> {
-        let mut core =
-            proto::proto::content::service::v1::category_service_client::CategoryServiceClient::new(
-                self.state.core_channel.clone(),
-            );
-        Ok(core
-            .create(with_operator(&_ctx, req))
-            .await
-            .map_err(map_status)?
-            .into_inner())
+        // The face's hand-written behavior (see the module docs).
+        crate::services::public::forbidden_mutation(&self.state, &_ctx, req).await
     }
 
     async fn update(
@@ -74,15 +53,8 @@ impl proto::gen_app::services::CategoryServiceHandlers for CategoryProxy {
         _ctx: rushwind_http_binding::ctx::RequestContext,
         req: proto::proto::content::service::v1::UpdateCategoryRequest,
     ) -> Result<proto::proto::content::service::v1::Category, StatusError> {
-        let mut core =
-            proto::proto::content::service::v1::category_service_client::CategoryServiceClient::new(
-                self.state.core_channel.clone(),
-            );
-        Ok(core
-            .update(with_operator(&_ctx, req))
-            .await
-            .map_err(map_status)?
-            .into_inner())
+        // The face's hand-written behavior (see the module docs).
+        crate::services::public::forbidden_mutation(&self.state, &_ctx, req).await
     }
 
     async fn delete(
@@ -90,15 +62,8 @@ impl proto::gen_app::services::CategoryServiceHandlers for CategoryProxy {
         _ctx: rushwind_http_binding::ctx::RequestContext,
         req: proto::proto::content::service::v1::DeleteCategoryRequest,
     ) -> Result<pbjson_types::Empty, StatusError> {
-        let mut core =
-            proto::proto::content::service::v1::category_service_client::CategoryServiceClient::new(
-                self.state.core_channel.clone(),
-            );
-        Ok(core
-            .delete(with_operator(&_ctx, req))
-            .await
-            .map_err(map_status)?
-            .into_inner())
+        // The face's hand-written behavior (see the module docs).
+        crate::services::public::forbidden_mutation(&self.state, &_ctx, req).await
     }
 
     async fn get_translation(
@@ -130,15 +95,8 @@ impl proto::gen_app::services::CommentServiceHandlers for CommentProxy {
         _ctx: rushwind_http_binding::ctx::RequestContext,
         req: proto::proto::pagination::PagingRequest,
     ) -> Result<proto::proto::comment::service::v1::ListCommentResponse, StatusError> {
-        let mut core =
-            proto::proto::comment::service::v1::comment_service_client::CommentServiceClient::new(
-                self.state.core_channel.clone(),
-            );
-        Ok(core
-            .list(with_operator(&_ctx, req))
-            .await
-            .map_err(map_status)?
-            .into_inner())
+        // The face's hand-written behavior (see the module docs).
+        crate::services::public::comment_list(&self.state, &_ctx, req).await
     }
 
     async fn get(
@@ -146,15 +104,8 @@ impl proto::gen_app::services::CommentServiceHandlers for CommentProxy {
         _ctx: rushwind_http_binding::ctx::RequestContext,
         req: proto::proto::comment::service::v1::GetCommentRequest,
     ) -> Result<proto::proto::comment::service::v1::Comment, StatusError> {
-        let mut core =
-            proto::proto::comment::service::v1::comment_service_client::CommentServiceClient::new(
-                self.state.core_channel.clone(),
-            );
-        Ok(core
-            .get(with_operator(&_ctx, req))
-            .await
-            .map_err(map_status)?
-            .into_inner())
+        // The face's hand-written behavior (see the module docs).
+        crate::services::public::comment_get(&self.state, &_ctx, req).await
     }
 
     async fn create(
@@ -162,15 +113,8 @@ impl proto::gen_app::services::CommentServiceHandlers for CommentProxy {
         _ctx: rushwind_http_binding::ctx::RequestContext,
         req: proto::proto::comment::service::v1::CreateCommentRequest,
     ) -> Result<proto::proto::comment::service::v1::Comment, StatusError> {
-        let mut core =
-            proto::proto::comment::service::v1::comment_service_client::CommentServiceClient::new(
-                self.state.core_channel.clone(),
-            );
-        Ok(core
-            .create(with_operator(&_ctx, req))
-            .await
-            .map_err(map_status)?
-            .into_inner())
+        // The face's hand-written behavior (see the module docs).
+        crate::services::public::comment_create(&self.state, &_ctx, req).await
     }
 
     async fn update(
@@ -178,15 +122,8 @@ impl proto::gen_app::services::CommentServiceHandlers for CommentProxy {
         _ctx: rushwind_http_binding::ctx::RequestContext,
         req: proto::proto::comment::service::v1::UpdateCommentRequest,
     ) -> Result<proto::proto::comment::service::v1::Comment, StatusError> {
-        let mut core =
-            proto::proto::comment::service::v1::comment_service_client::CommentServiceClient::new(
-                self.state.core_channel.clone(),
-            );
-        Ok(core
-            .update(with_operator(&_ctx, req))
-            .await
-            .map_err(map_status)?
-            .into_inner())
+        // The face's hand-written behavior (see the module docs).
+        crate::services::public::comment_update(&self.state, &_ctx, req).await
     }
 
     async fn delete(
@@ -194,15 +131,8 @@ impl proto::gen_app::services::CommentServiceHandlers for CommentProxy {
         _ctx: rushwind_http_binding::ctx::RequestContext,
         req: proto::proto::comment::service::v1::DeleteCommentRequest,
     ) -> Result<pbjson_types::Empty, StatusError> {
-        let mut core =
-            proto::proto::comment::service::v1::comment_service_client::CommentServiceClient::new(
-                self.state.core_channel.clone(),
-            );
-        Ok(core
-            .delete(with_operator(&_ctx, req))
-            .await
-            .map_err(map_status)?
-            .into_inner())
+        // The face's hand-written behavior (see the module docs).
+        crate::services::public::comment_delete(&self.state, &_ctx, req).await
     }
 }
 
@@ -362,14 +292,8 @@ impl proto::gen_app::services::NavigationServiceHandlers for NavigationProxy {
         _ctx: rushwind_http_binding::ctx::RequestContext,
         req: proto::proto::site::service::v1::CreateNavigationRequest,
     ) -> Result<proto::proto::site::service::v1::Navigation, StatusError> {
-        let mut core = proto::proto::site::service::v1::navigation_service_client::NavigationServiceClient::new(
-            self.state.core_channel.clone(),
-        );
-        Ok(core
-            .create(with_operator(&_ctx, req))
-            .await
-            .map_err(map_status)?
-            .into_inner())
+        // The face's hand-written behavior (see the module docs).
+        crate::services::public::forbidden_mutation(&self.state, &_ctx, req).await
     }
 
     async fn update(
@@ -377,14 +301,8 @@ impl proto::gen_app::services::NavigationServiceHandlers for NavigationProxy {
         _ctx: rushwind_http_binding::ctx::RequestContext,
         req: proto::proto::site::service::v1::UpdateNavigationRequest,
     ) -> Result<proto::proto::site::service::v1::Navigation, StatusError> {
-        let mut core = proto::proto::site::service::v1::navigation_service_client::NavigationServiceClient::new(
-            self.state.core_channel.clone(),
-        );
-        Ok(core
-            .update(with_operator(&_ctx, req))
-            .await
-            .map_err(map_status)?
-            .into_inner())
+        // The face's hand-written behavior (see the module docs).
+        crate::services::public::forbidden_mutation(&self.state, &_ctx, req).await
     }
 
     async fn delete(
@@ -392,14 +310,8 @@ impl proto::gen_app::services::NavigationServiceHandlers for NavigationProxy {
         _ctx: rushwind_http_binding::ctx::RequestContext,
         req: proto::proto::site::service::v1::DeleteNavigationRequest,
     ) -> Result<pbjson_types::Empty, StatusError> {
-        let mut core = proto::proto::site::service::v1::navigation_service_client::NavigationServiceClient::new(
-            self.state.core_channel.clone(),
-        );
-        Ok(core
-            .delete(with_operator(&_ctx, req))
-            .await
-            .map_err(map_status)?
-            .into_inner())
+        // The face's hand-written behavior (see the module docs).
+        crate::services::public::forbidden_mutation(&self.state, &_ctx, req).await
     }
 }
 
@@ -415,15 +327,8 @@ impl proto::gen_app::services::PageServiceHandlers for PageProxy {
         _ctx: rushwind_http_binding::ctx::RequestContext,
         req: proto::proto::pagination::PagingRequest,
     ) -> Result<proto::proto::content::service::v1::ListPageResponse, StatusError> {
-        let mut core =
-            proto::proto::content::service::v1::page_service_client::PageServiceClient::new(
-                self.state.core_channel.clone(),
-            );
-        Ok(core
-            .list(with_operator(&_ctx, req))
-            .await
-            .map_err(map_status)?
-            .into_inner())
+        // The face's hand-written behavior (see the module docs).
+        crate::services::public::page_list(&self.state, &_ctx, req).await
     }
 
     async fn get(
@@ -431,15 +336,8 @@ impl proto::gen_app::services::PageServiceHandlers for PageProxy {
         _ctx: rushwind_http_binding::ctx::RequestContext,
         req: proto::proto::content::service::v1::GetPageRequest,
     ) -> Result<proto::proto::content::service::v1::Page, StatusError> {
-        let mut core =
-            proto::proto::content::service::v1::page_service_client::PageServiceClient::new(
-                self.state.core_channel.clone(),
-            );
-        Ok(core
-            .get(with_operator(&_ctx, req))
-            .await
-            .map_err(map_status)?
-            .into_inner())
+        // The face's hand-written behavior (see the module docs).
+        crate::services::public::page_get(&self.state, &_ctx, req).await
     }
 
     async fn create(
@@ -447,15 +345,8 @@ impl proto::gen_app::services::PageServiceHandlers for PageProxy {
         _ctx: rushwind_http_binding::ctx::RequestContext,
         req: proto::proto::content::service::v1::CreatePageRequest,
     ) -> Result<proto::proto::content::service::v1::Page, StatusError> {
-        let mut core =
-            proto::proto::content::service::v1::page_service_client::PageServiceClient::new(
-                self.state.core_channel.clone(),
-            );
-        Ok(core
-            .create(with_operator(&_ctx, req))
-            .await
-            .map_err(map_status)?
-            .into_inner())
+        // The face's hand-written behavior (see the module docs).
+        crate::services::public::forbidden_mutation(&self.state, &_ctx, req).await
     }
 
     async fn update(
@@ -463,15 +354,8 @@ impl proto::gen_app::services::PageServiceHandlers for PageProxy {
         _ctx: rushwind_http_binding::ctx::RequestContext,
         req: proto::proto::content::service::v1::UpdatePageRequest,
     ) -> Result<proto::proto::content::service::v1::Page, StatusError> {
-        let mut core =
-            proto::proto::content::service::v1::page_service_client::PageServiceClient::new(
-                self.state.core_channel.clone(),
-            );
-        Ok(core
-            .update(with_operator(&_ctx, req))
-            .await
-            .map_err(map_status)?
-            .into_inner())
+        // The face's hand-written behavior (see the module docs).
+        crate::services::public::forbidden_mutation(&self.state, &_ctx, req).await
     }
 
     async fn delete(
@@ -479,15 +363,8 @@ impl proto::gen_app::services::PageServiceHandlers for PageProxy {
         _ctx: rushwind_http_binding::ctx::RequestContext,
         req: proto::proto::content::service::v1::DeletePageRequest,
     ) -> Result<pbjson_types::Empty, StatusError> {
-        let mut core =
-            proto::proto::content::service::v1::page_service_client::PageServiceClient::new(
-                self.state.core_channel.clone(),
-            );
-        Ok(core
-            .delete(with_operator(&_ctx, req))
-            .await
-            .map_err(map_status)?
-            .into_inner())
+        // The face's hand-written behavior (see the module docs).
+        crate::services::public::forbidden_mutation(&self.state, &_ctx, req).await
     }
 
     async fn get_translation(
@@ -519,15 +396,8 @@ impl proto::gen_app::services::PostServiceHandlers for PostProxy {
         _ctx: rushwind_http_binding::ctx::RequestContext,
         req: proto::proto::pagination::PagingRequest,
     ) -> Result<proto::proto::content::service::v1::ListPostResponse, StatusError> {
-        let mut core =
-            proto::proto::content::service::v1::post_service_client::PostServiceClient::new(
-                self.state.core_channel.clone(),
-            );
-        Ok(core
-            .list(with_operator(&_ctx, req))
-            .await
-            .map_err(map_status)?
-            .into_inner())
+        // The face's hand-written behavior (see the module docs).
+        crate::services::public::post_list(&self.state, &_ctx, req).await
     }
 
     async fn search_posts(
@@ -535,15 +405,8 @@ impl proto::gen_app::services::PostServiceHandlers for PostProxy {
         _ctx: rushwind_http_binding::ctx::RequestContext,
         req: proto::proto::content::service::v1::SearchPostsRequest,
     ) -> Result<proto::proto::content::service::v1::SearchPostsResponse, StatusError> {
-        let mut core =
-            proto::proto::content::service::v1::post_service_client::PostServiceClient::new(
-                self.state.core_channel.clone(),
-            );
-        Ok(core
-            .search_posts(with_operator(&_ctx, req))
-            .await
-            .map_err(map_status)?
-            .into_inner())
+        // The face's hand-written behavior (see the module docs).
+        crate::services::public::post_search(&self.state, &_ctx, req).await
     }
 
     async fn get(
@@ -551,15 +414,8 @@ impl proto::gen_app::services::PostServiceHandlers for PostProxy {
         _ctx: rushwind_http_binding::ctx::RequestContext,
         req: proto::proto::content::service::v1::GetPostRequest,
     ) -> Result<proto::proto::content::service::v1::Post, StatusError> {
-        let mut core =
-            proto::proto::content::service::v1::post_service_client::PostServiceClient::new(
-                self.state.core_channel.clone(),
-            );
-        Ok(core
-            .get(with_operator(&_ctx, req))
-            .await
-            .map_err(map_status)?
-            .into_inner())
+        // The face's hand-written behavior (see the module docs).
+        crate::services::public::post_get(&self.state, &_ctx, req).await
     }
 
     async fn create(
@@ -567,15 +423,8 @@ impl proto::gen_app::services::PostServiceHandlers for PostProxy {
         _ctx: rushwind_http_binding::ctx::RequestContext,
         req: proto::proto::content::service::v1::CreatePostRequest,
     ) -> Result<proto::proto::content::service::v1::Post, StatusError> {
-        let mut core =
-            proto::proto::content::service::v1::post_service_client::PostServiceClient::new(
-                self.state.core_channel.clone(),
-            );
-        Ok(core
-            .create(with_operator(&_ctx, req))
-            .await
-            .map_err(map_status)?
-            .into_inner())
+        // The face's hand-written behavior (see the module docs).
+        crate::services::public::forbidden_mutation(&self.state, &_ctx, req).await
     }
 
     async fn update(
@@ -583,15 +432,8 @@ impl proto::gen_app::services::PostServiceHandlers for PostProxy {
         _ctx: rushwind_http_binding::ctx::RequestContext,
         req: proto::proto::content::service::v1::UpdatePostRequest,
     ) -> Result<proto::proto::content::service::v1::Post, StatusError> {
-        let mut core =
-            proto::proto::content::service::v1::post_service_client::PostServiceClient::new(
-                self.state.core_channel.clone(),
-            );
-        Ok(core
-            .update(with_operator(&_ctx, req))
-            .await
-            .map_err(map_status)?
-            .into_inner())
+        // The face's hand-written behavior (see the module docs).
+        crate::services::public::forbidden_mutation(&self.state, &_ctx, req).await
     }
 
     async fn delete(
@@ -599,15 +441,8 @@ impl proto::gen_app::services::PostServiceHandlers for PostProxy {
         _ctx: rushwind_http_binding::ctx::RequestContext,
         req: proto::proto::content::service::v1::DeletePostRequest,
     ) -> Result<pbjson_types::Empty, StatusError> {
-        let mut core =
-            proto::proto::content::service::v1::post_service_client::PostServiceClient::new(
-                self.state.core_channel.clone(),
-            );
-        Ok(core
-            .delete(with_operator(&_ctx, req))
-            .await
-            .map_err(map_status)?
-            .into_inner())
+        // The face's hand-written behavior (see the module docs).
+        crate::services::public::forbidden_mutation(&self.state, &_ctx, req).await
     }
 
     async fn get_translation(
@@ -639,14 +474,8 @@ impl proto::gen_app::services::SiteServiceHandlers for SiteProxy {
         _ctx: rushwind_http_binding::ctx::RequestContext,
         req: proto::proto::pagination::PagingRequest,
     ) -> Result<proto::proto::site::service::v1::ListSiteResponse, StatusError> {
-        let mut core = proto::proto::site::service::v1::site_service_client::SiteServiceClient::new(
-            self.state.core_channel.clone(),
-        );
-        Ok(core
-            .list(with_operator(&_ctx, req))
-            .await
-            .map_err(map_status)?
-            .into_inner())
+        // The face's hand-written behavior (see the module docs).
+        crate::services::public::forbidden_mutation(&self.state, &_ctx, req).await
     }
 
     async fn get_site_by_domain(
@@ -654,14 +483,8 @@ impl proto::gen_app::services::SiteServiceHandlers for SiteProxy {
         _ctx: rushwind_http_binding::ctx::RequestContext,
         req: proto::proto::site::service::v1::GetSiteByDomainRequest,
     ) -> Result<proto::proto::site::service::v1::Site, StatusError> {
-        let mut core = proto::proto::site::service::v1::site_service_client::SiteServiceClient::new(
-            self.state.core_channel.clone(),
-        );
-        Ok(core
-            .get_site_by_domain(with_operator(&_ctx, req))
-            .await
-            .map_err(map_status)?
-            .into_inner())
+        // The face's hand-written behavior (see the module docs).
+        crate::services::public::site_by_domain(&self.state, &_ctx, req).await
     }
 
     async fn create(
@@ -669,14 +492,8 @@ impl proto::gen_app::services::SiteServiceHandlers for SiteProxy {
         _ctx: rushwind_http_binding::ctx::RequestContext,
         req: proto::proto::site::service::v1::CreateSiteRequest,
     ) -> Result<proto::proto::site::service::v1::Site, StatusError> {
-        let mut core = proto::proto::site::service::v1::site_service_client::SiteServiceClient::new(
-            self.state.core_channel.clone(),
-        );
-        Ok(core
-            .create(with_operator(&_ctx, req))
-            .await
-            .map_err(map_status)?
-            .into_inner())
+        // The face's hand-written behavior (see the module docs).
+        crate::services::public::forbidden_mutation(&self.state, &_ctx, req).await
     }
 
     async fn update(
@@ -684,14 +501,8 @@ impl proto::gen_app::services::SiteServiceHandlers for SiteProxy {
         _ctx: rushwind_http_binding::ctx::RequestContext,
         req: proto::proto::site::service::v1::UpdateSiteRequest,
     ) -> Result<proto::proto::site::service::v1::Site, StatusError> {
-        let mut core = proto::proto::site::service::v1::site_service_client::SiteServiceClient::new(
-            self.state.core_channel.clone(),
-        );
-        let _ = core
-            .update(tonic::Request::new(req))
-            .await
-            .map_err(map_status)?;
-        Ok(<proto::proto::site::service::v1::Site>::default())
+        // The face's hand-written behavior (see the module docs).
+        crate::services::public::forbidden_mutation(&self.state, &_ctx, req).await
     }
 
     async fn delete(
@@ -699,14 +510,8 @@ impl proto::gen_app::services::SiteServiceHandlers for SiteProxy {
         _ctx: rushwind_http_binding::ctx::RequestContext,
         req: proto::proto::site::service::v1::DeleteSiteRequest,
     ) -> Result<pbjson_types::Empty, StatusError> {
-        let mut core = proto::proto::site::service::v1::site_service_client::SiteServiceClient::new(
-            self.state.core_channel.clone(),
-        );
-        Ok(core
-            .delete(with_operator(&_ctx, req))
-            .await
-            .map_err(map_status)?
-            .into_inner())
+        // The face's hand-written behavior (see the module docs).
+        crate::services::public::forbidden_mutation(&self.state, &_ctx, req).await
     }
 }
 
@@ -754,15 +559,8 @@ impl proto::gen_app::services::TagServiceHandlers for TagProxy {
         _ctx: rushwind_http_binding::ctx::RequestContext,
         req: proto::proto::content::service::v1::CreateTagRequest,
     ) -> Result<proto::proto::content::service::v1::Tag, StatusError> {
-        let mut core =
-            proto::proto::content::service::v1::tag_service_client::TagServiceClient::new(
-                self.state.core_channel.clone(),
-            );
-        Ok(core
-            .create(with_operator(&_ctx, req))
-            .await
-            .map_err(map_status)?
-            .into_inner())
+        // The face's hand-written behavior (see the module docs).
+        crate::services::public::forbidden_mutation(&self.state, &_ctx, req).await
     }
 
     async fn update(
@@ -770,15 +568,8 @@ impl proto::gen_app::services::TagServiceHandlers for TagProxy {
         _ctx: rushwind_http_binding::ctx::RequestContext,
         req: proto::proto::content::service::v1::UpdateTagRequest,
     ) -> Result<proto::proto::content::service::v1::Tag, StatusError> {
-        let mut core =
-            proto::proto::content::service::v1::tag_service_client::TagServiceClient::new(
-                self.state.core_channel.clone(),
-            );
-        Ok(core
-            .update(with_operator(&_ctx, req))
-            .await
-            .map_err(map_status)?
-            .into_inner())
+        // The face's hand-written behavior (see the module docs).
+        crate::services::public::forbidden_mutation(&self.state, &_ctx, req).await
     }
 
     async fn delete(
@@ -786,15 +577,8 @@ impl proto::gen_app::services::TagServiceHandlers for TagProxy {
         _ctx: rushwind_http_binding::ctx::RequestContext,
         req: proto::proto::content::service::v1::DeleteTagRequest,
     ) -> Result<pbjson_types::Empty, StatusError> {
-        let mut core =
-            proto::proto::content::service::v1::tag_service_client::TagServiceClient::new(
-                self.state.core_channel.clone(),
-            );
-        Ok(core
-            .delete(with_operator(&_ctx, req))
-            .await
-            .map_err(map_status)?
-            .into_inner())
+        // The face's hand-written behavior (see the module docs).
+        crate::services::public::forbidden_mutation(&self.state, &_ctx, req).await
     }
 
     async fn get_translation(
@@ -856,8 +640,8 @@ impl proto::gen_app::services::UserProfileServiceHandlers for UserProfileProxy {
         _ctx: rushwind_http_binding::ctx::RequestContext,
         req: proto::proto::identity::service::v1::ChangePasswordRequest,
     ) -> Result<pbjson_types::Empty, StatusError> {
-        let _ = (req, &self.state);
-        Err(crate::state::internal_error("not implemented"))
+        // The face's hand-written behavior (see the module docs).
+        crate::services::public::change_password(&self.state, &_ctx, req).await
     }
 
     async fn bind_contact(
@@ -865,8 +649,8 @@ impl proto::gen_app::services::UserProfileServiceHandlers for UserProfileProxy {
         _ctx: rushwind_http_binding::ctx::RequestContext,
         req: proto::proto::identity::service::v1::BindContactRequest,
     ) -> Result<pbjson_types::Empty, StatusError> {
-        let _ = (req, &self.state);
-        Err(crate::state::internal_error("not implemented"))
+        // The face's hand-written behavior (see the module docs).
+        crate::services::public::bind_contact(&self.state, &_ctx, req).await
     }
 
     async fn verify_contact(
@@ -874,7 +658,7 @@ impl proto::gen_app::services::UserProfileServiceHandlers for UserProfileProxy {
         _ctx: rushwind_http_binding::ctx::RequestContext,
         req: proto::proto::identity::service::v1::VerifyContactRequest,
     ) -> Result<pbjson_types::Empty, StatusError> {
-        let _ = (req, &self.state);
-        Err(crate::state::internal_error("not implemented"))
+        // The face's hand-written behavior (see the module docs).
+        crate::services::public::verify_contact(&self.state, &_ctx, req).await
     }
 }

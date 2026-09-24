@@ -30,17 +30,17 @@ type Ctx = rushwind_http_binding::ctx::RequestContext;
 const HEADER_CAPTCHA_ID: &str = "x-captcha-id";
 const HEADER_CAPTCHA_VALUE: &str = "x-captcha-value";
 
-/// The admin client's refresh-expiry stamp (12h — the authenticator's
-/// admin profile; the cookie Max-Age mirror).
-const REFRESH_TTL_SECS: i64 = 43200;
+/// The refresh-expiry fallback when the core answer carries none (the
+/// reference's defaultRefreshTTL — 30 days).
+const REFRESH_TTL_FALLBACK_SECS: i64 = 30 * 24 * 3600;
 
 pub struct AuthenticationService {
     pub state: Arc<AppState>,
 }
 
 impl AuthenticationService {
-    fn set_refresh_cookies(&self, ctx: &Ctx, refresh: &str, secure: bool) {
-        let (rt, exp) = crate::token::refresh_cookie_values(refresh, secure, REFRESH_TTL_SECS);
+    fn set_refresh_cookies(&self, ctx: &Ctx, refresh: &str, secure: bool, ttl_secs: i64) {
+        let (rt, exp) = crate::token::refresh_cookie_values(refresh, secure, ttl_secs);
         ctx.add_reply_header("Set-Cookie", &rt);
         ctx.add_reply_header("Set-Cookie", &exp);
     }
@@ -57,13 +57,22 @@ impl AuthenticationService {
             .map(|v| v.eq_ignore_ascii_case("https"))
             .unwrap_or(false)
     }
+
+    /// The core's refresh-expiry stamp for the cookie mirror, with the
+    /// reference's 30-day fallback when the answer carries none.
+    fn refresh_ttl(resp: &LoginResponse) -> i64 {
+        match resp.refresh_expires_in {
+            Some(v) if v > 0 => v,
+            _ => REFRESH_TTL_FALLBACK_SECS,
+        }
+    }
 }
 
 #[async_trait::async_trait]
 impl proto::gen_admin::services::AuthenticationServiceHandlers for AuthenticationService {
     async fn login(&self, ctx: Ctx, req: LoginRequest) -> Result<LoginResponse, StatusError> {
-        // The captcha gate — password grant only.
         use proto::proto::authentication::service::v1::GrantType;
+        // The captcha gate — password grant only.
         if GrantType::try_from(req.grant_type) == Ok(GrantType::Password) {
             let ok = crate::captcha::verify(
                 &self.state.redis,
@@ -82,9 +91,17 @@ impl proto::gen_admin::services::AuthenticationServiceHandlers for Authenticatio
             }
         }
 
-        // Pin the client type (admin) and forward to core.
+        // Pin the client type (admin) and forward to core. An in-flight
+        // refresh answered through the login route binds to the
+        // operator's session keys.
+        let grant = req.grant_type;
         let mut req = req;
         req.client_type = Some(0);
+        if GrantType::try_from(req.grant_type) == Ok(GrantType::RefreshToken) {
+            let op = operator_of(&ctx)?;
+            req.jti = Some(op.jti);
+            req.user_id = Some(op.user_id);
+        }
         let login_username = req
             .identifier
             .as_ref()
@@ -149,6 +166,7 @@ impl proto::gen_admin::services::AuthenticationServiceHandlers for Authenticatio
                     failure_reason: &reason,
                     ip: &audit_ip,
                     request_id: &audit_rid,
+                    login_method: grant,
                 },
             )
             .await;
@@ -156,11 +174,12 @@ impl proto::gen_admin::services::AuthenticationServiceHandlers for Authenticatio
         let mut resp = login_result.map_err(map_status)?.into_inner();
 
         // The refresh token rides the HttpOnly cookie pair instead of
-        // the body.
+        // the body, with the core's own expiry stamp.
         let secure = Self::cookie_secure(&ctx);
         if let Some(rt) = resp.refresh_token.take() {
             if !rt.is_empty() {
-                self.set_refresh_cookies(&ctx, &rt, secure);
+                let ttl = Self::refresh_ttl(&resp);
+                self.set_refresh_cookies(&ctx, &rt, secure, ttl);
             }
         }
         Ok(resp)
@@ -193,8 +212,17 @@ impl proto::gen_admin::services::AuthenticationServiceHandlers for Authenticatio
                 req.refresh_token = Some(cv.clone());
             }
         }
-        // The binding keys: the operator claims when the access token
-        // is still in flight (page reloads carry them in the body).
+        // The binding keys, priority high→low: the request body (the
+        // front-end decodes them off its persisted access token —
+        // non-secret; the credential is the refresh token value), the
+        // operator claims (an in-flight refresh while the access token
+        // still verifies), and the unverified payload of the expired
+        // bearer JWT (same source, tolerating the expired case).
+        if req.refresh_token.as_deref().unwrap_or("").is_empty() {
+            if let Some(cv) = ctx.cookies.get("refresh_token") {
+                req.refresh_token = Some(cv.clone());
+            }
+        }
         let operator = ctx.claims.as_ref().and_then(UserTokenPayload::from_claims);
         if req.user_id.is_none() {
             req.user_id = operator.as_ref().map(|o| o.user_id);
@@ -202,8 +230,25 @@ impl proto::gen_admin::services::AuthenticationServiceHandlers for Authenticatio
         if req.jti.as_deref().unwrap_or("").is_empty() {
             req.jti = operator.as_ref().map(|o| o.jti.clone());
         }
+        if req.user_id.unwrap_or(0) == 0 || req.jti.as_deref().unwrap_or("").is_empty() {
+            let jwt = ctx
+                .headers
+                .get("authorization")
+                .and_then(|v| {
+                    v.strip_prefix("Bearer ")
+                        .or_else(|| v.strip_prefix("bearer "))
+                })
+                .and_then(auth::parse_unverified_bearer_jwt);
+            if let Some((uid, jti)) = jwt {
+                if req.user_id.unwrap_or(0) == 0 {
+                    req.user_id = Some(uid);
+                }
+                if req.jti.as_deref().unwrap_or("").is_empty() {
+                    req.jti = Some(jti);
+                }
+            }
+        }
         req.client_type = Some(0);
-        req.grant_type = proto::proto::authentication::service::v1::GrantType::RefreshToken as i32;
 
         let mut core = self.state.core.clone();
         let mut resp = core
@@ -215,7 +260,8 @@ impl proto::gen_admin::services::AuthenticationServiceHandlers for Authenticatio
         let secure = Self::cookie_secure(&ctx);
         if let Some(rt) = resp.refresh_token.take() {
             if !rt.is_empty() {
-                self.set_refresh_cookies(&ctx, &rt, secure);
+                let ttl = Self::refresh_ttl(&resp);
+                self.set_refresh_cookies(&ctx, &rt, secure, ttl);
             }
         }
         Ok(resp)

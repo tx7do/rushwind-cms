@@ -32,6 +32,35 @@ pub struct AuthenticationServiceImpl {
     pub state: Arc<AppState>,
 }
 
+/// The block/unblock target, unified across the two generated oneof
+/// shapes.
+enum TokenTarget {
+    Token(String),
+    Jti(String),
+}
+
+impl From<proto::proto::authentication::service::v1::block_token_request::Target> for TokenTarget {
+    fn from(t: proto::proto::authentication::service::v1::block_token_request::Target) -> Self {
+        use proto::proto::authentication::service::v1::block_token_request::Target;
+        match t {
+            Target::Token(s) => Self::Token(s),
+            Target::Jti(s) => Self::Jti(s),
+        }
+    }
+}
+
+impl From<proto::proto::authentication::service::v1::unblock_token_request::Target>
+    for TokenTarget
+{
+    fn from(t: proto::proto::authentication::service::v1::unblock_token_request::Target) -> Self {
+        use proto::proto::authentication::service::v1::unblock_token_request::Target;
+        match t {
+            Target::Token(s) => Self::Token(s),
+            Target::Jti(s) => Self::Jti(s),
+        }
+    }
+}
+
 impl AuthenticationServiceImpl {
     fn client_of(req: &LoginRequest) -> ClientType {
         ClientType::from_i32(req.client_type.unwrap_or(0))
@@ -126,6 +155,46 @@ impl AuthenticationServiceImpl {
             .ok_or_else(|| not_found("user"))
     }
 
+    /// Resolves the blacklist/unblock target to (client type, jti) —
+    /// the reference's target switch: a raw token scans the user's
+    /// session family for its jti, a jti checks the access row exists,
+    /// anything else is a bad request. An unknown client family scans
+    /// a family that never mints, so it lands on the not-found face
+    /// like the reference.
+    async fn resolve_target(
+        &self,
+        client_type: i32,
+        user_id: u32,
+        target: Option<TokenTarget>,
+    ) -> Result<(ClientType, String), Status> {
+        let Some(client) = ClientType::from_i32_strict(client_type) else {
+            return Err(not_found("access token not found"));
+        };
+        let store = self.state.tokens(client);
+        let jti = match target {
+            Some(TokenTarget::Token(token)) => {
+                let existence = |_| Status::unavailable("check access token existence failed");
+                store
+                    .jti_of_access_token(user_id, &token)
+                    .await
+                    .map_err(existence)?
+                    .ok_or_else(|| not_found("access token not found"))?
+            }
+            Some(TokenTarget::Jti(jti)) => {
+                let exists = store
+                    .has_access_token(user_id, &jti)
+                    .await
+                    .map_err(|_| Status::unavailable("check access token existence failed"))?;
+                if !exists {
+                    return Err(not_found("access token not found"));
+                }
+                jti
+            }
+            None => return Err(bad("invalid block token request target")),
+        };
+        Ok((client, jti))
+    }
+
     /// The password grant (the reference's doGrantTypePassword).
     async fn do_password(&self, req: &LoginRequest) -> Result<LoginResponse, Status> {
         let client = Self::client_of(req);
@@ -158,7 +227,11 @@ impl AuthenticationServiceImpl {
             _ => ("USERNAME", String::new()),
         };
 
-        let user_id = store::auth::verify_credential(
+        // The credential's tenant wins: a blank tenant_code resolves
+        // through the cross-tenant fallback (the C-side form carries
+        // no tenant input), pinning the session to the credential's
+        // own tenant.
+        let (user_id, tenant_id) = store::auth::verify_credential(
             &self.state.db,
             tenant_id,
             identifier,
@@ -325,41 +398,124 @@ impl AuthenticationService for AuthenticationServiceImpl {
 
     async fn get_access_tokens(
         &self,
-        _request: Request<GetAccessTokensRequest>,
+        request: Request<GetAccessTokensRequest>,
     ) -> ResponseResult<GetAccessTokensResponse> {
-        Err(Status::unimplemented("not implemented"))
+        let req = request.into_inner();
+        // An unknown client family scans a family that never mints —
+        // the answer is an empty session list (the reference's SCAN
+        // over a dead prefix).
+        let Some(client) = ClientType::from_i32_strict(req.client_type) else {
+            return Ok(Response::new(GetAccessTokensResponse::default()));
+        };
+        let access_tokens = self
+            .state
+            .tokens(client)
+            .access_tokens(req.user_id)
+            .await
+            .map_err(Status::internal)?;
+        Ok(Response::new(GetAccessTokensResponse { access_tokens }))
     }
 
     async fn revoke_token_by_id(
         &self,
-        _request: Request<RevokeTokenByIdRequest>,
+        request: Request<RevokeTokenByIdRequest>,
     ) -> ResponseResult<pbjson_types::Empty> {
-        Err(Status::unimplemented("not implemented"))
+        let req = request.into_inner();
+        let user_id = req.user_id.unwrap_or(0);
+        // A named client type revokes that family only (and must be a
+        // declared one); an absent one revokes both — the reference's
+        // RevokeTokenByJti.
+        let stores: Vec<&TokenStore> = match req.client_type {
+            Some(v) => vec![self
+                .state
+                .tokens(ClientType::from_i32_strict(v).ok_or_else(|| bad("invalid client type"))?)],
+            None => vec![&self.state.admin_tokens, &self.state.app_tokens],
+        };
+        for store in stores {
+            store
+                .revoke_by_jti(user_id, &req.jti)
+                .await
+                .map_err(Status::internal)?;
+        }
+        Ok(Response::new(pbjson_types::Empty {}))
     }
 
     async fn block_token(
         &self,
-        _request: Request<BlockTokenRequest>,
+        request: Request<BlockTokenRequest>,
     ) -> ResponseResult<BlockTokenResponse> {
-        Err(Status::unimplemented("not implemented"))
+        let req = request.into_inner();
+        let (client, jti) = self
+            .resolve_target(
+                req.client_type,
+                req.user_id,
+                req.target.map(TokenTarget::from),
+            )
+            .await?;
+        // A positive duration expires the blacklist row; an absent one
+        // persists it (the reference's SET with zero expiration).
+        let ttl = req
+            .duration
+            .as_ref()
+            .filter(|d| d.seconds > 0)
+            .map(|d| d.seconds.max(0) as u64 + u64::from(d.nanos > 0));
+        self.state
+            .tokens(client)
+            .block_token(&jti, &req.reason, ttl)
+            .await
+            .map_err(Status::internal)?;
+        let blocked_until = ttl.map(|secs| {
+            let until = chrono::Utc::now() + chrono::Duration::seconds(secs as i64);
+            pbjson_types::Timestamp {
+                seconds: until.timestamp(),
+                nanos: until.timestamp_subsec_nanos() as i32,
+            }
+        });
+        Ok(Response::new(BlockTokenResponse { blocked_until }))
     }
 
     async fn unblock_token(
         &self,
-        _request: Request<UnblockTokenRequest>,
+        request: Request<UnblockTokenRequest>,
     ) -> ResponseResult<pbjson_types::Empty> {
-        Err(Status::unimplemented("not implemented"))
+        let req = request.into_inner();
+        let (client, jti) = self
+            .resolve_target(
+                req.client_type,
+                req.user_id,
+                req.target.map(TokenTarget::from),
+            )
+            .await?;
+        // The unblock face removes the session rows (the whitelist
+        // check then fails before the blacklist is even consulted) —
+        // the reference's UnblockToken; the blacklist row itself just
+        // ages out.
+        self.state
+            .tokens(client)
+            .revoke_by_jti(req.user_id, &jti)
+            .await
+            .map_err(Status::internal)?;
+        Ok(Response::new(pbjson_types::Empty {}))
     }
 
     async fn who_am_i(
         &self,
         request: Request<pbjson_types::Empty>,
     ) -> ResponseResult<WhoAmIResponse> {
-        // The BFF forwards the operator metadata; absent → anonymous.
-        let _ = request;
-        Err(Status::unimplemented(
-            "route through the BFF operator context",
-        ))
+        // The BFF forwards the verified operator id as metadata; no
+        // client-supplied identity is ever trusted.
+        let uid = request
+            .metadata()
+            .get("x-user-id")
+            .and_then(|v| v.to_str().ok())
+            .and_then(|v| v.parse::<i64>().ok())
+            .filter(|v| *v > 0)
+            .ok_or_else(|| Status::unauthenticated("missing authentication context"))?;
+        let user = self.user_row(uid).await?;
+        Ok(Response::new(WhoAmIResponse {
+            user_id: user.id as u32,
+            username: user.username.unwrap_or_default(),
+        }))
     }
 
     async fn generate_captcha(

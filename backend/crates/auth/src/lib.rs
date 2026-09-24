@@ -102,6 +102,31 @@ fn unauthorized(package: &str, err: AuthnError) -> rushwind_http_binding::envelo
     rushwind_http_binding::envelope::StatusError::new(status, "UNAUTHORIZED", message)
 }
 
+/// The refresh fallback's claim sniff: decodes the JWT payload WITHOUT
+/// verifying the signature. The (possibly expired) access token is not
+/// a credential here — it only names the refresh binding key (uid/jti);
+/// the core validates the refresh token value itself. Mirrors the
+/// reference's ParseUnverifiedBearerJWTClaims.
+pub fn parse_unverified_bearer_jwt(token: &str) -> Option<(u32, String)> {
+    let payload_b64 = token.split('.').nth(1)?;
+    use base64::Engine as _;
+    let bytes = base64::engine::general_purpose::URL_SAFE_NO_PAD
+        .decode(payload_b64)
+        .or_else(|_| base64::engine::general_purpose::URL_SAFE.decode(payload_b64))
+        .ok()?;
+    let claims: serde_json::Value = serde_json::from_slice(&bytes).ok()?;
+    let uid = match claims.get("uid")? {
+        serde_json::Value::Number(n) => n.as_u64()? as u32,
+        serde_json::Value::String(s) => s.parse().ok()?,
+        _ => return None,
+    };
+    if uid == 0 {
+        return None;
+    }
+    let jti = claims.get("jti")?.as_str()?.to_string();
+    Some((uid, jti))
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -114,5 +139,24 @@ mod tests {
         assert_eq!(e.message, "missing bearer token");
         let e = unauthorized("app.service.v1", AuthnError::TokenExpired);
         assert_eq!(e.message, "access token expired");
+    }
+
+    #[test]
+    fn unverified_bearer_sniffs_uid_and_jti() {
+        use base64::engine::general_purpose::URL_SAFE_NO_PAD;
+        use base64::Engine as _;
+        let payload = serde_json::json!({"uid": 7u64, "jti": "abc-123"});
+        let seg = URL_SAFE_NO_PAD.encode(payload.to_string());
+        let token = format!("e30.{seg}.c2ln");
+        assert_eq!(
+            parse_unverified_bearer_jwt(&token),
+            Some((7, "abc-123".to_string()))
+        );
+        // junk forms land None
+        assert_eq!(parse_unverified_bearer_jwt("not-a-jwt"), None);
+        assert_eq!(parse_unverified_bearer_jwt("a.####.c"), None);
+        // zero uid is not an identity
+        let zero = URL_SAFE_NO_PAD.encode(r#"{"uid":0,"jti":"x"}"#);
+        assert_eq!(parse_unverified_bearer_jwt(&format!("h.{zero}.s")), None);
     }
 }

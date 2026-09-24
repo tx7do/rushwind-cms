@@ -73,9 +73,62 @@ STUB_METHODS = {
     ("File", "create"),
     ("Menu", "sync_menus"),
     ("Permission", "sync_permissions"),
-    ("UserProfile", "bind_contact"),
-    ("UserProfile", "change_password"),
-    ("UserProfile", "verify_contact"),
+}
+
+# 行为模块（手写面）：生成代码按 face 路由到对应模块。
+BEHAVIOR_MODULES = {"app": "crate::services::public", "admin": "crate::services::behaviors"}
+
+# 面特定的行为覆写——方法体改为调用手写模块，行为与生成代码解耦：
+#   app 公开站点语义（参照 app/service 的服务层逐方法对位）：公开读
+#   状态过滤、内容写禁用、Host 租户解析、游客评论策略、档案/改密钉扎。
+#   admin 侧：文件元数据创建（服务端操作者盖章）、权限派生重建触发、
+#   walk-route 调试面（本二进制路由表）、改密/联系面。
+BEHAVIOR_METHODS = {
+    "admin": {
+        ("Api", "get_walk_route_data"): "walk_route_data",
+        ("File", "create"): "file_create",
+        ("Permission", "sync_permissions"): "sync_permissions",
+        ("UserProfile", "change_password"): "change_password",
+        ("UserProfile", "bind_contact"): "bind_contact",
+        ("UserProfile", "verify_contact"): "verify_contact",
+    },
+    "app": {
+        ("Post", "list"): "post_list",
+        ("Post", "get"): "post_get",
+        ("Post", "search_posts"): "post_search",
+        ("Post", "create"): "forbidden_mutation",
+        ("Post", "update"): "forbidden_mutation",
+        ("Post", "delete"): "forbidden_mutation",
+        ("Category", "list"): "category_list",
+        ("Category", "get"): "category_get",
+        ("Category", "create"): "forbidden_mutation",
+        ("Category", "update"): "forbidden_mutation",
+        ("Category", "delete"): "forbidden_mutation",
+        ("Page", "list"): "page_list",
+        ("Page", "get"): "page_get",
+        ("Page", "create"): "forbidden_mutation",
+        ("Page", "update"): "forbidden_mutation",
+        ("Page", "delete"): "forbidden_mutation",
+        ("Tag", "create"): "forbidden_mutation",
+        ("Tag", "update"): "forbidden_mutation",
+        ("Tag", "delete"): "forbidden_mutation",
+        ("Navigation", "create"): "forbidden_mutation",
+        ("Navigation", "update"): "forbidden_mutation",
+        ("Navigation", "delete"): "forbidden_mutation",
+        ("Site", "list"): "forbidden_mutation",
+        ("Site", "create"): "forbidden_mutation",
+        ("Site", "update"): "forbidden_mutation",
+        ("Site", "delete"): "forbidden_mutation",
+        ("Site", "get_site_by_domain"): "site_by_domain",
+        ("Comment", "list"): "comment_list",
+        ("Comment", "get"): "comment_get",
+        ("Comment", "create"): "comment_create",
+        ("Comment", "update"): "comment_update",
+        ("Comment", "delete"): "comment_delete",
+        ("UserProfile", "change_password"): "change_password",
+        ("UserProfile", "bind_contact"): "bind_contact",
+        ("UserProfile", "verify_contact"): "verify_contact",
+    },
 }
 
 # 响应形状错位（BFF Empty ↔ 领域实体）：转发后丢弃响应体
@@ -162,12 +215,17 @@ def main():
         for method, req_ty, resp_ty in methods:
             mname = f"r#{method}" if method in RUST_KEYWORDS else method
             stubbed = (service, method) in STUB_METHODS
+            behavior = BEHAVIOR_METHODS.get(face, {}).get((service, method))
             out.append("    async fn %s(" % mname)
             out.append("        &self,")
             out.append("        _ctx: rushwind_http_binding::ctx::RequestContext,")
             out.append(f"        req: {req_ty},")
             out.append(f"    ) -> Result<{resp_ty}, StatusError> {{")
-            if (service, method) == ("Api", "sync_apis"):
+            if behavior:
+                behavior_mod = BEHAVIOR_MODULES[face]
+                out.append("        // The face's hand-written behavior (see the module docs).")
+                out.append(f"        {behavior_mod}::{behavior}(&self.state, &_ctx, req).await")
+            elif (service, method) == ("Api", "sync_apis"):
                 out.append("        let _ = req;")
                 out.append("        // Sync the generated route table into sys_apis (the route")
                 out.append("        // corpus this very binary was generated from).")

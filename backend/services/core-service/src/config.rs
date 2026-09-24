@@ -95,6 +95,15 @@ struct AuthFile {
     authenticator: Option<AuthenticatorSection>,
 }
 
+/// The object-store profile of a parsed oss.yaml — the minio section,
+/// dropped when its endpoint is blank (the section's presence alone
+/// selects the provider; an empty endpoint means "not configured").
+fn minio_section_of(file: OssFile) -> Option<MinioSection> {
+    file.oss
+        .and_then(|o| o.minio)
+        .filter(|m| !m.endpoint.is_empty())
+}
+
 #[derive(Debug, Default, Deserialize)]
 struct AuthenticatorSection {
     #[serde(default)]
@@ -130,10 +139,7 @@ impl Config {
         let clients = auth.authenticator.unwrap_or_default();
         let admin = clients.admin.unwrap_or_default();
         let app = clients.app.unwrap_or_default();
-        let minio = oss
-            .oss
-            .and_then(|o| o.minio)
-            .filter(|m| !m.endpoint.is_empty());
+        let minio = minio_section_of(oss);
 
         let secs = |d: &Option<DurationWire>, fallback: i64| {
             d.as_ref().map(|x| x.0.as_secs() as i64).unwrap_or(fallback)
@@ -162,5 +168,71 @@ impl Config {
             app_refresh_secs: secs(&app.refresh_token_expires, 0),
             oss,
         })
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn oss_yaml_full_section_parses_every_field() {
+        let file: OssFile = serde_yaml::from_str(
+            "oss:\n\
+             \x20 minio:\n\
+             \x20   endpoint: \"127.0.0.1:9000\"\n\
+             \x20   download_host: \"http://localhost:9000\"\n\
+             \x20   access_key: \"root\"\n\
+             \x20   secret_key: \"s3cret\"\n\
+             \x20   use_ssl: true\n",
+        )
+        .unwrap();
+        let m = minio_section_of(file).expect("endpoint present");
+        assert_eq!(m.endpoint, "127.0.0.1:9000");
+        assert_eq!(m.download_host, "http://localhost:9000");
+        assert_eq!(m.access_key, "root");
+        assert_eq!(m.secret_key, "s3cret");
+        assert!(m.use_ssl);
+    }
+
+    #[test]
+    fn oss_yaml_missing_fields_take_defaults_and_unknown_keys_are_ignored() {
+        // The embedded asset carries extra keys (upload_host, token)
+        // the section struct does not model — serde drops them.
+        let file: OssFile = serde_yaml::from_str(
+            "oss:\n  minio:\n    endpoint: e\n    upload_host: \"x\"\n    token: \"\"\n",
+        )
+        .unwrap();
+        let m = minio_section_of(file).expect("endpoint present");
+        assert_eq!(m.endpoint, "e");
+        assert_eq!(m.download_host, "");
+        assert_eq!(m.access_key, "");
+        assert_eq!(m.secret_key, "");
+        assert!(!m.use_ssl);
+    }
+
+    #[test]
+    fn oss_yaml_blank_endpoint_and_missing_sections_filter_out() {
+        // An empty endpoint means "not configured" — the section is
+        // dropped and the storage faces fall back to the local disk.
+        let file: OssFile = serde_yaml::from_str("oss:\n  minio:\n    endpoint: \"\"\n").unwrap();
+        assert!(minio_section_of(file).is_none());
+
+        let file: OssFile = serde_yaml::from_str("{}").unwrap();
+        assert!(minio_section_of(file).is_none());
+
+        let file: OssFile = serde_yaml::from_str("oss: {}").unwrap();
+        assert!(minio_section_of(file).is_none());
+    }
+
+    #[test]
+    fn embedded_oss_yaml_selects_the_local_minio_profile() {
+        let file: OssFile = serde_yaml::from_str(OSS_YAML).unwrap();
+        let m = minio_section_of(file).expect("the embedded dev section is configured");
+        assert_eq!(m.endpoint, "127.0.0.1:9000");
+        assert_eq!(m.download_host, "http://127.0.0.1:9000");
+        assert_eq!(m.access_key, "root");
+        assert_eq!(m.secret_key, "*Abcd123456");
+        assert!(!m.use_ssl);
     }
 }

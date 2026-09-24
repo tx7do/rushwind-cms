@@ -144,9 +144,11 @@ R=$(curl -s -o /dev/null -w "%{http_code}" -H "Authorization: Bearer $TOKEN3" "$
 check "post-logout token rejected" "401" "$R"
 
 echo "── 6. app 面（前台） ──────────────────────"
-R=$(curl -s -X POST -H "Content-Type: application/json" -d "{\"username\":\"e2e_app_$$\",\"password\":\"$PASS_ENC2\"}" "$APP/app/v1/register")
+# 注册契约：≥6 位密码 + Host 解析租户（本机 dev 前端恒带端口，core 去端口回退）
+APP_PW_ENC=$(printf '%s' "e2ePass123" | openssl enc -aes-128-cbc -K 66353164363661373364386130393237 -iv 66353164363661373364386130393237 -base64 -A)
+R=$(curl -s -X POST -H "Content-Type: application/json" -H "Host: localhost:5001" -d "{\"username\":\"e2e_app_$$\",\"password\":\"$APP_PW_ENC\"}" "$APP/app/v1/register")
 check "app register" 'userId' "$R"
-R=$(curl -s -X POST -H "Content-Type: application/json" -d "{\"grant_type\":0,\"username\":\"e2e_app_$$\",\"password\":\"$PASS_ENC2\"}" "$APP/app/v1/login")
+R=$(curl -s -X POST -H "Content-Type: application/json" -d "{\"grant_type\":0,\"username\":\"e2e_app_$$\",\"password\":\"$APP_PW_ENC\"}" "$APP/app/v1/login")
 APPTOKEN=$(echo "$R" | python3 -c "import json,sys; print(json.load(sys.stdin).get('access_token',''))" 2>/dev/null)
 check "app login (client=1, no captcha)" '"token_type":"bearer"' "$R"
 check "app token has 900s expiry" '"expires_in":"900"' "$R"
@@ -162,7 +164,7 @@ R=$(curl -s -o /dev/null -w "%{http_code}" -X POST -H "Authorization: Bearer $AP
 check "app logout with token → 200" "200" "$R"
 R=$(curl -s "$APP/app/v1/comments?page=1&pageSize=2")
 check "app comments (public)" '"items"' "$R"
-R=$(curl -s -X POST -H "Content-Type: application/json" -d '{"data":{"contentType":1,"objectId":1,"content":"e2e 评论","authorName":"游客"}}' "$APP/app/v1/comments")
+R=$(curl -s -X POST -H "Content-Type: application/json" -d '{"data":{"contentType":1,"objectId":1,"content":"e2e 评论","authorName":"游客","authorEmail":"guest@e2e.test"}}' "$APP/app/v1/comments")
 check "app guest comment create" '"content":"e2e 评论"' "$R"
 
 echo "── 7. 新模块（权限/审计/统计/互动写/杂项） ──────────────────────"
@@ -198,7 +200,7 @@ ISTATS=$(curl -s -H "$AUTH" "$ADMIN/admin/v1/stats/interactions?topN=5")
 check "interaction stats" '"totalLikes"' "$ISTATS"
 
 # interaction write path: like → unlike via app token
-APPTOKEN2=$(curl -s -X POST -H "Content-Type: application/json" -d "{\"grant_type\":0,\"username\":\"e2e_app_$$\",\"password\":\"$PASS_ENC2\"}" "$APP/app/v1/login" | python3 -c "import json,sys; print(json.load(sys.stdin).get('access_token',''))")
+APPTOKEN2=$(curl -s -X POST -H "Content-Type: application/json" -d "{\"grant_type\":0,\"username\":\"e2e_app_$$\",\"password\":\"$APP_PW_ENC\"}" "$APP/app/v1/login" | python3 -c "import json,sys; print(json.load(sys.stdin).get('access_token',''))")
 LIKE=$(curl -s -X POST -H "Authorization: Bearer $APPTOKEN2" -H "Content-Type: application/json" -d '{"targetType":1,"targetId":1}' "$APP/app/v1/interactions/like")
 check "post like (returns liked+count)" '"liked":true' "$LIKE"
 LIKE2=$(curl -s -X POST -H "Authorization: Bearer $APPTOKEN2" -H "Content-Type: application/json" -d '{"targetType":1,"targetId":1}' "$APP/app/v1/interactions/like")
@@ -351,6 +353,107 @@ R=$(curl -s -o /dev/null -w "%{http_code}" -X OPTIONS "http://127.0.0.1:6601/eve
 check "SSE preflight 204" "204" "$R"
 R=$(curl -s -i -X OPTIONS -H "Origin: http://localhost:5999" -H "Access-Control-Request-Method: POST" "$ADMIN/admin/v1/login" 2>&1 | grep -i "access-control-allow-origin" | head -1)
 check "CORS allowed origin" "http://localhost:5999" "$R"
+
+echo "── 11. 对位补齐面（调试路由/Range/改密/公开门禁/注册链） ──────────────────────"
+# walk-route 调试面（本二进制路由表投影）
+WALK=$(curl -s -H "$AUTH" "$ADMIN/admin/v1/apis/walk-route")
+check "walk-route 200" '"items"' "$WALK"
+check "walk-route lists login route" '"/admin/v1/login"' "$WALK"
+
+# 下载 Range 语义（206/416/Content-Range）
+echo "e2e-range-content" > /tmp/e2e-range.txt
+curl -s -H "$AUTH" -F "file=@/tmp/e2e-range.txt;type=text/plain" -F "sourceFileName=e2e-range.txt" -F "mime=text/plain" "$ADMIN/admin/v1/file/upload" > /dev/null
+RANGE_ROW=$(curl -s -H "$AUTH" "$ADMIN/admin/v1/files?page=1&pageSize=20" | python3 -c "
+import json,sys
+d=json.load(sys.stdin)
+r=next((i for i in d.get('items',[]) if i.get('fileName')=='e2e-range.txt'),None)
+print((str(r.get('id',0))+' '+r.get('fileGuid','')) if r else '0 x')" 2>/dev/null)
+RANGE_ID=${RANGE_ROW%% *}; RANGE_GUID=${RANGE_ROW##* }
+PART=$(curl -s -H "$AUTH" -H "Range: bytes=0-3" -w "|%{http_code}" "$ADMIN/admin/v1/file/download?fileId=$RANGE_ID")
+check "range download → 206 slice" "e2e-|206" "$PART"
+RANGEHEAD=$(curl -s -D - -o /dev/null -H "$AUTH" -H "Range: bytes=0-3" "$ADMIN/admin/v1/file/download?fileId=$RANGE_ID")
+check "range Content-Range header" "bytes 0-3/18" "$RANGEHEAD"
+check "range 206 status + accept-ranges" "206" "$RANGEHEAD"
+check "download advertises accept-ranges" "accept-ranges: bytes" "$RANGEHEAD"
+R416=$(curl -s -o /dev/null -w "%{http_code}" -H "$AUTH" -H "Range: bytes=999-" "$ADMIN/admin/v1/file/download?fileId=$RANGE_ID")
+check "unsatisfiable range → 416" "416" "$R416"
+curl -s -o /dev/null -X DELETE -H "$AUTH" "$ADMIN/admin/v1/files/$RANGE_ID"
+rm -f /tmp/e2e-range.txt
+
+# me/password 改密闭环（admin 明文口径：need_decrypt=false）
+MPW=$(curl -s -o /dev/null -w "%{http_code}" -X POST -H "$AUTH" -H "Content-Type: application/json" \
+  -d '{"oldPassword":"admin","newPassword":"admin"}' "$ADMIN/admin/v1/me/password")
+check "me password change → 200" "200" "$MPW"
+
+# app 公开面：写禁用 403、草稿不可见、游客评论待审
+APPTOKEN_JSON=$(curl -s -X POST -H "Content-Type: application/json" -H "Host: localhost:5001" \
+  -d "{\"grant_type\":0,\"username\":\"admin\",\"password\":\"$PASS_ENC\"}" \
+  "$APP/app/v1/login")
+APPTOKEN=$(echo "$APPTOKEN_JSON" | python3 -c "import json,sys; print(json.load(sys.stdin).get('access_token',''))" 2>/dev/null)
+APP_AUTH="Authorization: Bearer $APPTOKEN"
+if [ -n "$APPTOKEN" ]; then
+  R=$(curl -s -o /dev/null -w "%{http_code}" -X POST -H "$APP_AUTH" -H "Content-Type: application/json" \
+    -d '{"data":{}}' "$APP/app/v1/posts")
+  check "app content write → 403" "403" "$R"
+else
+  fail "app admin-token login" "$APPTOKEN_JSON"
+fi
+
+# 草稿在 app 面不可见（admin 新建缺省落草稿——缺省 DRAFT、显式状态照收）
+NP=$(curl -s -X POST -H "$AUTH" -H "Content-Type: application/json" \
+  -d '{"data":{"code":"e2e-draft","translations":[{"languageCode":"zh-CN","title":"e2e-draft-post"}]}}' "$ADMIN/admin/v1/posts")
+NP_ID=$(echo "$NP" | python3 -c "import json,sys; print(json.load(sys.stdin).get('id',0))" 2>/dev/null)
+NP_STATUS=$(echo "$NP" | python3 -c "import json,sys; print(json.load(sys.stdin).get('status',''))" 2>/dev/null)
+check "post create defaults to DRAFT" "POST_STATUS_DRAFT" "$NP_STATUS"
+APPSLUG=$(curl -s -H "$APP_AUTH" "$APP/app/v1/posts?page=1&pageSize=50")
+if echo "$APPSLUG" | grep -q "\"id\":$NP_ID[,}]"; then
+  fail "draft post hidden on app face" "$APPSLUG"
+else
+  ok "draft post hidden on app face"
+fi
+PUB=$(curl -s -o /dev/null -w "%{http_code}" -X PUT -H "$AUTH" -H "Content-Type: application/json" \
+  -d '{"data":{"status":2}}' "$ADMIN/admin/v1/posts/$NP_ID")
+check "post publish via admin → 200" "200" "$PUB"
+APPGOT=$(curl -s -H "$APP_AUTH" "$APP/app/v1/posts/$NP_ID")
+check "published post visible on app face" '"title":"e2e-draft-post"' "$APPGOT"
+GC=$(curl -s -X POST -H "Content-Type: application/json" -H "Host: localhost:5001" \
+  -d '{"data":{"content":"e2e-guest-comment","authorName":"guest-e2e","authorEmail":"g@e2e.test","objectId":1,"contentType":1}}' \
+  "$APP/app/v1/comments")
+GC_STATUS=$(echo "$GC" | python3 -c "import json,sys; print(json.load(sys.stdin).get('status',0))" 2>/dev/null)
+check "guest comment accepted (PENDING)" "STATUS_PENDING" "$GC_STATUS"
+APPCOMMENTS=$(curl -s -H "$APP_AUTH" "$APP/app/v1/comments?page=1&pageSize=50")
+if echo "$APPCOMMENTS" | grep -q 'e2e-guest-comment'; then
+  fail "pending comment hidden on app face" "$APPCOMMENTS"
+else
+  ok "pending comment hidden on app face"
+fi
+
+# app 注册链：AES 密文 + Host 租户归属 + 登录回环（跨租户回退）
+E2E_USER="e2e_u$(date +%s)"
+AES_PW=$(printf '%s' "e2ePass123" | openssl enc -aes-128-cbc -K 66353164363661373364386130393237 -iv 66353164363661373364386130393237 -base64 -A)
+REG=$(curl -s -w "\n%{http_code}" -X POST -H "Content-Type: application/json" -H "Host: localhost:5001" \
+  -d "{\"username\":\"$E2E_USER\",\"password\":\"$AES_PW\",\"tenant_code\":\"spoof\"}" \
+  "$APP/app/v1/register")
+REG_BODY=$(echo "$REG" | head -n -1); REG_CODE=$(echo "$REG" | tail -1)
+check "app register → 200" "200" "$REG_CODE"
+check "app register answers userId" '"userId"' "$REG_BODY"
+RELOGIN=$(curl -s -X POST -H "Content-Type: application/json" -H "Host: localhost:5001" \
+  -d "{\"grant_type\":0,\"username\":\"$E2E_USER\",\"password\":\"$AES_PW\"}" \
+  "$APP/app/v1/login")
+RELOGIN_OK=$(echo "$RELOGIN" | python3 -c "import json,sys; print(bool(json.load(sys.stdin).get('access_token')))" 2>/dev/null)
+check "registered user login (cross-tenant fallback)" "True" "$RELOGIN_OK"
+RELOGIN_TID=$(echo "$RELOGIN" | python3 -c "
+import json,sys,base64
+tok=json.load(sys.stdin).get('access_token','')
+seg=tok.split('.')[1] if tok.count('.')>=2 else ''
+seg += '=' * (-len(seg) % 4)
+claims=json.loads(base64.urlsafe_b64decode(seg)) if seg else {}
+print(claims.get('tid',-1))" 2>/dev/null)
+if [ "$RELOGIN_TID" = "1" ]; then
+  ok "registered user pinned to resolved tenant (tid=1)"
+else
+  fail "registered user tenant pin" "$RELOGIN_TID"
+fi
 
 echo ""
 echo "═══════ 结果: PASS=$PASS FAIL=$FAIL ═══════"

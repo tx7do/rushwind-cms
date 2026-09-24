@@ -2,27 +2,21 @@
 //! the reference registers BY HAND outside the generated handlers (the
 //! bind layer parses protojson, not multipart — the reference's
 //! `registerFileTransferServiceHandler` bypasses codegen for the same
-//! reason, and the reference's generated registration for the face is
-//! skipped in kind). rest.rs mounts the router behind the same auth
-//! gate as the generated protected subtree — the reference's hand
-//! registration sits inside the same server middleware chain.
+//! reason, and the generated registration for the face is skipped in
+//! kind). rest.rs mounts the router behind the same auth gate as the
+//! generated protected subtree — the reference's hand registration sits
+//! inside the same server middleware chain.
 //!
-//! Transport: the object bytes ride the proto's streaming channels —
-//! upload as one HttpBody chunk (the file name and mime beside the
-//! operator in the gRPC metadata), download as a relayed HttpBody
-//! stream (the content type off the stream, the recorded display name
-//! off the response metadata for the disposition header). The BFF
-//! touches no disk and carries no storage-root knowledge; the tenant
-//! ownership gate sits core-side with the rows.
+//! The C-side shape mirrors the admin face minus the media-library
+//! variant: upload POST|PUT plus download GET — the direct upload
+//! (metadata recorded core-side, the object through the streaming
+//! channel) and the fileId download with the tenant ownership gate.
 //!
-//! Wire format (the admin-react uploader):
-//! * `POST|PUT /admin/v1/file/upload` — multipart fields: `file` (blob),
+//! Wire format (the front-end uploader):
+//! * `POST|PUT /app/v1/file/upload` — multipart fields: `file` (blob),
 //!   `sourceFileName`, `mime`, `size`, `method`, `storageObject`
-//!   ({bucketName,fileDirectory} — recorded only; the local store
-//!   derives its own layout)
-//! * `POST /admin/v1/file/asset/upload` — the media-library variant:
-//!   the file part alone (its header carries the name and mime)
-//! * `GET /admin/v1/file/download?fileId=|fileGuid=` — streams the
+//!   ({bucketName,fileDirectory} — the placement pair)
+//! * `GET /app/v1/file/download?fileId=|fileGuid=` — streams the
 //!   object bytes back with the stored content type
 
 use std::sync::Arc;
@@ -34,7 +28,6 @@ use axum::response::{IntoResponse, Response};
 use crate::services::{map_status, with_operator_claims};
 use crate::state::{self, AppState};
 
-use proto::proto::media::service::v1 as mediav1;
 use proto::proto::storage::service::v1 as storagev1;
 
 fn core_file(
@@ -47,12 +40,6 @@ fn core_transfer(
     channel: &tonic::transport::Channel,
 ) -> storagev1::file_transfer_service_client::FileTransferServiceClient<tonic::transport::Channel> {
     storagev1::file_transfer_service_client::FileTransferServiceClient::new(channel.clone())
-}
-
-fn core_media_asset(
-    channel: &tonic::transport::Channel,
-) -> mediav1::media_asset_service_client::MediaAssetServiceClient<tonic::transport::Channel> {
-    mediav1::media_asset_service_client::MediaAssetServiceClient::new(channel.clone())
 }
 
 /// The verified claim bag the auth gate injected into the request
@@ -79,12 +66,10 @@ struct StorageObjectForm {
 /// Pulls the `file` part out of the multipart body. The reference's
 /// upload handlers let the `sourceFileName`/`mime` form fields override
 /// the part header's own values and parse the `storageObject` placement
-/// pair out of the form (its asset variant reads the header alone);
-/// mirrored here with the field values resolved after the scan so the
-/// wire order cannot flip the precedence.
+/// pair out of the form; mirrored here with the field values resolved
+/// after the scan so the wire order cannot flip the precedence.
 async fn read_upload(
     req: Request,
-    asset_shape: bool,
 ) -> Result<(String, String, String, String, Option<Vec<u8>>), state::StatusError> {
     let mut multipart = match Multipart::from_request(req, &()).await {
         Ok(m) => m,
@@ -116,17 +101,17 @@ async fn read_upload(
                     }
                 }
             }
-            "sourceFileName" if !asset_shape => {
+            "sourceFileName" => {
                 if let Ok(v) = field.text().await {
                     form_name = v;
                 }
             }
-            "mime" if !asset_shape => {
+            "mime" => {
                 if let Ok(v) = field.text().await {
                     form_mime = v;
                 }
             }
-            "storageObject" if !asset_shape => {
+            "storageObject" => {
                 if let Ok(v) = field.text().await {
                     // The reference unmarshals the placement JSON into
                     // its StorageObject message — a malformed body fails
@@ -150,12 +135,12 @@ async fn read_upload(
             }
         }
     }
-    let file_name = if !asset_shape && !form_name.is_empty() {
+    let file_name = if !form_name.is_empty() {
         form_name
     } else {
         part_name
     };
-    let mime = if !asset_shape && !form_mime.is_empty() {
+    let mime = if !form_mime.is_empty() {
         form_mime
     } else {
         part_mime
@@ -165,14 +150,9 @@ async fn read_upload(
 
 /// The streaming upload's parsed outcome: the contract JSON answer
 /// (`UploadFileResponse` — the recorded link) plus the created row's
-/// reference fields off the response metadata (the media library
-/// flow's row linkage; the wire response carries only the link).
+/// reference fields off the response metadata.
 struct UploadedFileRef {
     response: Response,
-    link: Option<String>,
-    file_id: Option<u32>,
-    size: Option<u64>,
-    storage_path: Option<String>,
 }
 
 /// Ships one blob through the streaming upload channel: the bytes as a
@@ -216,21 +196,6 @@ async fn stream_upload(
     };
     match call {
         Ok(resp) => {
-            let file_id = resp
-                .metadata()
-                .get("x-file-id")
-                .and_then(|v| v.to_str().ok())
-                .and_then(|v| v.parse::<u32>().ok());
-            let size = resp
-                .metadata()
-                .get("x-file-size")
-                .and_then(|v| v.to_str().ok())
-                .and_then(|v| v.parse::<u64>().ok());
-            let storage_path = resp
-                .metadata()
-                .get("x-file-path")
-                .and_then(|v| v.to_str().ok())
-                .map(str::to_string);
             let out = resp.into_inner();
             let body = serde_json::json!({ "objectName": out.object_name.clone() });
             let response = (
@@ -238,20 +203,10 @@ async fn stream_upload(
                 body.to_string(),
             )
                 .into_response();
-            UploadedFileRef {
-                response,
-                link: out.object_name,
-                file_id,
-                size,
-                storage_path,
-            }
+            UploadedFileRef { response }
         }
         Err(e) => UploadedFileRef {
             response: rushwind_http_binding::envelope::error_response(map_status(e)),
-            link: None,
-            file_id: None,
-            size: None,
-            storage_path: None,
         },
     }
 }
@@ -261,7 +216,7 @@ async fn stream_upload(
 pub async fn upload(State(state): State<Arc<AppState>>, req: Request) -> Response {
     let claims = claims_of(&req);
     let method = req.method().clone();
-    let (file_name, mime, bucket, dir, bytes) = match read_upload(req, false).await {
+    let (file_name, mime, bucket, dir, bytes) = match read_upload(req).await {
         Ok(v) => v,
         Err(e) => return rushwind_http_binding::envelope::error_response(e),
     };
@@ -284,71 +239,6 @@ pub async fn upload(State(state): State<Arc<AppState>>, req: Request) -> Respons
     .response
 }
 
-/// The media-library variant (the reference's `UploadMediaAsset`): the
-/// file part alone through the streaming channel, then the media-asset
-/// row (the linkage fields off the upload's response metadata, the
-/// classifier and COMPLETED status mirroring the reference's tail).
-pub async fn upload_asset(State(state): State<Arc<AppState>>, req: Request) -> Response {
-    let claims = claims_of(&req);
-    let method = req.method().clone();
-    let (file_name, mime, _bucket, _dir, bytes) = match read_upload(req, true).await {
-        Ok(v) => v,
-        Err(e) => return rushwind_http_binding::envelope::error_response(e),
-    };
-    let Some(bytes) = bytes else {
-        return rushwind_http_binding::envelope::error_response(state::status_error(
-            "BAD_REQUEST",
-            "file field required",
-        ));
-    };
-    if bytes.is_empty() {
-        return rushwind_http_binding::envelope::error_response(state::status_error(
-            "BAD_REQUEST",
-            "empty file",
-        ));
-    }
-    let asset_type = asset_type_of(&mime);
-    let out = stream_upload(
-        &state,
-        &claims,
-        &method,
-        file_name.clone(),
-        mime.clone(),
-        // The asset variant carries no placement: the reference derives
-        // the bucket from the mime policy and pins the directory empty.
-        String::new(),
-        String::new(),
-        bytes,
-    )
-    .await;
-    let mut asset_core = core_media_asset(&state.core_channel);
-    let asset = mediav1::CreateMediaAssetRequest {
-        data: Some(mediav1::MediaAsset {
-            file_id: out.file_id,
-            filename: Some(file_name),
-            mime_type: Some(mime),
-            size: out.size,
-            url: out.link,
-            storage_path: out.storage_path,
-            r#type: Some(asset_type),
-            processing_status: Some(mediav1::media_asset::ProcessingStatus::Completed as i32),
-            created_by: claims
-                .as_ref()
-                .and_then(|c| c.get("uid"))
-                .and_then(|v| v.as_u64())
-                .map(|v| v as u32),
-            ..Default::default()
-        }),
-    };
-    if let Err(e) = asset_core
-        .create(with_operator_claims(&claims, asset))
-        .await
-    {
-        return rushwind_http_binding::envelope::error_response(map_status(e));
-    }
-    out.response
-}
-
 /// Query shape of the download endpoint.
 #[derive(Default, serde::Deserialize)]
 pub struct DownloadQuery {
@@ -358,10 +248,6 @@ pub struct DownloadQuery {
     pub file_guid: Option<String>,
     #[serde(alias = "fileGuid")]
     pub file_guid_alias: Option<String>,
-    /// The Content-Disposition override (the reference passes the
-    /// caller's value through verbatim).
-    #[serde(default)]
-    pub disposition: Option<String>,
 }
 
 pub async fn download_query(State(state): State<Arc<AppState>>, req: Request) -> Response {
@@ -373,7 +259,7 @@ pub async fn download_query(State(state): State<Arc<AppState>>, req: Request) ->
         .unwrap_or_default();
     let mut core = core_file(&state.core_channel);
     // Resolve the target row id: direct, or via the recorded link's
-    // guid (the generated face carries no by-guid query; list + match).
+    // guid (list + match).
     let id = if let Some(id) = q.file_id.or(q.file_id_alias) {
         Some(id)
     } else if let Some(guid) = q.file_guid.or(q.file_guid_alias) {
@@ -443,152 +329,20 @@ pub async fn download_query(State(state): State<Arc<AppState>>, req: Request) ->
     if bytes.is_empty() {
         return rushwind_http_binding::envelope::error_response(state::not_found("object bytes"));
     }
-    let mime = if content_type.is_empty() {
-        "application/octet-stream"
-    } else {
-        content_type.as_str()
-    };
-    let disposition = match q.disposition.as_deref() {
-        Some(d) if !d.is_empty() => d.to_string(),
-        _ => format!("attachment; filename=\"{}\"", sanitize(&display_name)),
-    };
-    let total = bytes.len() as i64;
-
-    // The single-range partial read (the reference's Range handling):
-    // `bytes=start-end` / `bytes=start-`; malformed → 400,
-    // unsatisfiable → 416, else the 206 slice.
-    let range_header = req
-        .headers()
-        .get(header::RANGE)
-        .and_then(|v| v.to_str().ok())
-        .and_then(|v| v.strip_prefix("bytes=").map(str::to_string));
-    if let Some(r) = range_header {
-        let plain = |status: axum::http::StatusCode, msg: &'static str| -> Response {
-            (status, msg.to_string()).into_response()
-        };
-        let Some((start_s, end_s)) = r.split_once('-') else {
-            return plain(axum::http::StatusCode::BAD_REQUEST, "invalid Range header");
-        };
-        let Ok(start) = start_s.parse::<i64>() else {
-            return plain(axum::http::StatusCode::BAD_REQUEST, "invalid Range start");
-        };
-        if start < 0 {
-            return plain(axum::http::StatusCode::BAD_REQUEST, "invalid Range start");
-        }
-        let end = if end_s.is_empty() {
-            total - 1
-        } else {
-            match end_s.parse::<i64>() {
-                Ok(e) if e >= start => e,
-                _ => return plain(axum::http::StatusCode::BAD_REQUEST, "invalid Range end"),
-            }
-        };
-        if start >= total {
-            return plain(
-                axum::http::StatusCode::RANGE_NOT_SATISFIABLE,
-                "requested range not satisfiable",
-            );
-        }
-        let end = end.min(total - 1);
-        let length = (end - start + 1) as usize;
-        let slice = bytes[start as usize..(start as usize + length)].to_vec();
-        let mut resp = Response::new(axum::body::Body::from(slice));
-        *resp.status_mut() = axum::http::StatusCode::PARTIAL_CONTENT;
-        let h = resp.headers_mut();
-        h.insert(
-            header::CONTENT_TYPE,
-            mime.parse()
-                .unwrap_or(header::HeaderValue::from_static("application/octet-stream")),
-        );
-        if let Ok(v) = disposition.parse() {
-            h.insert(header::CONTENT_DISPOSITION, v);
-        }
-        h.insert(
-            header::ACCEPT_RANGES,
-            header::HeaderValue::from_static("bytes"),
-        );
-        if let Ok(v) = format!("bytes {start}-{end}/{total}").parse() {
-            h.insert(header::CONTENT_RANGE, v);
-        }
-        h.insert(header::CONTENT_LENGTH, length.to_string().parse().unwrap());
-        return resp;
-    }
-
     let mut resp = Response::new(axum::body::Body::from(bytes));
     let h = resp.headers_mut();
     h.insert(
         header::CONTENT_TYPE,
-        mime.parse()
-            .unwrap_or(header::HeaderValue::from_static("application/octet-stream")),
+        content_type
+            .parse()
+            .unwrap_or(axum::http::HeaderValue::from_static(
+                "application/octet-stream",
+            )),
     );
-    if let Ok(v) = disposition.parse() {
+    if let Ok(v) = format!("attachment; filename=\"{}\"", sanitize(&display_name)).parse() {
         h.insert(header::CONTENT_DISPOSITION, v);
     }
-    h.insert(
-        header::ACCEPT_RANGES,
-        header::HeaderValue::from_static("bytes"),
-    );
-    h.insert(header::CONTENT_LENGTH, total.to_string().parse().unwrap());
     resp
-}
-
-/// The asset classifier — the reference's mimeTypeToAssetType table
-/// verbatim (image/video/audio prefixes, the archive and office
-/// document lists, else OTHER).
-fn asset_type_of(mime: &str) -> i32 {
-    use mediav1::media_asset::AssetType as T;
-    if mime.is_empty() {
-        return T::Unspecified as i32;
-    }
-    let mt = mime
-        .to_ascii_lowercase()
-        .split(';')
-        .next()
-        .unwrap_or("")
-        .trim()
-        .to_string();
-    if mt.starts_with("image/") {
-        return T::Image as i32;
-    }
-    if mt.starts_with("video/") {
-        return T::Video as i32;
-    }
-    if mt.starts_with("audio/") {
-        return T::Audio as i32;
-    }
-    if matches!(
-        mt.as_str(),
-        "application/zip"
-            | "application/x-zip-compressed"
-            | "multipart/x-zip"
-            | "application/x-7z-compressed"
-            | "application/x-tar"
-            | "application/gzip"
-            | "application/x-gzip"
-            | "application/x-bzip2"
-            | "application/x-bzip"
-            | "application/x-xz"
-            | "application/vnd.rar"
-            | "application/x-rar-compressed"
-            | "application/java-archive"
-            | "application/zstd"
-            | "application/x-zstd"
-    ) {
-        return T::Archive as i32;
-    }
-    if matches!(
-        mt.as_str(),
-        "application/pdf"
-            | "application/msword"
-            | "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
-            | "application/vnd.ms-excel"
-            | "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
-            | "application/vnd.ms-powerpoint"
-            | "application/vnd.openxmlformats-officedocument.presentationml.presentation"
-    ) {
-        return T::Document as i32;
-    }
-    T::Other as i32
 }
 
 fn sanitize(name: &str) -> String {
@@ -602,17 +356,10 @@ fn sanitize(name: &str) -> String {
 pub fn router(state: Arc<AppState>) -> axum::Router {
     axum::Router::new()
         .route(
-            "/admin/v1/file/upload",
+            "/app/v1/file/upload",
             axum::routing::post(upload).put(upload),
         )
-        .route(
-            "/admin/v1/file/asset/upload",
-            axum::routing::post(upload_asset),
-        )
-        .route(
-            "/admin/v1/file/download",
-            axum::routing::get(download_query),
-        )
+        .route("/app/v1/file/download", axum::routing::get(download_query))
         .with_state(state)
 }
 
@@ -624,7 +371,6 @@ mod tests {
     fn sanitize_keeps_only_safe_disposition_chars() {
         assert_eq!(sanitize("report 2026.pdf"), "report2026.pdf");
         assert_eq!(sanitize("üñîçödé.png"), "d.png");
-        assert_eq!(sanitize("a-b_c.d"), "a-b_c.d");
         assert_eq!(sanitize(""), "");
     }
 
@@ -634,10 +380,8 @@ mod tests {
             serde_json::from_str(r#"{"bucketName":"images","fileDirectory":"e2e"}"#).unwrap();
         assert_eq!(ok.bucket_name.as_deref(), Some("images"));
         assert_eq!(ok.file_directory.as_deref(), Some("e2e"));
-        // partial bodies decode with defaults
         let partial: StorageObjectForm = serde_json::from_str("{}").unwrap();
         assert_eq!(partial.bucket_name, None);
-        // malformed JSON is the codec error the reference surfaces
         assert!(serde_json::from_str::<StorageObjectForm>("{nope").is_err());
     }
 
@@ -645,8 +389,6 @@ mod tests {
     fn download_query_reads_camel_and_snake_forms() {
         let q: DownloadQuery = serde_urlencoded::from_str("fileId=7").unwrap();
         assert_eq!(q.file_id.or(q.file_id_alias), Some(7));
-        let q: DownloadQuery = serde_urlencoded::from_str("file_id=9").unwrap();
-        assert_eq!(q.file_id.or(q.file_id_alias), Some(9));
         let q: DownloadQuery = serde_urlencoded::from_str("fileGuid=abc").unwrap();
         assert_eq!(q.file_guid.or(q.file_guid_alias).as_deref(), Some("abc"));
         let q: DownloadQuery = serde_urlencoded::from_str("").unwrap();

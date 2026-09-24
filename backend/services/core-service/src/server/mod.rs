@@ -223,4 +223,14 @@ pub fn registry(state: Arc<AppState>) -> tonic::service::Routes {
             service::messaging::RecipientWriteServiceImpl { state: Arc::clone(&state) },
         ),
     )
+    .add_service(
+        proto::proto::authentication::service::v1::user_credential_service_server::UserCredentialServiceServer::new(
+            service::credential::UserCredentialServiceImpl { state: Arc::clone(&state) },
+        ),
+    )
+    .add_service(
+        proto::proto::permission::service::v1::policy_evaluation_log_service_server::PolicyEvaluationLogServiceServer::new(
+            service::policy_evaluation_log::PolicyEvaluationLogServiceImpl { state: Arc::clone(&state) },
+        ),
+    )
 }

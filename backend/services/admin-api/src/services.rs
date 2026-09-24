@@ -3,7 +3,7 @@
 
 pub mod admin_portal;
 pub mod authentication;
-pub mod file;
+pub mod behaviors;
 pub mod file_transfer;
 pub mod internal_message;
 pub mod proxies;

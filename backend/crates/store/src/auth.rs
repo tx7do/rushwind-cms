@@ -4,7 +4,7 @@
 //! codes), and the C-side register flow.
 
 use sea_orm::{
-    ActiveModelTrait, ColumnTrait, DatabaseConnection, EntityTrait, QueryFilter, Set,
+    ActiveModelTrait, ColumnTrait, DatabaseConnection, EntityTrait, QueryFilter, QuerySelect, Set,
     TransactionTrait,
 };
 
@@ -130,13 +130,18 @@ pub struct Authority {
 /// USER_NOT_FOUND / INVALID_PASSWORD anti-enumeration split.
 ///
 /// `identifier.0` is the identity type ("USERNAME" | "EMAIL"); tenant 0
-/// scans the platform row.
+/// scans the platform row. When no tenant was named (the C-side form
+/// carries none), a platform-scope miss falls back to one cross-tenant
+/// lookup: a globally unique identifier match proceeds with the
+/// credential's own tenant, ambiguity refuses without a code (the
+/// reference's FindUserCredentialAcrossTenants). Returns the verified
+/// user id and its resolved tenant.
 pub async fn verify_credential(
     db: &DatabaseConnection,
     tenant_id: i64,
     identifier: (&str, String),
     encrypted_password: &str,
-) -> Result<i64, rushwind_http_binding::envelope::StatusError> {
+) -> Result<(i64, i64), rushwind_http_binding::envelope::StatusError> {
     fn unauthorized(
         reason: &'static str,
         msg: &str,
@@ -149,30 +154,71 @@ pub async fn verify_credential(
         Err(_) => return Err(unauthorized("BAD_REQUEST", "invalid credential format")),
     };
 
-    let row = sys_user_credentials::Entity::find()
-        .filter(
-            sea_orm::Condition::all()
-                .add(sys_user_credentials::Column::TenantId.eq(tenant_id))
-                .add(sys_user_credentials::Column::IdentityType.eq(identifier.0))
-                .add(sys_user_credentials::Column::Identifier.eq(identifier.1.clone())),
-        )
+    let by_identifier = |tenant: Option<i64>| {
+        let mut cond = sea_orm::Condition::all()
+            .add(sys_user_credentials::Column::IdentityType.eq(identifier.0))
+            .add(sys_user_credentials::Column::Identifier.eq(identifier.1.clone()));
+        if let Some(t) = tenant {
+            cond = cond.add(sys_user_credentials::Column::TenantId.eq(t));
+        }
+        sys_user_credentials::Entity::find().filter(cond)
+    };
+
+    let row = by_identifier(Some(tenant_id))
         .one(db)
         .await
         .map_err(crate::db_err)?;
 
-    let Some(row) = row else {
-        crypto::dummy_verify();
-        return Err(unauthorized("USER_NOT_FOUND", "user not found"));
+    let row = match row {
+        Some(row) => row,
+        None if tenant_id == 0 => {
+            // The cross-tenant fallback: two valid rows mean the
+            // identifier is ambiguous without a tenant code — refuse
+            // without attempting any password.
+            let candidates: Vec<_> = by_identifier(None)
+                .limit(2)
+                .all(db)
+                .await
+                .map_err(crate::db_err)?
+                .into_iter()
+                .filter(|r| {
+                    r.status.as_deref() == Some("ENABLED")
+                        && r.credential_type.is_some()
+                        && r.credential.is_some()
+                        && r.user_id.unwrap_or(0) > 0
+                })
+                .collect();
+            if candidates.len() > 1 {
+                crypto::dummy_verify();
+                return Err(unauthorized(
+                    "USER_NOT_FOUND",
+                    "ambiguous identifier, tenant code required",
+                ));
+            }
+            match candidates.into_iter().next() {
+                Some(row) => row,
+                None => {
+                    crypto::dummy_verify();
+                    return Err(unauthorized("USER_NOT_FOUND", "user not found"));
+                }
+            }
+        }
+        None => {
+            crypto::dummy_verify();
+            return Err(unauthorized("USER_NOT_FOUND", "user not found"));
+        }
     };
+
     if row.status.as_deref() != Some("ENABLED") {
         crypto::dummy_verify();
         return Err(unauthorized("USER_NOT_FOUND", "user not found"));
     }
+    let tenant = row.tenant_id.unwrap_or(0);
     let stored = row.credential.unwrap_or_default();
     if !crypto::verify_password(&plain, &stored) {
         return Err(unauthorized("INVALID_PASSWORD", "incorrect password"));
     }
-    Ok(row.user_id.unwrap_or(0))
+    Ok((row.user_id.unwrap_or(0), tenant))
 }
 
 /// The credential query WITHOUT the AES layer (the register flow stores
@@ -330,7 +376,7 @@ pub async fn register_user(
     db: &DatabaseConnection,
     tenant_code: &str,
     username: &str,
-    encrypted_password: &str,
+    password: &str,
     email: Option<&str>,
 ) -> Result<i64, rushwind_http_binding::envelope::StatusError> {
     use rushwind_http_binding::envelope::StatusError;
@@ -346,8 +392,10 @@ pub async fn register_user(
         t.map(|t| t.id).unwrap_or(0)
     };
 
-    let plain = crypto::decrypt_login_credential(encrypted_password)
-        .map_err(|_| StatusError::new(400, "BAD_REQUEST", "invalid credential format"))?;
+    // The BFF layer delivers PLAINTEXT (it unwraps the front-end's
+    // AES(base64) — the reference's split: the credential path hashes
+    // before storing, and login decrypts the same way).
+    let plain = password.to_string();
 
     // Duplicate guard: the username must be free within the tenant.
     let dupe = sys_user_credentials::Entity::find()

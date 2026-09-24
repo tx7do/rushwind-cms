@@ -3,15 +3,21 @@
 
 use std::sync::Arc;
 
-use sea_orm::{ActiveModelTrait, ColumnTrait, EntityTrait, PaginatorTrait, QueryFilter, Set};
+use sea_orm::{
+    ActiveModelTrait, ColumnTrait, EntityTrait, PaginatorTrait, QueryFilter, Set, TransactionTrait,
+};
 use tonic::{Request, Response, Status};
 
-use crate::data::social_repo as repo;
-use crate::state::{bad, db_status, not_found, ts_to_proto, AppState};
-use store::entities::{comments, interaction_counters};
+use crate::data::{content_repo, social_repo as repo};
+use crate::state::{bad, db_status, forbidden, not_found, ts_to_proto, AppState};
+use store::entities::{
+    comment_likes, comments, interaction_counters, post_likes, post_watches, site_settings,
+};
 use store::paging::fetch_paged;
 
+use proto::proto::audit::service::v1 as auditv1;
 use proto::proto::comment::service::v1 as commentv1;
+use proto::proto::content::service::v1 as contentv1;
 use proto::proto::interaction::service::v1 as interactionv1;
 
 /// The operator user id off the gRPC metadata the BFF forwards
@@ -53,6 +59,17 @@ fn author_type_num(name: &str) -> Option<i32> {
     })
 }
 
+fn author_type_name(v: i32) -> Option<String> {
+    Some(
+        match v {
+            1 => "USER",
+            2 => "GUEST",
+            _ => return None,
+        }
+        .to_string(),
+    )
+}
+
 fn comment_status_num(name: &str) -> Option<i32> {
     Some(match name {
         "PENDING" => 1,
@@ -61,6 +78,54 @@ fn comment_status_num(name: &str) -> Option<i32> {
         "SPAM" => 4,
         _ => return None,
     })
+}
+
+fn comment_status_name(v: i32) -> Option<String> {
+    Some(
+        match v {
+            1 => "PENDING",
+            2 => "APPROVED",
+            3 => "REJECTED",
+            4 => "SPAM",
+            _ => return None,
+        }
+        .to_string(),
+    )
+}
+
+/// The trusted inner tenant stamp: the anonymous chain's explicit
+/// `x-md-global-tenant-id` (the reference's metadata channel) wins,
+/// else the operator bag's `x-tenant-id`.
+fn request_tenant_of<T>(request: &tonic::Request<T>) -> i64 {
+    for name in ["x-md-global-tenant-id", "x-tenant-id"] {
+        if let Some(v) = request.metadata().get(name).and_then(|v| v.to_str().ok()) {
+            if let Ok(n) = v.parse::<i64>() {
+                if n >= 0 {
+                    return n;
+                }
+            }
+        }
+    }
+    0
+}
+
+/// The site-settings boolean (the newest row for the key): missing row
+/// or unreadable store reads as enabled — the switch only turns things
+/// off explicitly (the reference's boolSetting).
+async fn bool_setting(db: &sea_orm::DatabaseConnection, key: &str) -> bool {
+    use sea_orm::QueryOrder as _;
+    match site_settings::Entity::find()
+        .filter(site_settings::Column::Key.eq(key))
+        .order_by_desc(site_settings::Column::CreatedAt)
+        .one(db)
+        .await
+    {
+        Ok(Some(s)) => s
+            .value
+            .map(|v| v.eq_ignore_ascii_case("true"))
+            .unwrap_or(true),
+        _ => true,
+    }
 }
 
 fn comment_proto(r: comments::Model) -> commentv1::Comment {
@@ -139,11 +204,27 @@ impl commentv1::comment_service_server::CommentService for CommentServiceImpl {
         &self,
         request: Request<commentv1::CreateCommentRequest>,
     ) -> Result<Response<commentv1::Comment>, Status> {
+        // The anonymous chain's tenant stamp rides the trusted inner
+        // metadata; logged-in calls carry it in the operator bag.
+        // Read before into_inner() consumes the request.
+        let tenant_id = request_tenant_of(&request);
         let req = request.into_inner();
         let Some(data) = req.data else {
             return Err(bad("data required"));
         };
+        // The site comment policy (site_settings, the reference's
+        // repo-level gate): enable_comments=false closes commenting for
+        // everyone; allow_guest_comments=false bars guests only.
+        if !bool_setting(&self.state.db, "enable_comments").await {
+            return Err(forbidden("comments are disabled"));
+        }
+        if data.author_type == Some(commentv1::comment::AuthorType::Guest as i32)
+            && !bool_setting(&self.state.db, "allow_guest_comments").await
+        {
+            return Err(forbidden("guest comments are disabled"));
+        }
         let row = comments::ActiveModel {
+            tenant_id: Set(Some(tenant_id)),
             content_type: Set(data.content_type.and_then(content_type_name)),
             object_id: Set(data.object_id.map(|v| v as i64)),
             content: Set(Some(data.content.unwrap_or_default())),
@@ -151,11 +232,17 @@ impl commentv1::comment_service_server::CommentService for CommentServiceImpl {
             author_name: Set(data.author_name),
             author_email: Set(data.author_email),
             author_url: Set(data.author_url),
-            status: Set(Some("PENDING".to_string())),
+            author_type: Set(data.author_type.and_then(author_type_name)),
+            status: Set(Some(
+                data.status
+                    .and_then(comment_status_name)
+                    .unwrap_or_else(|| "PENDING".to_string()),
+            )),
             ip_address: Set(data.ip_address),
             user_agent: Set(data.user_agent),
             reply_to_id: Set(data.reply_to_id.map(|v| v as i64)),
             parent_id: Set(data.parent_id.map(|v| v as i64)),
+            created_by: Set(data.created_by.map(|v| v as i64)),
             created_at: Set(Some(store::now())),
             updated_at: Set(Some(store::now())),
             ..Default::default()
@@ -439,6 +526,117 @@ impl interactionv1::interaction_service_server::InteractionService for Interacti
         }))
     }
 
+    async fn get_interaction_status(
+        &self,
+        request: Request<interactionv1::GetInteractionStatusRequest>,
+    ) -> Result<Response<interactionv1::GetInteractionStatusResponse>, Status> {
+        let user_id = operator_of(&request)?;
+        let req = request.into_inner();
+        // Every requested id answers (liked=false/watched=false unless a
+        // ledger row says otherwise).
+        let mut statuses: std::collections::HashMap<u32, interactionv1::InteractionStatus> = req
+            .target_ids
+            .iter()
+            .map(|&id| {
+                (
+                    id,
+                    interactionv1::InteractionStatus {
+                        liked: false,
+                        watched: false,
+                    },
+                )
+            })
+            .collect();
+        let ids: Vec<i64> = req.target_ids.iter().map(|&v| v as i64).collect();
+        match req.target_type {
+            1 => {
+                // post: liked off post_likes, watched off post_watches
+                let liked = post_likes::Entity::find()
+                    .filter(post_likes::Column::UserId.eq(user_id))
+                    .filter(post_likes::Column::PostId.is_in(ids.clone()))
+                    .all(&self.state.db)
+                    .await
+                    .map_err(db_status)?;
+                for row in liked {
+                    if let Some(pid) = row.post_id {
+                        if let Some(status) = statuses.get_mut(&(pid as u32)) {
+                            status.liked = true;
+                        }
+                    }
+                }
+                let watched = post_watches::Entity::find()
+                    .filter(post_watches::Column::UserId.eq(user_id))
+                    .filter(post_watches::Column::PostId.is_in(ids))
+                    .all(&self.state.db)
+                    .await
+                    .map_err(db_status)?;
+                for row in watched {
+                    if let Some(pid) = row.post_id {
+                        if let Some(status) = statuses.get_mut(&(pid as u32)) {
+                            status.watched = true;
+                        }
+                    }
+                }
+            }
+            2 => {
+                // comment: liked off comment_likes; watching is post-only
+                // so watched keeps its false init
+                let liked = comment_likes::Entity::find()
+                    .filter(comment_likes::Column::UserId.eq(user_id))
+                    .filter(comment_likes::Column::CommentId.is_in(ids))
+                    .all(&self.state.db)
+                    .await
+                    .map_err(db_status)?;
+                for row in liked {
+                    if let Some(cid) = row.comment_id {
+                        if let Some(status) = statuses.get_mut(&(cid as u32)) {
+                            status.liked = true;
+                        }
+                    }
+                }
+            }
+            _ => return Err(bad("invalid target type")),
+        }
+        Ok(Response::new(interactionv1::GetInteractionStatusResponse {
+            statuses,
+        }))
+    }
+
+    async fn list_watched_posts(
+        &self,
+        request: Request<proto::proto::pagination::PagingRequest>,
+    ) -> Result<Response<contentv1::ListPostResponse>, Status> {
+        let user_id = operator_of(&request)?;
+        let (rows, total) = fetch_paged(
+            &self.state.db,
+            post_watches::Entity::find().filter(post_watches::Column::UserId.eq(user_id)),
+            &request.into_inner(),
+        )
+        .await
+        .map_err(|e| Status::internal(e.message))?;
+        let mut items = Vec::with_capacity(rows.len());
+        for row in rows {
+            let Some(post_id) = row.post_id else { continue };
+            // A watched post that no longer resolves drops out of the
+            // page instead of failing it (the reference logs and skips).
+            let Ok(post) = content_repo::post_by_id(&self.state.db, post_id).await else {
+                continue;
+            };
+            let Ok((translations, category_ids, tag_ids)) =
+                content_repo::post_relations(&self.state.db, post_id).await
+            else {
+                continue;
+            };
+            items.push(crate::service::content::post_proto(
+                post,
+                translations,
+                category_ids,
+                tag_ids,
+            ));
+        }
+        Ok(Response::new(contentv1::ListPostResponse { items, total }))
+    }
+
     async fn get_counts(
         &self,
         request: Request<interactionv1::GetCountsRequest>,
@@ -461,6 +659,161 @@ impl interactionv1::interaction_service_server::InteractionService for Interacti
     }
 }
 
+// ── Interaction admin (the清算 face) ─────────────────────────────────
+
+/// The interaction_counters target_type column values (POST=1 /
+/// COMMENT=2, the proto's enum numbers).
+fn target_type_num(target_type: i32) -> Option<i16> {
+    match target_type {
+        1 => Some(1),
+        2 => Some(2),
+        _ => None,
+    }
+}
+
+/// The admin清算 gate (the reference's requireAdminOperator): the
+/// operator identity must ride the metadata (401 otherwise) and the
+/// operator must sit in the platform/system context — tenant 0 in the
+/// metadata bag (403 otherwise).
+fn require_admin_operator<T>(request: &Request<T>) -> Result<(i64, i64), Status> {
+    let user_id = operator_of(request)?;
+    let tenant_id = request
+        .metadata()
+        .get("x-tenant-id")
+        .and_then(|v| v.to_str().ok())
+        .and_then(|v| v.parse::<i64>().ok())
+        .unwrap_or(0);
+    if tenant_id != 0 {
+        return Err(forbidden("platform admin only"));
+    }
+    Ok((tenant_id, user_id))
+}
+
+/// The purge/reset audit row (the reference's writeAudit: one
+/// OperationAuditLog with the DELETE action; a failed audit write never
+/// fails the RPC).
+async fn write_purge_audit(
+    db: &sea_orm::DatabaseConnection,
+    operator_tenant_id: i64,
+    operator_user_id: i64,
+    resource_type: &str,
+    resource_id: &str,
+    success: bool,
+) {
+    let entry = auditv1::OperationAuditLog {
+        tenant_id: Some(operator_tenant_id as u32),
+        user_id: Some(operator_user_id as u32),
+        resource_type: Some(resource_type.to_string()),
+        resource_id: Some(resource_id.to_string()),
+        action: Some(auditv1::operation_audit_log::ActionType::Delete as i32),
+        success: Some(success),
+        ..Default::default()
+    };
+    let _ = crate::service::audit::insert_operation_audit(db, entry).await;
+}
+
+/// The target-wide ledger wipe + counter zero-out in one transaction
+/// (the reference's PurgeTargetInteractions repo tail).
+async fn purge_target_interactions_inner(
+    db: &sea_orm::DatabaseConnection,
+    target_type: i16,
+    target_id: i64,
+) -> Result<u32, Status> {
+    let txn = db.begin().await.map_err(db_status)?;
+    // The like ledgers follow the target family; the watches are
+    // post-only but deleted unconditionally like the reference.
+    let mut affected: u32 = match target_type {
+        1 => repo::delete_post_likes_of_post(&txn, target_id).await?,
+        _ => repo::delete_comment_likes_of_comment(&txn, target_id).await?,
+    } as u32;
+    affected += repo::delete_post_watches_of_post(&txn, target_id).await? as u32;
+    // The counters zero out to row deletion: LIKE always, WATCH for
+    // whatever row exists on this target.
+    interaction_counters::Entity::delete_many()
+        .filter(interaction_counters::Column::TargetType.eq(target_type))
+        .filter(interaction_counters::Column::TargetId.eq(target_id))
+        .filter(interaction_counters::Column::Metric.is_in([1i16, 2]))
+        .exec(&txn)
+        .await
+        .map_err(db_status)?;
+    txn.commit().await.map_err(db_status)?;
+    Ok(affected)
+}
+
+/// The user-wide ledger wipe (the reference's PurgeUserInteractions):
+/// every ledger row of the user goes and each removed row rolls its
+/// target's counter back one step, all inside one transaction (the
+/// reference splits it into 200-row short transactions; the port keeps
+/// the single-transaction semantics).
+async fn purge_user_interactions_inner(
+    db: &sea_orm::DatabaseConnection,
+    user_id: i64,
+) -> Result<u32, Status> {
+    let txn = db.begin().await.map_err(db_status)?;
+    let mut affected: u32 = 0;
+    // post likes (LIKE metric, target=post)
+    for post_id in repo::post_like_targets_of_user(&txn, user_id).await? {
+        repo::adjust_counter(&txn, 0, 1, post_id, 1, -1).await?;
+        affected += 1;
+    }
+    post_likes::Entity::delete_many()
+        .filter(post_likes::Column::UserId.eq(user_id))
+        .exec(&txn)
+        .await
+        .map_err(db_status)?;
+    // comment likes (LIKE metric, target=comment)
+    for comment_id in repo::comment_like_targets_of_user(&txn, user_id).await? {
+        repo::adjust_counter(&txn, 0, 2, comment_id, 1, -1).await?;
+        affected += 1;
+    }
+    comment_likes::Entity::delete_many()
+        .filter(comment_likes::Column::UserId.eq(user_id))
+        .exec(&txn)
+        .await
+        .map_err(db_status)?;
+    // post watches (WATCH metric, target=post)
+    for post_id in repo::post_watch_targets_of_user(&txn, user_id).await? {
+        repo::adjust_counter(&txn, 0, 1, post_id, 2, -1).await?;
+        affected += 1;
+    }
+    post_watches::Entity::delete_many()
+        .filter(post_watches::Column::UserId.eq(user_id))
+        .exec(&txn)
+        .await
+        .map_err(db_status)?;
+    txn.commit().await.map_err(db_status)?;
+    Ok(affected)
+}
+
+/// The counter recompute (the reference's ResetCounter): count the
+/// ledger truth for (target, metric), then push the counter row to it
+/// inside one transaction.
+async fn reset_counter_inner(
+    db: &sea_orm::DatabaseConnection,
+    target_type: i32,
+    target_id: i64,
+    metric: i32,
+) -> Result<i64, Status> {
+    // The ledger recount per metric family; WATCH counts the post
+    // watches whatever the target type rides in on (like the reference).
+    let recount: i64 = match (metric, target_type) {
+        (1, 1) => repo::count_ledger(db, 1, 1, target_id).await? as i64,
+        (1, 2) => repo::count_ledger(db, 1, 2, target_id).await? as i64,
+        (1, _) => return Err(bad("invalid target type")),
+        (2, _) => repo::count_ledger(db, 2, 1, target_id).await? as i64,
+        _ => return Err(bad("invalid metric")),
+    };
+    let row_type = target_type_num(target_type).unwrap_or(1);
+    let metric = metric_num(metric);
+    let txn = db.begin().await.map_err(db_status)?;
+    let delta = recount - repo::counter_of(&txn, row_type, target_id, metric).await?;
+    if delta != 0 {
+        repo::adjust_counter(&txn, 0, row_type, target_id, metric, delta).await?;
+    }
+    txn.commit().await.map_err(db_status)?;
+    Ok(recount)
+}
+
 pub struct InteractionAdminServiceImpl {
     pub state: Arc<AppState>,
 }
@@ -471,23 +824,78 @@ impl interactionv1::interaction_admin_service_server::InteractionAdminService
 {
     async fn purge_target_interactions(
         &self,
-        _request: Request<interactionv1::PurgeTargetInteractionsRequest>,
+        request: Request<interactionv1::PurgeTargetInteractionsRequest>,
     ) -> Result<Response<interactionv1::PurgeTargetInteractionsResponse>, Status> {
-        Err(Status::unimplemented("not implemented"))
+        let (op_tid, op_uid) = require_admin_operator(&request)?;
+        let req = request.into_inner();
+        let target_type =
+            target_type_num(req.target_type).ok_or_else(|| bad("invalid target type"))?;
+        let target_id = req.target_id as i64;
+
+        let outcome = purge_target_interactions_inner(&self.state.db, target_type, target_id).await;
+        write_purge_audit(
+            &self.state.db,
+            op_tid,
+            op_uid,
+            "interaction_counter",
+            &target_id.to_string(),
+            outcome.is_ok(),
+        )
+        .await;
+        Ok(Response::new(
+            interactionv1::PurgeTargetInteractionsResponse {
+                affected_rows: outcome?,
+            },
+        ))
     }
 
     async fn purge_user_interactions(
         &self,
-        _request: Request<interactionv1::PurgeUserInteractionsRequest>,
+        request: Request<interactionv1::PurgeUserInteractionsRequest>,
     ) -> Result<Response<interactionv1::PurgeUserInteractionsResponse>, Status> {
-        Err(Status::unimplemented("not implemented"))
+        let (op_tid, op_uid) = require_admin_operator(&request)?;
+        let req = request.into_inner();
+        let user_id = req.user_id as i64;
+
+        let outcome = purge_user_interactions_inner(&self.state.db, user_id).await;
+        write_purge_audit(
+            &self.state.db,
+            op_tid,
+            op_uid,
+            "interaction_user_ledger",
+            &user_id.to_string(),
+            outcome.is_ok(),
+        )
+        .await;
+        Ok(Response::new(
+            interactionv1::PurgeUserInteractionsResponse {
+                affected_rows: outcome?,
+            },
+        ))
     }
 
     async fn reset_counter(
         &self,
-        _request: Request<interactionv1::ResetCounterRequest>,
+        request: Request<interactionv1::ResetCounterRequest>,
     ) -> Result<Response<interactionv1::ResetCounterResponse>, Status> {
-        Err(Status::unimplemented("not implemented"))
+        let (op_tid, op_uid) = require_admin_operator(&request)?;
+        let req = request.into_inner();
+        let target_id = req.target_id as i64;
+
+        let outcome =
+            reset_counter_inner(&self.state.db, req.target_type, target_id, req.metric).await;
+        write_purge_audit(
+            &self.state.db,
+            op_tid,
+            op_uid,
+            "interaction_counter_reset",
+            &target_id.to_string(),
+            outcome.is_ok(),
+        )
+        .await;
+        Ok(Response::new(interactionv1::ResetCounterResponse {
+            recount: outcome?,
+        }))
     }
 }
 
@@ -504,5 +912,116 @@ impl InteractionAdminServiceImpl {
             request,
         )
         .await
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// A request carrying the given metadata headers.
+    fn req_with(headers: &[(&'static str, &'static str)]) -> tonic::Request<()> {
+        let mut request = tonic::Request::new(());
+        for (name, value) in headers {
+            request.metadata_mut().insert(*name, value.parse().unwrap());
+        }
+        request
+    }
+
+    // ── request_tenant_of ───────────────────────────────────────────
+
+    #[test]
+    fn tenant_global_header_wins_over_operator_bag() {
+        let request = req_with(&[("x-md-global-tenant-id", "5"), ("x-tenant-id", "7")]);
+        assert_eq!(request_tenant_of(&request), 5);
+    }
+
+    #[test]
+    fn tenant_falls_back_to_the_operator_bag_header() {
+        let request = req_with(&[("x-tenant-id", "7")]);
+        assert_eq!(request_tenant_of(&request), 7);
+    }
+
+    #[test]
+    fn tenant_invalid_or_negative_global_falls_through() {
+        // Non-numeric global → the bag header answers.
+        let request = req_with(&[("x-md-global-tenant-id", "abc"), ("x-tenant-id", "7")]);
+        assert_eq!(request_tenant_of(&request), 7);
+
+        // Negative global is rejected (n >= 0 gate) → the bag header.
+        let request = req_with(&[("x-md-global-tenant-id", "-3"), ("x-tenant-id", "7")]);
+        assert_eq!(request_tenant_of(&request), 7);
+
+        // Negative everywhere → 0.
+        let request = req_with(&[("x-md-global-tenant-id", "-3"), ("x-tenant-id", "-1")]);
+        assert_eq!(request_tenant_of(&request), 0);
+
+        // Non-numeric everywhere → 0.
+        let request = req_with(&[
+            ("x-md-global-tenant-id", "abc"),
+            ("x-tenant-id", "not-a-number"),
+        ]);
+        assert_eq!(request_tenant_of(&request), 0);
+    }
+
+    #[test]
+    fn tenant_missing_headers_and_explicit_zero_read_zero() {
+        assert_eq!(request_tenant_of(&req_with(&[])), 0);
+        assert_eq!(request_tenant_of(&req_with(&[("x-tenant-id", "abc")])), 0);
+        // Zero is a legal tenant value (the platform scope).
+        assert_eq!(
+            request_tenant_of(&req_with(&[("x-md-global-tenant-id", "0")])),
+            0
+        );
+        assert_eq!(request_tenant_of(&req_with(&[("x-tenant-id", "0")])), 0);
+    }
+
+    // ── enum converters ─────────────────────────────────────────────
+
+    #[test]
+    fn content_type_round_trips_and_rejects_unknowns() {
+        for (name, num) in [("POST", 1), ("PAGE", 2)] {
+            assert_eq!(content_type_num(name), Some(num), "{name}");
+            assert_eq!(content_type_name(num).as_deref(), Some(name), "{num}");
+        }
+        for name in ["COMMENT", "MEDIA", ""] {
+            assert_eq!(content_type_num(name), None, "{name}");
+        }
+        for num in [0, 3, -1, 100] {
+            assert_eq!(content_type_name(num), None, "{num}");
+        }
+    }
+
+    #[test]
+    fn author_type_round_trips_and_rejects_unknowns() {
+        for (name, num) in [("USER", 1), ("GUEST", 2)] {
+            assert_eq!(author_type_num(name), Some(num), "{name}");
+            assert_eq!(author_type_name(num).as_deref(), Some(name), "{num}");
+        }
+        for name in ["ADMIN", "SYSTEM", ""] {
+            assert_eq!(author_type_num(name), None, "{name}");
+        }
+        for num in [0, 3, -1, 100] {
+            assert_eq!(author_type_name(num), None, "{num}");
+        }
+    }
+
+    #[test]
+    fn comment_status_round_trips_and_rejects_unknowns() {
+        for (name, num) in [
+            ("PENDING", 1),
+            ("APPROVED", 2),
+            ("REJECTED", 3),
+            ("SPAM", 4),
+        ] {
+            assert_eq!(comment_status_num(name), Some(num), "{name}");
+            assert_eq!(comment_status_name(num).as_deref(), Some(name), "{num}");
+        }
+        for name in ["TRASHED", "approved", ""] {
+            assert_eq!(comment_status_num(name), None, "{name}");
+        }
+        for num in [0, 5, -1, 100] {
+            assert_eq!(comment_status_name(num), None, "{num}");
+        }
     }
 }
