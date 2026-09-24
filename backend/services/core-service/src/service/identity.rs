@@ -6,6 +6,7 @@ use std::sync::Arc;
 use sea_orm::{ColumnTrait, EntityTrait, PaginatorTrait, QueryFilter};
 use tonic::{Request, Response, Status};
 
+use crate::data::identity_repo as repo;
 use crate::state::{bad, db_status, not_found, ts_to_proto, AppState};
 use store::entities::{sys_roles, sys_tenants, sys_users};
 use store::paging::fetch_paged;
@@ -147,11 +148,7 @@ impl permissionv1::role_service_server::RoleService for RoleServiceImpl {
         let Some(permissionv1::get_role_request::QueryBy::Id(id)) = req.query_by else {
             return Err(bad("query_by required"));
         };
-        let row = sys_roles::Entity::find_by_id(id as i64)
-            .one(&self.state.db)
-            .await
-            .map_err(db_status)?
-            .ok_or_else(|| not_found("role"))?;
+        let row = repo::roles_by_id(&self.state.db, id as i64).await?;
         Ok(Response::new(role_proto(row)))
     }
 }

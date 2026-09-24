@@ -6,6 +6,7 @@ use std::sync::Arc;
 use sea_orm::{ActiveModelTrait, ColumnTrait, EntityTrait, PaginatorTrait, QueryFilter, Set};
 use tonic::{Request, Response, Status};
 
+use crate::data::social_repo as repo;
 use crate::state::{bad, db_status, not_found, ts_to_proto, AppState};
 use store::entities::{comments, interaction_counters};
 use store::paging::fetch_paged;
@@ -130,11 +131,7 @@ impl commentv1::comment_service_server::CommentService for CommentServiceImpl {
     ) -> Result<Response<commentv1::Comment>, Status> {
         let req = request.into_inner();
         let id = req.id;
-        let row = comments::Entity::find_by_id(id as i64)
-            .one(&self.state.db)
-            .await
-            .map_err(db_status)?
-            .ok_or_else(|| not_found("comment"))?;
+        let row = repo::comments_by_id(&self.state.db, id as i64).await?;
         Ok(Response::new(comment_proto(row)))
     }
 
@@ -201,10 +198,7 @@ impl commentv1::comment_service_server::CommentService for CommentServiceImpl {
         let Some(commentv1::delete_comment_request::QueryBy::Id(id)) = req.query_by else {
             return Err(bad("query_by required"));
         };
-        comments::Entity::delete_by_id(id as i64)
-            .exec(&self.state.db)
-            .await
-            .map_err(db_status)?;
+        repo::delete_comments(&self.state.db, id as i64).await?;
         Ok(Response::new(pbjson_types::Empty {}))
     }
 }

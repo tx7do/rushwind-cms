@@ -8,6 +8,7 @@ use std::sync::Arc;
 use sea_orm::{ActiveModelTrait, ColumnTrait, EntityTrait, QueryFilter, Set, TransactionTrait};
 use tonic::{Request, Response, Status};
 
+use crate::data::identity_repo as repo;
 use crate::state::{bad, db_status, not_found, ts_to_proto, AppState};
 use store::entities::{
     sys_role_permissions, sys_roles, sys_tenants, sys_user_credentials, sys_user_roles, sys_users,
@@ -96,11 +97,7 @@ impl identityv1::user_service_server::UserService for UserWriteServiceImpl {
         let Some(identityv1::get_user_request::QueryBy::Id(id)) = req.query_by else {
             return Err(bad("query_by required"));
         };
-        let row = sys_users::Entity::find_by_id(id as i64)
-            .one(&self.state.db)
-            .await
-            .map_err(db_status)?
-            .ok_or_else(|| not_found("user"))?;
+        let row = repo::users_by_id(&self.state.db, id as i64).await?;
         Ok(Response::new(user_proto(row)))
     }
 
@@ -234,10 +231,7 @@ impl identityv1::user_service_server::UserService for UserWriteServiceImpl {
         let Some(identityv1::delete_user_request::QueryBy::Id(id)) = req.query_by else {
             return Err(bad("query_by required"));
         };
-        sys_users::Entity::delete_by_id(id as i64)
-            .exec(&self.state.db)
-            .await
-            .map_err(db_status)?;
+        repo::delete_users(&self.state.db, id as i64).await?;
         sys_user_credentials::Entity::delete_many()
             .filter(sys_user_credentials::Column::UserId.eq(id as i64))
             .exec(&self.state.db)
@@ -300,11 +294,7 @@ impl identityv1::user_profile_service_server::UserProfileService for UserProfile
         request: Request<pbjson_types::Empty>,
     ) -> Result<Response<identityv1::User>, Status> {
         let uid = operator_user_id(&request)?;
-        let row = sys_users::Entity::find_by_id(uid)
-            .one(&self.state.db)
-            .await
-            .map_err(db_status)?
-            .ok_or_else(|| not_found("user"))?;
+        let row = repo::users_by_id(&self.state.db, uid).await?;
         Ok(Response::new(user_proto(row)))
     }
 
@@ -373,11 +363,7 @@ impl permissionv1::role_service_server::RoleService for RoleWriteServiceImpl {
         let Some(permissionv1::get_role_request::QueryBy::Id(id)) = req.query_by else {
             return Err(bad("query_by required"));
         };
-        let row = sys_roles::Entity::find_by_id(id as i64)
-            .one(&self.state.db)
-            .await
-            .map_err(db_status)?
-            .ok_or_else(|| not_found("role"))?;
+        let row = repo::roles_by_id(&self.state.db, id as i64).await?;
         Ok(Response::new(role_proto(row)))
     }
 
@@ -458,10 +444,7 @@ impl permissionv1::role_service_server::RoleService for RoleWriteServiceImpl {
         let Some(permissionv1::delete_role_request::QueryBy::Id(id)) = req.query_by else {
             return Err(bad("query_by required"));
         };
-        sys_roles::Entity::delete_by_id(id as i64)
-            .exec(&self.state.db)
-            .await
-            .map_err(db_status)?;
+        repo::delete_roles(&self.state.db, id as i64).await?;
         sys_role_permissions::Entity::delete_many()
             .filter(sys_role_permissions::Column::RoleId.eq(id as i64))
             .exec(&self.state.db)
@@ -630,10 +613,7 @@ impl identityv1::tenant_service_server::TenantService for TenantWriteServiceImpl
         let Some(identityv1::delete_tenant_request::QueryBy::Id(id)) = req.query_by else {
             return Err(bad("query_by required"));
         };
-        sys_tenants::Entity::delete_by_id(id as i64)
-            .exec(&self.state.db)
-            .await
-            .map_err(db_status)?;
+        repo::delete_tenants(&self.state.db, id as i64).await?;
         Ok(Response::new(pbjson_types::Empty {}))
     }
 

@@ -7,6 +7,7 @@ use std::sync::Arc;
 use sea_orm::{EntityTrait, PaginatorTrait};
 use tonic::{Request, Response, Status};
 
+use crate::data::misc_repo as repo;
 use crate::state::{bad, db_status, not_found, ts_to_proto, AppState};
 use store::entities::{
     content_models, internal_message_categories, internal_message_recipients, internal_messages,
@@ -84,11 +85,7 @@ impl identityv1::org_unit_service_server::OrgUnitService for OrgUnitServiceImpl 
         let Some(identityv1::get_org_unit_request::QueryBy::Id(id)) = req.query_by else {
             return Err(bad("query_by required"));
         };
-        let row = sys_org_units::Entity::find_by_id(id as i64)
-            .one(&self.state.db)
-            .await
-            .map_err(db_status)?
-            .ok_or_else(|| not_found("org unit"))?;
+        let row = repo::org_units_by_id(&self.state.db, id as i64).await?;
         Ok(Response::new(org_unit_proto(row)))
     }
 }
@@ -158,11 +155,7 @@ impl identityv1::position_service_server::PositionService for PositionServiceImp
         let Some(identityv1::get_position_request::QueryBy::Id(id)) = req.query_by else {
             return Err(bad("query_by required"));
         };
-        let row = sys_positions::Entity::find_by_id(id as i64)
-            .one(&self.state.db)
-            .await
-            .map_err(db_status)?
-            .ok_or_else(|| not_found("position"))?;
+        let row = repo::positions_by_id(&self.state.db, id as i64).await?;
         Ok(Response::new(position_proto(row)))
     }
 }
@@ -214,11 +207,7 @@ impl authv1::login_policy_service_server::LoginPolicyService for LoginPolicyServ
         let Some(authv1::get_login_policy_request::QueryBy::Id(id)) = req.query_by else {
             return Err(bad("query_by required"));
         };
-        let row = sys_login_policies::Entity::find_by_id(id as i64)
-            .one(&self.state.db)
-            .await
-            .map_err(db_status)?
-            .ok_or_else(|| not_found("login policy"))?;
+        let row = repo::login_policies_by_id(&self.state.db, id as i64).await?;
         Ok(Response::new(login_policy_proto(row)))
     }
 }
@@ -269,11 +258,7 @@ impl contentv1::content_model_service_server::ContentModelService for ContentMod
         let Some(contentv1::get_content_model_request::QueryBy::Id(id)) = req.query_by else {
             return Err(bad("query_by required"));
         };
-        let row = content_models::Entity::find_by_id(id as i64)
-            .one(&self.state.db)
-            .await
-            .map_err(db_status)?
-            .ok_or_else(|| not_found("content model"))?;
+        let row = repo::content_models_by_id(&self.state.db, id as i64).await?;
         Ok(Response::new(content_model_proto(row)))
     }
 }
@@ -336,11 +321,7 @@ impl mediav1::media_asset_service_server::MediaAssetService for MediaAssetServic
     ) -> Result<Response<mediav1::MediaAsset>, Status> {
         let req = request.into_inner();
         let id = req.id;
-        let row = media_assets::Entity::find_by_id(id as i64)
-            .one(&self.state.db)
-            .await
-            .map_err(db_status)?
-            .ok_or_else(|| not_found("media asset"))?;
+        let row = repo::media_assets_by_id(&self.state.db, id as i64).await?;
         Ok(Response::new(media_asset_proto(row)))
     }
 }

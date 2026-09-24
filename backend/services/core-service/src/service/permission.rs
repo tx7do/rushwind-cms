@@ -8,6 +8,7 @@ use std::sync::Arc;
 use sea_orm::{ActiveModelTrait, ColumnTrait, EntityTrait, PaginatorTrait, QueryFilter, Set};
 use tonic::{Request, Response, Status};
 
+use crate::data::permission_repo as repo;
 use crate::state::{bad, db_status, not_found, ts_to_proto, AppState};
 use store::entities::{sys_apis, sys_menus, sys_permission_groups, sys_permissions};
 use store::paging::fetch_paged;
@@ -123,11 +124,7 @@ impl permissionv1::menu_service_server::MenuService for MenuServiceImpl {
         let Some(permissionv1::get_menu_request::QueryBy::Id(id)) = req.query_by else {
             return Err(bad("query_by required"));
         };
-        let row = sys_menus::Entity::find_by_id(id as i64)
-            .one(&self.state.db)
-            .await
-            .map_err(db_status)?
-            .ok_or_else(|| not_found("menu"))?;
+        let row = repo::menus_by_id(&self.state.db, id as i64).await?;
         let children = sys_menus::Entity::find()
             .filter(sys_menus::Column::ParentId.eq(row.id))
             .all(&self.state.db)
@@ -206,10 +203,7 @@ impl permissionv1::menu_service_server::MenuService for MenuServiceImpl {
         let Some(permissionv1::delete_menu_request::QueryBy::Id(id)) = req.query_by else {
             return Err(bad("query_by required"));
         };
-        sys_menus::Entity::delete_by_id(id as i64)
-            .exec(&self.state.db)
-            .await
-            .map_err(db_status)?;
+        repo::delete_menus(&self.state.db, id as i64).await?;
         Ok(Response::new(pbjson_types::Empty {}))
     }
 }
@@ -277,11 +271,7 @@ impl permissionv1::api_service_server::ApiService for ApiServiceImpl {
         let Some(permissionv1::get_api_request::QueryBy::Id(id)) = req.query_by else {
             return Err(bad("query_by required"));
         };
-        let row = sys_apis::Entity::find_by_id(id as i64)
-            .one(&self.state.db)
-            .await
-            .map_err(db_status)?
-            .ok_or_else(|| not_found("api"))?;
+        let row = repo::apis_by_id(&self.state.db, id as i64).await?;
         Ok(Response::new(api_proto(row)))
     }
 
@@ -344,10 +334,7 @@ impl permissionv1::api_service_server::ApiService for ApiServiceImpl {
         let Some(permissionv1::delete_api_request::QueryBy::Id(id)) = req.query_by else {
             return Err(bad("query_by required"));
         };
-        sys_apis::Entity::delete_by_id(id as i64)
-            .exec(&self.state.db)
-            .await
-            .map_err(db_status)?;
+        repo::delete_apis(&self.state.db, id as i64).await?;
         Ok(Response::new(pbjson_types::Empty {}))
     }
 }
@@ -416,11 +403,7 @@ impl permissionv1::permission_group_service_server::PermissionGroupService
         let Some(permissionv1::get_permission_group_request::QueryBy::Id(id)) = req.query_by else {
             return Err(bad("query_by required"));
         };
-        let row = sys_permission_groups::Entity::find_by_id(id as i64)
-            .one(&self.state.db)
-            .await
-            .map_err(db_status)?
-            .ok_or_else(|| not_found("permission group"))?;
+        let row = repo::permission_groups_by_id(&self.state.db, id as i64).await?;
         Ok(Response::new(group_proto(row)))
     }
 
@@ -487,10 +470,7 @@ impl permissionv1::permission_group_service_server::PermissionGroupService
         else {
             return Err(bad("query_by required"));
         };
-        sys_permission_groups::Entity::delete_by_id(id as i64)
-            .exec(&self.state.db)
-            .await
-            .map_err(db_status)?;
+        repo::delete_permission_groups(&self.state.db, id as i64).await?;
         Ok(Response::new(pbjson_types::Empty {}))
     }
 }
@@ -555,11 +535,7 @@ impl permissionv1::permission_service_server::PermissionService for PermissionSe
         let Some(permissionv1::get_permission_request::QueryBy::Id(id)) = req.query_by else {
             return Err(bad("query_by required"));
         };
-        let row = sys_permissions::Entity::find_by_id(id as i64)
-            .one(&self.state.db)
-            .await
-            .map_err(db_status)?
-            .ok_or_else(|| not_found("permission"))?;
+        let row = repo::permissions_by_id(&self.state.db, id as i64).await?;
         Ok(Response::new(permission_proto(row)))
     }
 
@@ -619,10 +595,7 @@ impl permissionv1::permission_service_server::PermissionService for PermissionSe
         let req = request.into_inner();
         match req.query_by {
             Some(permissionv1::delete_permission_request::QueryBy::Id(id)) => {
-                sys_permissions::Entity::delete_by_id(id as i64)
-                    .exec(&self.state.db)
-                    .await
-                    .map_err(db_status)?;
+                repo::delete_permissions(&self.state.db, id as i64).await?;
             }
             Some(permissionv1::delete_permission_request::QueryBy::GroupId(gid)) => {
                 sys_permissions::Entity::delete_many()

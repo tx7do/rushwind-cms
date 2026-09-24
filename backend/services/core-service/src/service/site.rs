@@ -6,6 +6,7 @@ use std::sync::Arc;
 use sea_orm::{ActiveModelTrait, ColumnTrait, EntityTrait, QueryFilter, Set};
 use tonic::{Request, Response, Status};
 
+use crate::data::site_repo as repo;
 use crate::state::{bad, db_status, not_found, ts_to_proto, AppState};
 use store::entities::{navigation_items, navigations, site_settings, sites};
 use store::paging::fetch_paged;
@@ -109,11 +110,7 @@ impl sitev1::site_service_server::SiteService for SiteServiceImpl {
     ) -> Result<Response<sitev1::Site>, Status> {
         let req = request.into_inner();
         let id = req.id;
-        let row = sites::Entity::find_by_id(id as i64)
-            .one(&self.state.db)
-            .await
-            .map_err(db_status)?
-            .ok_or_else(|| not_found("site"))?;
+        let row = repo::sites_by_id(&self.state.db, id as i64).await?;
         Ok(Response::new(site_proto(row)))
     }
 
@@ -210,10 +207,7 @@ impl sitev1::site_service_server::SiteService for SiteServiceImpl {
         let Some(sitev1::delete_site_request::QueryBy::Id(id)) = req.query_by else {
             return Err(bad("query_by required"));
         };
-        sites::Entity::delete_by_id(id as i64)
-            .exec(&self.state.db)
-            .await
-            .map_err(db_status)?;
+        repo::delete_sites(&self.state.db, id as i64).await?;
         Ok(Response::new(pbjson_types::Empty {}))
     }
 }
@@ -272,11 +266,7 @@ impl sitev1::site_setting_service_server::SiteSettingService for SiteSettingServ
     ) -> Result<Response<sitev1::SiteSetting>, Status> {
         let req = request.into_inner();
         let id = req.id;
-        let row = site_settings::Entity::find_by_id(id as i64)
-            .one(&self.state.db)
-            .await
-            .map_err(db_status)?
-            .ok_or_else(|| not_found("site setting"))?;
+        let row = repo::site_settings_by_id(&self.state.db, id as i64).await?;
         Ok(Response::new(site_setting_proto(row)))
     }
 
@@ -343,10 +333,7 @@ impl sitev1::site_setting_service_server::SiteSettingService for SiteSettingServ
         let Some(sitev1::delete_site_setting_request::QueryBy::Id(id)) = req.query_by else {
             return Err(bad("query_by required"));
         };
-        site_settings::Entity::delete_by_id(id as i64)
-            .exec(&self.state.db)
-            .await
-            .map_err(db_status)?;
+        repo::delete_site_settings(&self.state.db, id as i64).await?;
         Ok(Response::new(pbjson_types::Empty {}))
     }
 }
@@ -437,11 +424,7 @@ impl sitev1::navigation_service_server::NavigationService for NavigationServiceI
         let Some(sitev1::get_navigation_request::QueryBy::Id(id)) = req.query_by else {
             return Err(bad("query_by required"));
         };
-        let row = navigations::Entity::find_by_id(id as i64)
-            .one(&self.state.db)
-            .await
-            .map_err(db_status)?
-            .ok_or_else(|| not_found("navigation"))?;
+        let row = repo::navigations_by_id(&self.state.db, id as i64).await?;
         let children = navigation_items_of(&self.state.db, row.id).await?;
         Ok(Response::new(navigation_proto(row, children)))
     }
@@ -522,10 +505,7 @@ impl sitev1::navigation_service_server::NavigationService for NavigationServiceI
         let Some(sitev1::delete_navigation_request::QueryBy::Id(id)) = req.query_by else {
             return Err(bad("query_by required"));
         };
-        navigations::Entity::delete_by_id(id as i64)
-            .exec(&self.state.db)
-            .await
-            .map_err(db_status)?;
+        repo::delete_navigations(&self.state.db, id as i64).await?;
         Ok(Response::new(pbjson_types::Empty {}))
     }
 }
@@ -563,11 +543,7 @@ impl sitev1::navigation_item_service_server::NavigationItemService for Navigatio
         let Some(sitev1::get_navigation_item_request::QueryBy::Id(id)) = req.query_by else {
             return Err(bad("query_by required"));
         };
-        let row = navigation_items::Entity::find_by_id(id as i64)
-            .one(&self.state.db)
-            .await
-            .map_err(db_status)?
-            .ok_or_else(|| not_found("navigation item"))?;
+        let row = repo::navigation_items_by_id(&self.state.db, id as i64).await?;
         Ok(Response::new(navigation_item_proto(row)))
     }
 
@@ -633,10 +609,7 @@ impl sitev1::navigation_item_service_server::NavigationItemService for Navigatio
         let Some(sitev1::delete_navigation_item_request::QueryBy::Id(id)) = req.query_by else {
             return Err(bad("query_by required"));
         };
-        navigation_items::Entity::delete_by_id(id as i64)
-            .exec(&self.state.db)
-            .await
-            .map_err(db_status)?;
+        repo::delete_navigation_items(&self.state.db, id as i64).await?;
         Ok(Response::new(pbjson_types::Empty {}))
     }
 }

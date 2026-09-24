@@ -6,6 +6,7 @@ use std::sync::Arc;
 use sea_orm::{ActiveModelTrait, ColumnTrait, EntityTrait, PaginatorTrait, QueryFilter, Set};
 use tonic::{Request, Response, Status};
 
+use crate::data::dict_repo as repo;
 use crate::state::{bad, db_status, not_found, AppState};
 use store::entities::{sys_dict_entries, sys_dict_types, sys_languages};
 use store::paging::fetch_paged;
@@ -189,10 +190,7 @@ impl proto::proto::dict::service::v1::language_service_server::LanguageService
             return Err(bad("query_by required"));
         };
         let id = id as i64;
-        sys_languages::Entity::delete_by_id(id)
-            .exec(&self.state.db)
-            .await
-            .map_err(db_status)?;
+        repo::delete_languages(&self.state.db, id).await?;
         Ok(Response::new(pbjson_types::Empty {}))
     }
 }

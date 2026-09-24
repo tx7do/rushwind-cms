@@ -8,7 +8,8 @@ use std::sync::Arc;
 use sea_orm::{ActiveModelTrait, ColumnTrait, EntityTrait, QueryFilter, Set};
 use tonic::{Request, Response, Status};
 
-use crate::state::{bad, db_status, not_found, ts_to_proto, AppState};
+use crate::data::storage_repo as repo;
+use crate::state::{bad, db_status, ts_to_proto, AppState};
 use store::entities::{files, sys_apis};
 use store::paging::fetch_paged;
 
@@ -137,11 +138,7 @@ impl FileServiceImpl {
 
     /// Reads an object back (the download bridge).
     pub async fn get_object(&self, file_id: i64) -> Result<(files::Model, Vec<u8>), Status> {
-        let row = files::Entity::find_by_id(file_id)
-            .one(&self.state.db)
-            .await
-            .map_err(db_status)?
-            .ok_or_else(|| not_found("file"))?;
+        let row = repo::files_by_id(&self.state.db, file_id).await?;
         let p = std::path::Path::new(&row.file_directory.clone().unwrap_or_default())
             .join(row.save_file_name.clone().unwrap_or_default());
         let bytes = tokio::fs::read(p)
@@ -176,11 +173,7 @@ impl storagev1::file_service_server::FileService for FileServiceImpl {
             Some(storagev1::get_file_request::QueryBy::Id(id)) => id as i64,
             _ => return Err(bad("query_by required")),
         };
-        let row = files::Entity::find_by_id(id)
-            .one(&self.state.db)
-            .await
-            .map_err(db_status)?
-            .ok_or_else(|| not_found("file"))?;
+        let row = repo::files_by_id(&self.state.db, id).await?;
         Ok(Response::new(file_proto(row)))
     }
 
@@ -202,10 +195,7 @@ impl storagev1::file_service_server::FileService for FileServiceImpl {
                 .join(row.save_file_name.clone().unwrap_or_default());
             let _ = tokio::fs::remove_file(p).await;
         }
-        files::Entity::delete_by_id(id)
-            .exec(&self.state.db)
-            .await
-            .map_err(db_status)?;
+        repo::delete_files(&self.state.db, id).await?;
         Ok(Response::new(pbjson_types::Empty {}))
     }
 }

@@ -7,6 +7,7 @@ use std::sync::Arc;
 use sea_orm::{ActiveModelTrait, ColumnTrait, EntityTrait, QueryFilter, Set};
 use tonic::{Request, Response, Status};
 
+use crate::data::messaging_repo as repo;
 use crate::state::{bad, db_status, not_found, ts_to_proto, AppState};
 use store::entities::{internal_message_recipients, internal_messages, sys_tasks};
 use store::paging::fetch_paged;
@@ -94,11 +95,7 @@ impl imv1::internal_message_service_server::InternalMessageService
         let Some(imv1::get_internal_message_request::QueryBy::Id(id)) = req.query_by else {
             return Err(bad("query_by required"));
         };
-        let row = internal_messages::Entity::find_by_id(id as i64)
-            .one(&self.state.db)
-            .await
-            .map_err(db_status)?
-            .ok_or_else(|| not_found("message"))?;
+        let row = repo::internal_messages_by_id(&self.state.db, id as i64).await?;
         Ok(Response::new(message_proto(row)))
     }
 
@@ -240,11 +237,7 @@ impl imv1::internal_message_recipient_service_server::InternalMessageRecipientSe
         else {
             return Err(bad("query_by required"));
         };
-        let row = internal_message_recipients::Entity::find_by_id(id as i64)
-            .one(&self.state.db)
-            .await
-            .map_err(db_status)?
-            .ok_or_else(|| not_found("recipient"))?;
+        let row = repo::internal_message_recipients_by_id(&self.state.db, id as i64).await?;
         Ok(Response::new(recipient_proto(row)))
     }
 

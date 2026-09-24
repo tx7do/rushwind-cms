@@ -5,4 +5,12 @@
 //! spans tables or needs raw SQL.
 
 pub mod content_repo;
+pub mod dict_repo;
 pub mod helpers;
+pub mod identity_repo;
+pub mod messaging_repo;
+pub mod misc_repo;
+pub mod permission_repo;
+pub mod site_repo;
+pub mod social_repo;
+pub mod storage_repo;
