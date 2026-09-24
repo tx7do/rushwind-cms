@@ -64,15 +64,28 @@ fn claims_of(req: &Request) -> Option<serde_json::Map<String, serde_json::Value>
         .map(|c| c.0.clone())
 }
 
+/// The `storageObject` form field's shape — the placement pair the
+/// reference parses into its StorageObject message and forwards to the
+/// upload (ours rides the streaming call's metadata).
+#[derive(Default, serde::Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct StorageObjectForm {
+    #[serde(default)]
+    bucket_name: Option<String>,
+    #[serde(default)]
+    file_directory: Option<String>,
+}
+
 /// Pulls the `file` part out of the multipart body. The reference's
 /// upload handlers let the `sourceFileName`/`mime` form fields override
-/// the part header's own values (its asset variant reads the header
-/// alone); mirrored here with the field values resolved after the scan
-/// so the wire order cannot flip the precedence.
+/// the part header's own values and parse the `storageObject` placement
+/// pair out of the form (its asset variant reads the header alone);
+/// mirrored here with the field values resolved after the scan so the
+/// wire order cannot flip the precedence.
 async fn read_upload(
     req: Request,
     asset_shape: bool,
-) -> Result<(String, String, Option<Vec<u8>>), state::StatusError> {
+) -> Result<(String, String, String, String, Option<Vec<u8>>), state::StatusError> {
     let mut multipart = match Multipart::from_request(req, &()).await {
         Ok(m) => m,
         Err(_) => {
@@ -85,6 +98,8 @@ async fn read_upload(
     let mut part_mime = String::new();
     let mut form_name = String::new();
     let mut form_mime = String::new();
+    let mut form_bucket = String::new();
+    let mut form_dir = String::new();
     let mut bytes: Option<Vec<u8>> = None;
     while let Ok(Some(field)) = multipart.next_field().await {
         let name = field.name().unwrap_or_default().to_string();
@@ -111,8 +126,25 @@ async fn read_upload(
                     form_mime = v;
                 }
             }
-            // storageObject / size / method — consumed, nothing the
-            // local store reads (the core records what it needs).
+            "storageObject" if !asset_shape => {
+                if let Ok(v) = field.text().await {
+                    // The reference unmarshals the placement JSON into
+                    // its StorageObject message — a malformed body fails
+                    // the call there; mirrored.
+                    match serde_json::from_str::<StorageObjectForm>(&v) {
+                        Ok(f) => {
+                            form_bucket = f.bucket_name.unwrap_or_default();
+                            form_dir = f.file_directory.unwrap_or_default();
+                        }
+                        Err(_) => {
+                            return Err(rushwind_http_binding::envelope::codec_error(
+                                "malformed storageObject",
+                            ))
+                        }
+                    }
+                }
+            }
+            // size / method — consumed, nothing the transfer reads.
             _ => {
                 let _ = field.bytes().await;
             }
@@ -128,7 +160,7 @@ async fn read_upload(
     } else {
         part_mime
     };
-    Ok((file_name, mime, bytes))
+    Ok((file_name, mime, form_bucket, form_dir, bytes))
 }
 
 /// The streaming upload's parsed outcome: the contract JSON answer
@@ -144,14 +176,18 @@ struct UploadedFileRef {
 }
 
 /// Ships one blob through the streaming upload channel: the bytes as a
-/// single HttpBody chunk, the file name and mime (and the operator bag)
+/// single HttpBody chunk, the file name, mime, and the client's
+/// storage-object placement (bucket/directory) — and the operator bag —
 /// as the call's gRPC metadata.
+#[allow(clippy::too_many_arguments)]
 async fn stream_upload(
     state: &AppState,
     claims: &Option<serde_json::Map<String, serde_json::Value>>,
     method: &axum::http::Method,
     file_name: String,
     mime: String,
+    bucket: String,
+    dir: String,
     bytes: Vec<u8>,
 ) -> UploadedFileRef {
     let body = proto::proto::google::api::HttpBody {
@@ -165,6 +201,12 @@ async fn stream_upload(
     }
     if let Ok(v) = tonic::metadata::MetadataValue::try_from(mime.as_str()) {
         req.metadata_mut().insert("x-mime", v);
+    }
+    if let Ok(v) = tonic::metadata::MetadataValue::try_from(bucket.as_str()) {
+        req.metadata_mut().insert("x-file-bucket", v);
+    }
+    if let Ok(v) = tonic::metadata::MetadataValue::try_from(dir.as_str()) {
+        req.metadata_mut().insert("x-file-dir", v);
     }
     let mut core = core_transfer(&state.core_channel);
     let call = if *method == axum::http::Method::PUT {
@@ -219,7 +261,7 @@ async fn stream_upload(
 pub async fn upload(State(state): State<Arc<AppState>>, req: Request) -> Response {
     let claims = claims_of(&req);
     let method = req.method().clone();
-    let (file_name, mime, bytes) = match read_upload(req, false).await {
+    let (file_name, mime, bucket, dir, bytes) = match read_upload(req, false).await {
         Ok(v) => v,
         Err(e) => return rushwind_http_binding::envelope::error_response(e),
     };
@@ -235,9 +277,11 @@ pub async fn upload(State(state): State<Arc<AppState>>, req: Request) -> Respons
             "empty file",
         ));
     }
-    stream_upload(&state, &claims, &method, file_name, mime, bytes)
-        .await
-        .response
+    stream_upload(
+        &state, &claims, &method, file_name, mime, bucket, dir, bytes,
+    )
+    .await
+    .response
 }
 
 /// The media-library variant (the reference's `UploadMediaAsset`): the
@@ -247,7 +291,7 @@ pub async fn upload(State(state): State<Arc<AppState>>, req: Request) -> Respons
 pub async fn upload_asset(State(state): State<Arc<AppState>>, req: Request) -> Response {
     let claims = claims_of(&req);
     let method = req.method().clone();
-    let (file_name, mime, bytes) = match read_upload(req, true).await {
+    let (file_name, mime, _bucket, _dir, bytes) = match read_upload(req, true).await {
         Ok(v) => v,
         Err(e) => return rushwind_http_binding::envelope::error_response(e),
     };
@@ -270,6 +314,10 @@ pub async fn upload_asset(State(state): State<Arc<AppState>>, req: Request) -> R
         &method,
         file_name.clone(),
         mime.clone(),
+        // The asset variant carries no placement: the reference derives
+        // the bucket from the mime policy and pins the directory empty.
+        String::new(),
+        String::new(),
         bytes,
     )
     .await;

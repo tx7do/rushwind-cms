@@ -1,12 +1,40 @@
-//! The core application state: database, Redis, the HS256 engine, and
-//! the per-client token stores. The core service is the ONLY process
-//! touching the database.
+//! The core application state: database, Redis, the HS256 engine, the
+//! per-client token stores, and the optional object store endpoint.
+//! The core service is the ONLY process touching the database and the
+//! object store.
 
 use redis::aio::ConnectionManager;
 use sea_orm::{ConnectOptions, Database, DatabaseConnection};
 
-use crate::config::Config;
+use crate::config::{Config, OssConfig};
 use crate::token::{ClientType, TokenStore};
+
+/// The MinIO object store endpoint (the config-selected backend;
+/// `None` falls the storage faces to the local disk store).
+pub struct OssStore {
+    pub client: minio::s3::MinioClient,
+    pub download_host: String,
+}
+
+impl OssStore {
+    fn connect(cfg: &OssConfig) -> Result<Self, String> {
+        let url = format!(
+            "{}://{}",
+            if cfg.use_ssl { "https" } else { "http" },
+            cfg.endpoint
+        );
+        let base_url: minio::s3::http::BaseUrl =
+            url.parse().map_err(|e| format!("minio base url: {e:?}"))?;
+        let provider =
+            minio::s3::creds::StaticProvider::new(&cfg.access_key, &cfg.secret_key, None);
+        let client = minio::s3::MinioClient::new(base_url, Some(provider), None, None)
+            .map_err(|e| format!("minio client: {e:?}"))?;
+        Ok(Self {
+            client,
+            download_host: cfg.download_host.clone(),
+        })
+    }
+}
 
 pub struct AppState {
     pub cfg: Config,
@@ -18,6 +46,8 @@ pub struct AppState {
     /// The per-client session stores (admin ct=0, app ct=1).
     pub admin_tokens: TokenStore,
     pub app_tokens: TokenStore,
+    /// The object store endpoint, when the config selects one.
+    pub oss: Option<OssStore>,
 }
 
 impl AppState {
@@ -48,6 +78,11 @@ impl AppState {
                 .with_key(cfg.jwt_key.as_bytes()),
         );
 
+        let oss = match &cfg.oss {
+            Some(oss_cfg) => Some(OssStore::connect(oss_cfg)?),
+            None => None,
+        };
+
         let admin_tokens = TokenStore::new(
             redis_conn.clone(),
             ClientType::Admin,
@@ -68,6 +103,7 @@ impl AppState {
             jwt,
             admin_tokens,
             app_tokens,
+            oss,
         })
     }
 

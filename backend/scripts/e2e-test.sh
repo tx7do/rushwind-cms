@@ -264,7 +264,7 @@ check "portal initial context" '"permissions"' "$CTX"
 APPUID=$(curl -s -H "Authorization: Bearer $APPTOKEN2" "$APP/app/v1/me" 2>/dev/null)
 check "app user profile" '"username"' "$APPUID"
 
-echo "── 9. multipart 文件上传与下载 ──────────────────────"
+echo "── 9. multipart 文件上传与下载（MinIO 对象存储后端） ──────────────────────"
 # 造一个小测试文件
 echo "e2e-upload-content-rushwind" > /tmp/e2e-upload.txt
 UP=$(curl -s -w "\n%{http_code}" -X POST -H "$AUTH" \
@@ -275,7 +275,7 @@ UP=$(curl -s -w "\n%{http_code}" -X POST -H "$AUTH" \
 UP_BODY=$(echo "$UP" | head -n -1); UP_CODE=$(echo "$UP" | tail -1)
 check "multipart upload → 200" "200" "$UP_CODE"
 check "upload answers contract objectName" '"objectName"' "$UP_BODY"
-F_GUID=$(echo "$UP_BODY" | python3 -c "import json,sys; print(json.load(sys.stdin).get('objectName','').split('fileGuid=')[-1])" 2>/dev/null)
+check "upload link = download-host/bucket/dir join (client placement)" '"objectName":"http://127.0.0.1:9000/images/e2e/' "$UP_BODY"
 
 # 媒体库变体（reference 的 UploadMediaAsset）：文件行 + media_assets 行
 AUP=$(curl -s -w "\n%{http_code}" -X POST -H "$AUTH" \
@@ -284,22 +284,33 @@ AUP=$(curl -s -w "\n%{http_code}" -X POST -H "$AUTH" \
 AUP_BODY=$(echo "$AUP" | head -n -1); AUP_CODE=$(echo "$AUP" | tail -1)
 check "asset upload → 200" "200" "$AUP_CODE"
 check "asset upload answers contract objectName" '"objectName"' "$AUP_BODY"
-A_GUID=$(echo "$AUP_BODY" | python3 -c "import json,sys; print(json.load(sys.stdin).get('objectName','').split('fileGuid=')[-1])" 2>/dev/null)
+check "asset upload link = policy bucket join (text/plain → docs, no dir)" '"objectName":"http://127.0.0.1:9000/docs/' "$AUP_BODY"
 
-# 两条文件行都入列
+# 两条文件行都入列：plain 行带客户端桶/目录（images/e2e），asset 行带策略桶
+# （text/plain → docs）且无目录 —— 行匹配走 fileName+bucketName，并断言
+# 落库 linkUrl 的 join 形状（download host + bucket + key）。
 FLIST=$(curl -s -H "$AUTH" "$ADMIN/admin/v1/files?page=1&pageSize=100")
-check "uploaded file row visible" "\"fileGuid\":\"$F_GUID\"" "$FLIST"
-check "asset-flow file row visible" "\"fileGuid\":\"$A_GUID\"" "$FLIST"
+PLAIN_ROW=$(echo "$FLIST" | python3 -c "
+import json,sys
+d=json.load(sys.stdin)
+r=next((i for i in d.get('items',[]) if i.get('fileName')=='e2e-upload.txt' and i.get('bucketName')=='images' and i.get('fileDirectory')=='e2e'),None)
+print('%d %s' % (r.get('id',0), r.get('fileGuid','')) if r else '0 missing')" 2>/dev/null)
+ASSET_ROW=$(echo "$FLIST" | python3 -c "
+import json,sys
+d=json.load(sys.stdin)
+r=next((i for i in d.get('items',[]) if i.get('fileName')=='e2e-upload.txt' and i.get('bucketName')=='docs' and not i.get('fileDirectory')),None)
+print(r.get('id',0) if r else 0)" 2>/dev/null)
+F_ID=${PLAIN_ROW%% *}; F_GUID=${PLAIN_ROW##* }
+A_FID=$ASSET_ROW
+check "plain row persisted (client bucket + dir on linkUrl)" '"linkUrl":"http://127.0.0.1:9000/images/e2e/' "$FLIST"
+check "asset row persisted (policy bucket, no dir, on linkUrl)" '"linkUrl":"http://127.0.0.1:9000/docs/' "$FLIST"
 ALIST=$(curl -s -H "$AUTH" "$ADMIN/admin/v1/media-assets?page=1&pageSize=100")
 check "asset row visible in media library" '"filename":"e2e-upload.txt"' "$ALIST"
+check "media row storagePath = bucket/key join (leading slash, policy bucket)" '"storagePath":"/docs/' "$ALIST"
 
 DOWN=$(curl -s -H "$AUTH" -w "|%{http_code}|%{content_type}" "$ADMIN/admin/v1/file/download?fileGuid=$F_GUID")
 check "download by guid streams bytes" "|200|text/plain" "$DOWN"
 check "download roundtrip content (guid)" 'e2e-upload-content-rushwind' "$DOWN"
-F_ID=$(echo "$FLIST" | python3 -c "
-import json,sys
-d=json.load(sys.stdin)
-print(next((i.get('id',0) for i in d.get('items',[]) if i.get('fileGuid')=='$F_GUID'),0))" 2>/dev/null)
 DOWN2=$(curl -s -H "$AUTH" -w "|%{http_code}|%{content_type}" "$ADMIN/admin/v1/file/download?fileId=$F_ID")
 check "download by id streams bytes" "|200|text/plain" "$DOWN2"
 check "download roundtrip content (id)" 'e2e-upload-content-rushwind' "$DOWN2"
@@ -325,11 +336,8 @@ check "media asset delete → 200" "200" "$MAD"
 R=$(curl -s -o /dev/null -w "%{http_code}" -H "$AUTH" "$ADMIN/admin/v1/media-assets/$MA_ID")
 check "deleted media asset get → 404" "404" "$R"
 
-# 清理：两条文件行连同磁盘对象
-A_FID=$(echo "$FLIST" | python3 -c "
-import json,sys
-d=json.load(sys.stdin)
-print(next((i.get('id',0) for i in d.get('items',[]) if i.get('fileGuid')=='$A_GUID'),0))" 2>/dev/null)
+# 清理：两条文件行连同对象存储里的对象（delete 走 core → minio
+# delete_object，桶内不留 e2e 残留）
 DEL=$(curl -s -o /dev/null -w "%{http_code}" -X DELETE -H "$AUTH" "$ADMIN/admin/v1/files/$F_ID")
 check "file delete → 200" "200" "$DEL"
 R=$(curl -s -o /dev/null -w "%{http_code}" -H "$AUTH" "$ADMIN/admin/v1/files/$F_ID")

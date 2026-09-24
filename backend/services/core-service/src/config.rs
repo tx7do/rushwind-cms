@@ -1,14 +1,15 @@
 //! Config loading — parses the embedded yaml defaults
-//! (`assets/data.yaml`, `assets/auth.yaml`) with env overrides, plus
-//! the gRPC listener address (`CORE_GRPC_ADDR`, default :6602 — the
-//! reference resolves core via registry; the port keeps a static
-//! default for direct-dial deployments).
+//! (`assets/data.yaml`, `assets/auth.yaml`, `assets/oss.yaml`) with env
+//! overrides, plus the gRPC listener address (`CORE_GRPC_ADDR`,
+//! default :6602 — the reference resolves core via registry; the port
+//! keeps a static default for direct-dial deployments).
 
 use rushwind_bootstrap::DurationWire;
 use serde::Deserialize;
 
 const DATA_YAML: &str = include_str!("../assets/data.yaml");
 const AUTH_YAML: &str = include_str!("../assets/auth.yaml");
+const OSS_YAML: &str = include_str!("../assets/oss.yaml");
 
 #[derive(Debug, Clone)]
 pub struct Config {
@@ -24,6 +25,19 @@ pub struct Config {
     pub admin_refresh_secs: i64,
     pub app_access_secs: i64,
     pub app_refresh_secs: i64,
+    /// The object store (the reference's oss.yaml minio section);
+    /// `None` falls the storage faces back to the local disk store.
+    pub oss: Option<OssConfig>,
+}
+
+/// The MinIO object store endpoint profile.
+#[derive(Debug, Clone)]
+pub struct OssConfig {
+    pub endpoint: String,
+    pub download_host: String,
+    pub access_key: String,
+    pub secret_key: String,
+    pub use_ssl: bool,
 }
 
 #[derive(Debug, Default, Deserialize)]
@@ -49,6 +63,31 @@ struct RedisSection {
     addr: String,
     #[serde(default)]
     password: String,
+}
+
+#[derive(Debug, Deserialize)]
+struct OssFile {
+    oss: Option<OssSection>,
+}
+
+#[derive(Debug, Deserialize)]
+struct OssSection {
+    #[serde(default)]
+    minio: Option<MinioSection>,
+}
+
+#[derive(Debug, Default, Deserialize)]
+struct MinioSection {
+    #[serde(default)]
+    endpoint: String,
+    #[serde(default)]
+    download_host: String,
+    #[serde(default)]
+    access_key: String,
+    #[serde(default)]
+    secret_key: String,
+    #[serde(default)]
+    use_ssl: bool,
 }
 
 #[derive(Debug, Deserialize)]
@@ -83,16 +122,33 @@ impl Config {
             serde_yaml::from_str(DATA_YAML).map_err(|e| format!("parse data.yaml: {e}"))?;
         let auth: AuthFile =
             serde_yaml::from_str(AUTH_YAML).map_err(|e| format!("parse auth.yaml: {e}"))?;
+        let oss: OssFile =
+            serde_yaml::from_str(OSS_YAML).map_err(|e| format!("parse oss.yaml: {e}"))?;
         let section = data.data.unwrap_or_default();
         let database = section.database.unwrap_or_default();
         let redis = section.redis.unwrap_or_default();
         let clients = auth.authenticator.unwrap_or_default();
         let admin = clients.admin.unwrap_or_default();
         let app = clients.app.unwrap_or_default();
+        let minio = oss
+            .oss
+            .and_then(|o| o.minio)
+            .filter(|m| !m.endpoint.is_empty());
 
         let secs = |d: &Option<DurationWire>, fallback: i64| {
             d.as_ref().map(|x| x.0.as_secs() as i64).unwrap_or(fallback)
         };
+
+        // The object store profile: the embedded dev section carries the
+        // reference's local MinIO; the env vars override its values (the
+        // section's presence alone selects the provider).
+        let oss = minio.map(|m| OssConfig {
+            endpoint: std::env::var("RUSHWIND_MINIO_ENDPOINT").unwrap_or(m.endpoint),
+            download_host: std::env::var("RUSHWIND_MINIO_DOWNLOAD_HOST").unwrap_or(m.download_host),
+            access_key: std::env::var("RUSHWIND_MINIO_ACCESS_KEY").unwrap_or(m.access_key),
+            secret_key: std::env::var("RUSHWIND_MINIO_SECRET_KEY").unwrap_or(m.secret_key),
+            use_ssl: m.use_ssl,
+        });
 
         Ok(Self {
             grpc_addr: std::env::var("CORE_GRPC_ADDR").unwrap_or_else(|_| "0.0.0.0:6602".into()),
@@ -104,6 +160,7 @@ impl Config {
             admin_refresh_secs: secs(&admin.refresh_token_expires, 43200),
             app_access_secs: secs(&app.access_token_expires, 900),
             app_refresh_secs: secs(&app.refresh_token_expires, 0),
+            oss,
         })
     }
 }

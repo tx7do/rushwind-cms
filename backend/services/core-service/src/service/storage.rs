@@ -1,8 +1,10 @@
-//! The file storage face: local-disk object storage (the MinIO bridge
-//! lands with the OSS phase) + the files table metadata, and the
-//! streaming transfer channel (the proto's HttpBody streams — the
-//! object bytes' only wire path; `FileService` proper stays the
-//! metadata CRUD).
+//! The file storage face: the object store behind the streaming
+//! transfer channel — the MinIO endpoint when the config selects one
+//! (the reference's layout: the bucket policy, the key layout, the
+//! public download link, the bucket materializing on demand), else the
+//! local disk store — plus the files table metadata. `FileService`
+//! proper stays the metadata CRUD; the object bytes ride the proto's
+//! HttpBody streams only.
 
 use std::sync::Arc;
 
@@ -22,7 +24,14 @@ const STORAGE_ROOT: &str = "/tmp/rushwind-cms-files";
 fn file_proto(r: files::Model) -> storagev1::File {
     storagev1::File {
         id: Some(r.id as u32),
-        provider: Some(1), // LOCAL
+        // The row's provider label maps back through the proto enum's
+        // name table (the reference's registered converter pair);
+        // unmapped labels land nil.
+        provider: r
+            .provider
+            .as_deref()
+            .and_then(storagev1::OssProvider::from_str_name)
+            .map(|v| v as i32),
         bucket_name: r.bucket_name.clone(),
         file_directory: r.file_directory.clone(),
         file_guid: r.file_guid.clone(),
@@ -109,6 +118,142 @@ fn metadata_str<T>(request: &tonic::Request<T>, name: &str) -> String {
         .to_string()
 }
 
+/// The media type's main/sub pair, lowercased and stripped of
+/// parameters (the reference's mime.ParseMediaType preprocessing).
+fn media_type_parts(mime: &str) -> Option<(String, String)> {
+    let mt = mime
+        .split(';')
+        .next()
+        .unwrap_or("")
+        .trim()
+        .to_ascii_lowercase();
+    let (main, sub) = mt.split_once('/')?;
+    if main.is_empty() || sub.is_empty() {
+        return None;
+    }
+    Some((main.to_string(), sub.to_string()))
+}
+
+/// The content-type storage-bucket policy — the reference's
+/// ContentTypeToBucketName table verbatim (media-type prefix routing;
+/// text and the office/document family land in docs, the rest in
+/// files).
+fn content_type_to_bucket(mime: &str) -> &'static str {
+    let Some((main, sub)) = media_type_parts(mime) else {
+        return "files";
+    };
+    match main.as_str() {
+        "image" => "images",
+        "video" => "videos",
+        "audio" => "audios",
+        "text" => "docs",
+        "application" => match sub.as_str() {
+            "pdf" | "json" => "docs",
+            _ => {
+                if sub.starts_with("vnd.ms-")
+                    || sub.contains("officedocument")
+                    || sub.contains("word")
+                    || sub.contains("excel")
+                    || sub.contains("powerpoint")
+                {
+                    "docs"
+                } else {
+                    "files"
+                }
+            }
+        },
+        _ => "files",
+    }
+}
+
+/// The content-type extension table — the reference's
+/// ContentTypeToFileExtension verbatim (dots stripped; the stdlib
+/// ExtensionsByType fallback ports as no extension).
+fn content_type_to_file_extension(mime: &str) -> &'static str {
+    let mt = mime
+        .split(';')
+        .next()
+        .unwrap_or("")
+        .trim()
+        .to_ascii_lowercase();
+    match mt.as_str() {
+        "image/jpeg" | "image/jpg" => "jpg",
+        "image/png" => "png",
+        "image/gif" => "gif",
+        "image/webp" => "webp",
+        "image/bmp" => "bmp",
+        "image/x-icon" | "image/vnd.microsoft.icon" => "ico",
+        "image/svg+xml" => "svg",
+        "video/mp4" => "mp4",
+        "video/webm" => "webm",
+        "video/quicktime" => "mov",
+        "video/x-matroska" | "video/mkv" => "mkv",
+        "audio/mpeg" => "mp3",
+        "audio/wav" | "audio/x-wav" => "wav",
+        "audio/ogg" | "audio/vorbis" => "ogg",
+        "audio/mp4" => "m4a",
+        "text/plain" => "txt",
+        "text/html" => "html",
+        "text/css" => "css",
+        "text/csv" => "csv",
+        "text/xml" => "xml",
+        "text/javascript" | "application/javascript" | "application/x-javascript" => "js",
+        "text/x-lua" | "application/x-lua" => "lua",
+        "text/x-python" | "application/x-python" | "text/python" => "py",
+        "application/pdf" => "pdf",
+        "application/json" => "json",
+        "application/zip" => "zip",
+        "application/x-tar" => "tar",
+        "application/gzip" | "application/x-gzip" => "gz",
+        "application/x-7z-compressed" | "application/7z" => "7z",
+        _ => "",
+    }
+}
+
+/// The trailing dot-separated segment of a file name (the reference's
+/// ExtractFileExtension: a leading dot or no dot yields none).
+fn extract_file_extension(file_name: &str) -> String {
+    match file_name.rfind('.') {
+        Some(idx) if idx > 0 => file_name[idx + 1..].to_ascii_lowercase(),
+        _ => String::new(),
+    }
+}
+
+/// The extension for a generated object name — the reference's
+/// EnsureFileExtension: the source name's extension first, else the
+/// content-type table, else "bin".
+fn ensure_file_extension(file_name: &str, mime: &str) -> String {
+    let ext = extract_file_extension(file_name);
+    if !ext.is_empty() {
+        return ext;
+    }
+    let ext = content_type_to_file_extension(mime);
+    if !ext.is_empty() {
+        return ext.to_string();
+    }
+    "bin".to_string()
+}
+
+/// The object URL join — the reference's JoinObjectUrl verbatim.
+fn join_object_url(endpoint: &str, bucket_name: &str, object_name: &str) -> String {
+    format!(
+        "{}/{}/{}",
+        endpoint.trim_end_matches('/'),
+        bucket_name.trim_matches('/'),
+        object_name.trim_start_matches('/')
+    )
+}
+
+/// The object-store failure form.
+fn minio_status(e: minio::s3::error::Error) -> Status {
+    Status::internal(format!("object store: {e}"))
+}
+
+/// The object-store validation failure form.
+fn minio_validation(e: minio::s3::error::ValidationErr) -> Status {
+    Status::internal(format!("object store validation: {e:?}"))
+}
+
 pub struct FileServiceImpl {
     pub state: Arc<AppState>,
 }
@@ -134,43 +279,113 @@ fn tenant_of<T>(request: &tonic::Request<T>) -> i64 {
 }
 
 impl FileServiceImpl {
-    /// Writes an object to the local store + the metadata row (the
-    /// streaming upload face's landing point).
+    /// Writes an object to the configured store + the metadata row —
+    /// the streaming upload face's landing point. The object-store
+    /// profile picks the backend: the MinIO endpoint when configured
+    /// (the reference's layout — the bucket policy, the key layout,
+    /// the public download link, the bucket materializing on demand),
+    /// else the local disk store.
+    #[allow(clippy::too_many_arguments)]
     pub async fn put(
         &self,
         uploader: i64,
         tenant: i64,
         file_name: &str,
-        _mime_type: &str,
+        mime_type: &str,
+        bucket_param: &str,
+        dir_param: &str,
         bytes: Vec<u8>,
     ) -> Result<files::Model, Status> {
-        let (stem, ext) = file_name
-            .rsplit_once('.')
-            .map(|(s, e)| (s.to_string(), e.to_string()))
-            .unwrap_or((file_name.to_string(), "bin".to_string()));
-        let dir = std::path::Path::new(STORAGE_ROOT)
-            .join(chrono::Utc::now().format("%Y%m%d").to_string());
-        tokio::fs::create_dir_all(&dir)
-            .await
-            .map_err(|e| Status::internal(format!("storage dir: {e}")))?;
-        // One guid names both the on-disk object and the row's
+        let ext = ensure_file_extension(file_name, mime_type);
+        // One guid names both the stored object and the row's
         // save_file_name — the download resolves the pair.
         let guid = uuid::Uuid::now_v7().simple().to_string();
         let save_name = format!("{guid}.{ext}");
-        let path = dir.join(&save_name);
-        tokio::fs::write(&path, &bytes)
-            .await
-            .map_err(|e| Status::internal(format!("storage write: {e}")))?;
+
+        // The provider branch. The MinIO side mirrors the reference's
+        // mc.UploadFile: the bucket is the client-supplied one when
+        // present, else the content-type policy bucket; the key
+        // prefixes the client-supplied directory when present; the
+        // recorded link is the download host join.
+        let (provider, bucket, dir, link_url) = match &self.state.oss {
+            Some(oss) => {
+                let bucket = if bucket_param.is_empty() {
+                    content_type_to_bucket(mime_type).to_string()
+                } else {
+                    bucket_param.to_string()
+                };
+                let key = if dir_param.is_empty() {
+                    save_name.clone()
+                } else {
+                    format!("{dir_param}/{save_name}")
+                };
+                use minio::s3::types::S3Api as _;
+                let exists: minio::s3::response::BucketExistsResponse = oss
+                    .client
+                    .bucket_exists(bucket.as_str())
+                    .map_err(minio_validation)?
+                    .build()
+                    .send()
+                    .await
+                    .map_err(minio_status)?;
+                if !exists.exists() {
+                    let _: minio::s3::response::CreateBucketResponse = oss
+                        .client
+                        .create_bucket(bucket.as_str())
+                        .map_err(minio_validation)?
+                        .build()
+                        .send()
+                        .await
+                        .map_err(minio_status)?;
+                }
+                let _: minio::s3::response::PutObjectContentResponse = oss
+                    .client
+                    .put_object_content(
+                        bucket.as_str(),
+                        key.as_str(),
+                        minio::s3::builders::ObjectContent::from(bytes.clone()),
+                    )
+                    .map_err(minio_validation)?
+                    .build()
+                    .send()
+                    .await
+                    .map_err(minio_status)?;
+                (
+                    "MINIO",
+                    Some(bucket.clone()),
+                    dir_param.to_string(),
+                    Some(join_object_url(&oss.download_host, &bucket, &key)),
+                )
+            }
+            None => {
+                let dir = std::path::Path::new(STORAGE_ROOT)
+                    .join(chrono::Utc::now().format("%Y%m%d").to_string());
+                tokio::fs::create_dir_all(&dir)
+                    .await
+                    .map_err(|e| Status::internal(format!("storage dir: {e}")))?;
+                let path = dir.join(&save_name);
+                tokio::fs::write(&path, &bytes)
+                    .await
+                    .map_err(|e| Status::internal(format!("storage write: {e}")))?;
+                (
+                    "LOCAL",
+                    None,
+                    dir.to_string_lossy().to_string(),
+                    Some(format!("/admin/v1/file/download?fileGuid={guid}")),
+                )
+            }
+        };
 
         let now = store::now();
         let row = repo::insert_files(
             &self.state.db,
             files::ActiveModel {
-                provider: Set(Some("LOCAL".to_string())),
-                file_directory: Set(Some(dir.to_string_lossy().to_string())),
+                provider: Set(Some(provider.to_string())),
+                bucket_name: Set(bucket),
+                file_directory: Set(Some(dir)),
                 file_guid: Set(Some(guid.clone())),
                 save_file_name: Set(Some(save_name)),
-                file_name: Set(Some(stem)),
+                file_name: Set(Some(file_name.to_string())),
                 extension: Set(Some(ext)),
                 size: Set(Some(bytes.len() as i64)),
                 size_format: Set(Some(format_size(bytes.len() as i64))),
@@ -178,7 +393,7 @@ impl FileServiceImpl {
                     use sha2::Digest as _;
                     sha2::Sha256::digest(&bytes)
                 }))),
-                link_url: Set(Some(format!("/admin/v1/file/download?fileGuid={guid}"))),
+                link_url: Set(link_url),
                 tenant_id: Set(Some(tenant)),
                 created_by: Set(Some(uploader)),
                 created_at: Set(Some(now)),
@@ -190,9 +405,35 @@ impl FileServiceImpl {
         Ok(row)
     }
 
-    /// Reads an object back (the download bridge).
+    /// Reads an object back (the download bridge) — the configured
+    /// backend: the MinIO object off its recorded bucket/key, else the
+    /// local disk store.
     pub async fn get_object(&self, file_id: i64) -> Result<(files::Model, Vec<u8>), Status> {
         let row = repo::files_by_id(&self.state.db, file_id).await?;
+        if row.provider.as_deref() == Some("MINIO") {
+            let Some(oss) = &self.state.oss else {
+                return Err(Status::internal("object store not configured"));
+            };
+            let bucket = row.bucket_name.clone().unwrap_or_default();
+            let dir = row.file_directory.clone().unwrap_or_default();
+            let name = row.save_file_name.clone().unwrap_or_default();
+            let key = if dir.is_empty() {
+                name
+            } else {
+                format!("{dir}/{name}")
+            };
+            use minio::s3::types::S3Api as _;
+            let resp: minio::s3::response::GetObjectResponse = oss
+                .client
+                .get_object(bucket.as_str(), key.as_str())
+                .map_err(minio_validation)?
+                .build()
+                .send()
+                .await
+                .map_err(minio_status)?;
+            let bytes = resp.into_bytes().await.map_err(minio_status)?.to_vec();
+            return Ok((row, bytes));
+        }
         let p = std::path::Path::new(&row.file_directory.clone().unwrap_or_default())
             .join(row.save_file_name.clone().unwrap_or_default());
         let bytes = tokio::fs::read(p)
@@ -202,7 +443,8 @@ impl FileServiceImpl {
     }
 
     /// The upload streams' shared body: the bytes off the HttpBody
-    /// chunks into the local store; the file name and mime ride the
+    /// chunks into the configured store; the file name, mime, and the
+    /// client's storage-object placement (bucket/directory) ride the
     /// request metadata beside the operator headers.
     async fn upload_stream(
         &self,
@@ -212,6 +454,8 @@ impl FileServiceImpl {
         let tenant = tenant_of(&request);
         let file_name = metadata_str(&request, "x-file-name");
         let mime = metadata_str(&request, "x-mime");
+        let bucket = metadata_str(&request, "x-file-bucket");
+        let dir = metadata_str(&request, "x-file-dir");
         let mut bytes = Vec::new();
         let mut stream = request.into_inner();
         use tokio_stream::StreamExt as _;
@@ -224,7 +468,9 @@ impl FileServiceImpl {
         if bytes.is_empty() {
             return Err(bad("empty payload"));
         }
-        let row = self.put(uploader, tenant, &file_name, &mime, bytes).await?;
+        let row = self
+            .put(uploader, tenant, &file_name, &mime, &bucket, &dir, bytes)
+            .await?;
         let mut resp = Response::new(storagev1::UploadFileResponse {
             object_name: row.link_url.clone(),
             ..Default::default()
@@ -232,7 +478,9 @@ impl FileServiceImpl {
         // The created row's reference fields ride the response metadata
         // — the wire response carries only the link, and the media
         // library flow's row linkage (id/size/storage location) needs
-        // the rest. ASCII-only; dropped on encoding failure.
+        // the rest. The storage location takes the provider's recorded
+        // form: the object-store bucket/key join, or the local path.
+        // ASCII-only; dropped on encoding failure.
         if let Ok(v) = tonic::metadata::MetadataValue::try_from(row.id.to_string().as_str()) {
             resp.metadata_mut().insert("x-file-id", v);
         }
@@ -241,12 +489,24 @@ impl FileServiceImpl {
                 resp.metadata_mut().insert("x-file-size", v);
             }
         }
-        let path = format!(
-            "{}/{}",
-            row.file_directory.clone().unwrap_or_default(),
-            row.save_file_name.clone().unwrap_or_default()
-        );
-        if let Ok(v) = tonic::metadata::MetadataValue::try_from(path.as_str()) {
+        let storage_path = if row.provider.as_deref() == Some("MINIO") {
+            join_object_url(
+                "",
+                &row.bucket_name.clone().unwrap_or_default(),
+                &format!(
+                    "{}/{}",
+                    row.file_directory.clone().unwrap_or_default(),
+                    row.save_file_name.clone().unwrap_or_default()
+                ),
+            )
+        } else {
+            format!(
+                "{}/{}",
+                row.file_directory.clone().unwrap_or_default(),
+                row.save_file_name.clone().unwrap_or_default()
+            )
+        };
+        if let Ok(v) = tonic::metadata::MetadataValue::try_from(storage_path.as_str()) {
             resp.metadata_mut().insert("x-file-path", v);
         }
         Ok(resp)
@@ -376,9 +636,33 @@ impl storagev1::file_service_server::FileService for FileServiceImpl {
             _ => return Err(bad("query_by required")),
         };
         if let Ok(row) = repo::files_by_id(&self.state.db, id).await {
-            let p = std::path::Path::new(&row.file_directory.clone().unwrap_or_default())
-                .join(row.save_file_name.clone().unwrap_or_default());
-            let _ = tokio::fs::remove_file(p).await;
+            if row.provider.as_deref() == Some("MINIO") {
+                // The MinIO object goes with the row (the reference's
+                // FileService.Delete tail).
+                if let Some(oss) = &self.state.oss {
+                    let bucket = row.bucket_name.clone().unwrap_or_default();
+                    let dir = row.file_directory.clone().unwrap_or_default();
+                    let name = row.save_file_name.clone().unwrap_or_default();
+                    let key = if dir.is_empty() {
+                        name
+                    } else {
+                        format!("{dir}/{name}")
+                    };
+                    use minio::s3::types::S3Api as _;
+                    let _: minio::s3::response::DeleteObjectResponse = oss
+                        .client
+                        .delete_object(bucket.as_str(), key.as_str())
+                        .map_err(minio_validation)?
+                        .build()
+                        .send()
+                        .await
+                        .map_err(minio_status)?;
+                }
+            } else {
+                let p = std::path::Path::new(&row.file_directory.clone().unwrap_or_default())
+                    .join(row.save_file_name.clone().unwrap_or_default());
+                let _ = tokio::fs::remove_file(p).await;
+            }
         }
         repo::delete_files(&self.state.db, id).await?;
         Ok(Response::new(pbjson_types::Empty {}))
