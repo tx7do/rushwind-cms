@@ -12,7 +12,6 @@ use std::collections::{HashMap, HashSet};
 use sea_orm::{DatabaseConnection, Set};
 use tonic::Status;
 
-use crate::data::permission_repo as repo;
 use crate::state::bad;
 use store::entities::{sys_menus, sys_permission_groups, sys_permissions};
 
@@ -45,7 +44,7 @@ pub async fn sync_permissions(
     let operator = operator_id.map(|v| v as i64);
 
     // 输入：启用菜单集（id 降序基序 → 稳定按 parent_id 升序）
-    let mut menus = repo::menus_enabled_desc(db).await?;
+    let mut menus = menu_repo::menus_enabled_desc(db).await?;
     compose_menu_paths(&mut menus);
     menus.sort_by_key(|m| m.parent_id.unwrap_or(0));
 
@@ -80,8 +79,8 @@ pub async fn sync_permissions(
     }
 
     // 清理菜单相关权限——失败必须返回错误，否则后续批量创建会产生重复数据
-    repo::truncate_biz_permissions(db).await?;
-    repo::truncate_biz_groups(db).await?;
+    permission_repo::truncate_biz_permissions(db).await?;
+    permission_group_repo::truncate_biz_groups(db).await?;
 
     // 为权限追加对应的 API 资源 ID 列表
     append_apis(db, &mut perms, &mut map_permissions).await?;
@@ -90,7 +89,7 @@ pub async fn sync_permissions(
     if groups.is_empty() {
         return Err(bad("invalid parameter"));
     }
-    let group_rows = repo::insert_permission_groups_bulk(
+    let group_rows = permission_group_repo::insert_permission_groups_bulk(
         db,
         groups
             .into_iter()
@@ -123,7 +122,7 @@ pub async fn sync_permissions(
     if perms.is_empty() {
         return Err(bad("invalid parameter"));
     }
-    let perm_rows = repo::insert_permissions_bulk(
+    let perm_rows = permission_repo::insert_permissions_bulk(
         db,
         perms
             .iter()
@@ -143,10 +142,10 @@ pub async fn sync_permissions(
 
     for (p, row) in perms.iter().zip(&perm_rows) {
         if !p.api_ids.is_empty() {
-            repo::assign_permission_apis(db, row.id, &p.api_ids).await?;
+            permission_api_repo::assign_permission_apis(db, row.id, &p.api_ids).await?;
         }
         if !p.menu_ids.is_empty() {
-            repo::assign_permission_menus(db, row.id, &p.menu_ids).await?;
+            permission_menu_repo::assign_permission_menus(db, row.id, &p.menu_ids).await?;
         }
     }
 
@@ -161,7 +160,7 @@ async fn append_apis(
     perms: &mut Vec<PermDraft>,
     map_permissions: &mut Vec<(String, Vec<usize>)>,
 ) -> Result<(), Status> {
-    let mut apis = repo::apis_enabled_by_operation(db).await?;
+    let mut apis = api_repo::apis_enabled_by_operation(db).await?;
     apis.sort_by(|a, b| {
         a.module
             .as_deref()
@@ -871,6 +870,7 @@ const BARE: SRule = SRule {
     end_anchor: true,
     repl: "",
 };
+use crate::data::{api_repo, menu_repo, permission_api_repo, permission_group_repo, permission_menu_repo, permission_repo};
 
 /// 编译序的常规规则（声明倒序 × Upper/Exact/Fold）。
 fn regular_rules() -> Vec<(&'static str, SRule)> {
@@ -1698,4 +1698,3 @@ mod tests {
         assert_eq!(pascal_case(""), "");
     }
 }
-

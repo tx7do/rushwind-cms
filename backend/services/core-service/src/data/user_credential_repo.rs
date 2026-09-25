@@ -13,10 +13,11 @@ use tonic::Status;
 
 use proto::proto::authentication::service::v1 as authv1;
 use proto::proto::pagination::PagingRequest;
+use store::entities::sys_user_credentials;
 use store::entities::sys_user_credentials as entity;
 use store::paging::fetch_paged;
 
-use crate::state::{db_status, StatusResult};
+use crate::state::{StatusResult, db_status, not_found_status};
 
 /// The proto enum number → the varchar value the golden schema stores
 /// (the proto string names ARE the stored values); unknown numbers
@@ -430,5 +431,36 @@ pub async fn reset_credential(
     a.credential = Set(Some(prepared));
     a.updated_at = Set(Some(store::now()));
     a.update(db).await.map_err(db_status)?;
+    Ok(())
+}
+pub async fn user_credentials_by_id(
+    db: &DatabaseConnection,
+    id: i64,
+) -> StatusResult<sys_user_credentials::Model> {
+    sys_user_credentials::Entity::find_by_id(id)
+        .one(db)
+        .await
+        .map_err(db_status)?
+        .ok_or_else(|| not_found_status("user credentials"))
+}
+pub async fn insert_user_credentials(
+    db: &DatabaseConnection,
+    a: sys_user_credentials::ActiveModel,
+) -> StatusResult<sys_user_credentials::Model> {
+    use sea_orm::ActiveModelTrait as _;
+    a.insert(db).await.map_err(db_status)
+}
+pub async fn update_user_credentials(
+    db: &DatabaseConnection,
+    a: sys_user_credentials::ActiveModel,
+) -> StatusResult<sys_user_credentials::Model> {
+    use sea_orm::ActiveModelTrait as _;
+    a.update(db).await.map_err(db_status)
+}
+pub async fn delete_user_credentials(db: &DatabaseConnection, id: i64) -> StatusResult<()> {
+    sys_user_credentials::Entity::delete_by_id(id)
+        .exec(db)
+        .await
+        .map_err(db_status)?;
     Ok(())
 }

@@ -406,7 +406,13 @@ NP_ID=$(echo "$NP" | python3 -c "import json,sys; print(json.load(sys.stdin).get
 NP_STATUS=$(echo "$NP" | python3 -c "import json,sys; print(json.load(sys.stdin).get('status',''))" 2>/dev/null)
 check "post create defaults to DRAFT" "POST_STATUS_DRAFT" "$NP_STATUS"
 APPSLUG=$(curl -s -H "$APP_AUTH" "$APP/app/v1/posts?page=1&pageSize=50")
-if echo "$APPSLUG" | grep -q "\"id\":$NP_ID[,}]"; then
+# 精确比较：列表里 translations 子表行有自己的 id 序列，字符串 grep 会误命中
+HIT=$(echo "$APPSLUG" | python3 -c "
+import json,sys
+d = json.load(sys.stdin)
+ids = [i.get('id') for i in d.get('items', [])]
+print('HIT' if int('$NP_ID') in ids else 'MISS')" 2>/dev/null)
+if [ "$HIT" == "HIT" ]; then
   fail "draft post hidden on app face" "$APPSLUG"
 else
   ok "draft post hidden on app face"
