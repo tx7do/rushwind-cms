@@ -247,6 +247,10 @@ pub fn build_router(state: Arc<AppState>) -> axum::Router {
                                 pool(),
                                 "permission.service.v1.ListApiResponse",
                                 &resp,
+                                // The framework's redaction plan rides the
+                                // generated mounts; this hand-mounted face
+                                // answers a menu tree with nothing sensitive.
+                                None,
                             )
                             .map_err(rushwind_http_binding::envelope::error_response)
                             .unwrap_or_default();

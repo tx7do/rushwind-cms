@@ -65,3 +65,49 @@ pub mod gen_app {
 pub mod tables;
 
 include!("auth_free.rs");
+
+/// The static redaction plan over the annotated pool — fail-closed
+/// resolved once per process (the contract tree carries the same
+/// redact.v1 options as the admin deployment: user email/mobile masks,
+/// the nested list envelopes, the method_skip set). The generated
+/// mounts thread this to the lifecycle glue.
+pub fn redact_plan() -> &'static rushwind_redact::RedactPlan {
+    static PLAN: std::sync::OnceLock<rushwind_redact::RedactPlan> = std::sync::OnceLock::new();
+    PLAN.get_or_init(|| {
+        rushwind_redact::RedactPlan::build(pool())
+            .expect("redact plan over the annotated contract pool must build")
+    })
+}
+
+/// The generated `PagingRequest` resolves into the framework paging
+/// pipeline's params — the impl lives in THIS crate because the orphan
+/// rule pins it to the type's owner; the repositories' call sites keep
+/// passing the request verbatim.
+impl rushwind_storage_seaorm_support::paging::PagingInput
+    for crate::proto::pagination::PagingRequest
+{
+    fn paging_params(&self) -> rushwind_storage_seaorm_support::paging::Params {
+        use crate::proto::pagination::paging_request::FilteringType;
+        rushwind_storage_seaorm_support::paging::Params {
+            query: match &self.filtering_type {
+                Some(FilteringType::Query(query)) => Some(query.clone()),
+                _ => None,
+            },
+            order_by: self.order_by.clone(),
+            sorting: self
+                .sorting
+                .iter()
+                .filter(|s| !s.field.is_empty())
+                .map(|s| rushwind_storage_seaorm_support::paging::Sorting {
+                    field: s.field.clone(),
+                    desc: s.direction == 1, // Direction::DESC
+                })
+                .collect(),
+            page: self.page,
+            page_size: self.page_size,
+            offset: self.offset,
+            limit: self.limit,
+            no_paging: self.no_paging.unwrap_or(false),
+        }
+    }
+}

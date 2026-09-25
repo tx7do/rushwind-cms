@@ -23,20 +23,11 @@ pub const DEMO_DATA_SQL: &str = include_str!("../../../sql/demo-data.sql");
 /// The menu seed (the admin-react route tree), embedded.
 pub const MENUS_SEED_SQL: &str = include_str!("../../../sql/menus-seed.sql");
 
-/// DB failure → the Unknown envelope shape (500, empty reason).
-pub fn db_err(e: sea_orm::DbErr) -> rushwind_http_binding::envelope::StatusError {
-    rushwind_http_binding::envelope::internal_error(format!("db: {e}"))
-}
-
-/// A plain error string → the Unknown envelope shape.
-pub fn db_err_internal(message: &str) -> rushwind_http_binding::envelope::StatusError {
-    rushwind_http_binding::envelope::internal_error(message.to_string())
-}
-
-/// Now, as a timestamptz value (the schema's timestamp flavor).
-pub fn now() -> chrono::DateTime<chrono::FixedOffset> {
-    chrono::Utc::now().fixed_offset()
-}
+// The DB failure mappings and the entity-time helpers live in the
+// framework bridge crate; re-exported so the repositories' and
+// services' paths stay put.
+pub use rushwind_storage_seaorm_support::time::now;
+pub use rushwind_storage_seaorm_support::{db_err, internal_error_msg as db_err_internal};
 
 /// The tables exist check — the bootstrap gate (fresh databases get the
 /// golden DDL + demo seed; existing ones are left alone).

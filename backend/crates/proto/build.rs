@@ -219,6 +219,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         proto_module_path: "crate::proto",
         pool_expr: "crate::pool()",
         auth_free: AUTH_FREE,
+        redact_plan_expr: Some("crate::redact_plan()"),
     };
     for (face, roots) in [("admin", "admin/service/v1/"), ("app", "app/service/v1/")] {
         let sub = sub_closure(&annotated, roots)?;
