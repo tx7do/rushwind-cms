@@ -16,12 +16,12 @@ store = { path = "../../crates/store" }
 auth = { path = "../../crates/auth" }
 tonic = { version = "0.14", default-features = false, features = ["codegen", "channel", "router", "transport"] }
 tonic-prost = "0.14"
-rushwind-authn = { git = "https://github.com/tx7do/rushwind", rev = "9bad36d8c14332da3e3dc2795b5e40e12ab621de" }
-rushwind-authn-jwt = { git = "https://github.com/tx7do/rushwind", rev = "9bad36d8c14332da3e3dc2795b5e40e12ab621de" }
-rushwind-bootstrap = { git = "https://github.com/tx7do/rushwind", rev = "9bad36d8c14332da3e3dc2795b5e40e12ab621de" }
-rushwind-http-binding = { git = "https://github.com/tx7do/rushwind", rev = "9bad36d8c14332da3e3dc2795b5e40e12ab621de" }
-rushwind-transport = { git = "https://github.com/tx7do/rushwind", rev = "9bad36d8c14332da3e3dc2795b5e40e12ab621de" }
-rushwind-transport-axum = { git = "https://github.com/tx7do/rushwind", rev = "9bad36d8c14332da3e3dc2795b5e40e12ab621de" }
+rushwind-authn = { git = "https://github.com/tx7do/rushwind", rev = "cc80e1cfecc98cb7b027f56ea6adaf46c62cee1e" }
+rushwind-authn-jwt = { git = "https://github.com/tx7do/rushwind", rev = "cc80e1cfecc98cb7b027f56ea6adaf46c62cee1e" }
+rushwind-bootstrap = { git = "https://github.com/tx7do/rushwind", rev = "cc80e1cfecc98cb7b027f56ea6adaf46c62cee1e" }
+rushwind-http-binding = { git = "https://github.com/tx7do/rushwind", rev = "cc80e1cfecc98cb7b027f56ea6adaf46c62cee1e" }
+rushwind-transport = { git = "https://github.com/tx7do/rushwind", rev = "cc80e1cfecc98cb7b027f56ea6adaf46c62cee1e" }
+rushwind-transport-axum = { git = "https://github.com/tx7do/rushwind", rev = "cc80e1cfecc98cb7b027f56ea6adaf46c62cee1e" }
 axum = { version = "0.8", default-features = false, features = ["http1", "tokio", "query", "json", "matched-path", "multipart"] }
 tokio = { workspace = true }
 redis = { workspace = true }
