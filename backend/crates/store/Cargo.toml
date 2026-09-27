@@ -18,9 +18,9 @@ rust-utils = { workspace = true }
 serde = { workspace = true, features = ["derive"] }
 serde_json = { workspace = true }
 chrono = { workspace = true }
-rushwind-authn = { git = "https://github.com/tx7do/rushwind", rev = "7629efbab4e240d349b6c9bd22ebf97763520fb8" }
-rushwind-http-binding = { git = "https://github.com/tx7do/rushwind", rev = "7629efbab4e240d349b6c9bd22ebf97763520fb8" }
-rushwind-storage-seaorm-support = { git = "https://github.com/tx7do/rushwind", rev = "7629efbab4e240d349b6c9bd22ebf97763520fb8" }
+rushwind-authn = { git = "https://github.com/tx7do/rushwind", rev = "9bad36d8c14332da3e3dc2795b5e40e12ab621de" }
+rushwind-http-binding = { git = "https://github.com/tx7do/rushwind", rev = "9bad36d8c14332da3e3dc2795b5e40e12ab621de" }
+rushwind-storage-seaorm-support = { git = "https://github.com/tx7do/rushwind", rev = "9bad36d8c14332da3e3dc2795b5e40e12ab621de" }
 bcrypt = "0.15"
 aes = "0.8"
 cbc = "0.1"
