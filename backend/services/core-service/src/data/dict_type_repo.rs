@@ -5,7 +5,6 @@ use sea_orm::{DatabaseConnection, EntityTrait};
 use crate::state::{db_status, not_found_status, StatusResult};
 use store::entities::sys_dict_types;
 
-
 pub async fn dict_types_by_id(
     db: &DatabaseConnection,
     id: i64,
@@ -40,4 +39,3 @@ pub async fn delete_dict_types(db: &DatabaseConnection, id: i64) -> StatusResult
         .map_err(db_status)?;
     Ok(())
 }
-

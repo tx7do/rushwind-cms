@@ -3,9 +3,7 @@
 //! varchar enum names).
 use std::sync::Arc;
 
-use sea_orm::{
-    EntityTrait, Set,
-};
+use sea_orm::{EntityTrait, Set};
 use tonic::{Request, Response, Status};
 
 use crate::state::{bad, ts_to_proto, AppState};
@@ -223,5 +221,4 @@ impl mediav1::media_asset_service_server::MediaAssetService for MediaAssetServic
         Ok(Response::new(pbjson_types::Empty {}))
     }
 }
-use crate::data::{media_asset_repo};
-
+use crate::data::media_asset_repo;

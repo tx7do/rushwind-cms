@@ -119,7 +119,11 @@ impl imv1::internal_message_category_service_server::InternalMessageCategoryServ
         else {
             return Err(bad("query_by required"));
         };
-        let row = internal_message_category_repo::internal_message_categories_by_id(&self.state.db, id as i64).await?;
+        let row = internal_message_category_repo::internal_message_categories_by_id(
+            &self.state.db,
+            id as i64,
+        )
+        .await?;
         Ok(Response::new(internal_message_category_proto(row)))
     }
 
@@ -168,9 +172,12 @@ impl imv1::internal_message_category_service_server::InternalMessageCategoryServ
         };
         // 不存在则创建
         if req.allow_missing.unwrap_or(false)
-            && internal_message_category_repo::internal_message_categories_by_id(&self.state.db, req.id as i64)
-                .await
-                .is_err()
+            && internal_message_category_repo::internal_message_categories_by_id(
+                &self.state.db,
+                req.id as i64,
+            )
+            .await
+            .is_err()
         {
             let mut create_data = data;
             create_data.created_by = create_data.updated_by;
@@ -233,8 +240,11 @@ impl imv1::internal_message_category_service_server::InternalMessageCategoryServ
             return Err(bad("query_by required"));
         };
         // 级联删除全部子孙节点
-        let mut ids =
-            internal_message_category_repo::internal_message_category_descendant_ids(&self.state.db, id as i64).await?;
+        let mut ids = internal_message_category_repo::internal_message_category_descendant_ids(
+            &self.state.db,
+            id as i64,
+        )
+        .await?;
         ids.push(id as i64);
         internal_message_categories::Entity::delete_many()
             .filter(internal_message_categories::Column::Id.is_in(ids))
@@ -244,5 +254,4 @@ impl imv1::internal_message_category_service_server::InternalMessageCategoryServ
         Ok(Response::new(pbjson_types::Empty {}))
     }
 }
-use crate::data::{internal_message_category_repo};
-
+use crate::data::internal_message_category_repo;

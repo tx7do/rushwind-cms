@@ -8,14 +8,10 @@ use std::sync::Arc;
 use sea_orm::{ActiveModelTrait, ColumnTrait, EntityTrait, QueryFilter, Set, TransactionTrait};
 use tonic::{Request, Response, Status};
 
-use crate::data::{user_repo};
-use crate::service::context::{
-    operator_of, operator_tenant_id,
-};
+use crate::data::user_repo;
+use crate::service::context::{operator_of, operator_tenant_id};
 use crate::state::{bad, db_status, not_found, ts_to_proto, AppState};
-use store::entities::{
-    sys_roles, sys_user_credentials, sys_user_roles, sys_users,
-};
+use store::entities::{sys_roles, sys_user_credentials, sys_user_roles, sys_users};
 use store::paging::fetch_paged;
 
 use proto::proto::identity::service::v1 as identityv1;

@@ -5,7 +5,6 @@ use sea_orm::{DatabaseConnection, EntityTrait};
 use crate::state::{db_status, not_found_status, StatusResult};
 use store::entities::sys_dict_entries;
 
-
 pub async fn dict_entries_by_id(
     db: &DatabaseConnection,
     id: i64,

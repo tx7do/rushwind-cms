@@ -82,7 +82,6 @@ pub fn require_admin_operator<T>(request: &tonic::Request<T>) -> Result<(i64, i6
 mod tests {
     use super::*;
 
-
     /// A request carrying the given metadata headers.
     fn req_with(headers: &[(&'static str, &'static str)]) -> tonic::Request<()> {
         let mut request = tonic::Request::new(());

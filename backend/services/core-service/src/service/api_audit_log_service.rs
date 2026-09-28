@@ -1,6 +1,5 @@
 //! The api-audit-log service (api_audit_log_service.go).
 
-
 use sea_orm::EntityTrait as _;
 use sea_orm::Set;
 use tonic::{Request, Response, Status};
@@ -9,7 +8,6 @@ use crate::state::{bad, db_status, not_found, ts_to_proto};
 use store::paging::fetch_paged;
 
 use proto::proto::audit::service::v1 as auditv1;
-
 
 fn api_audit_proto(r: store::entities::sys_api_audit_logs::Model) -> auditv1::ApiAuditLog {
     auditv1::ApiAuditLog {
@@ -36,7 +34,6 @@ fn api_audit_proto(r: store::entities::sys_api_audit_logs::Model) -> auditv1::Ap
         ..Default::default()
     }
 }
-
 
 pub async fn insert_api_audit(
     db: &sea_orm::DatabaseConnection,
@@ -71,7 +68,6 @@ pub async fn insert_api_audit(
     Ok(())
 }
 
-
 pub struct ApiAuditLogService {
     pub state: std::sync::Arc<crate::state::AppState>,
 }
@@ -83,7 +79,6 @@ pub struct LoginAuditLogServiceImpl {
 pub struct OperationAuditLogServiceImpl {
     pub state: std::sync::Arc<crate::state::AppState>,
 }
-
 
 #[async_trait::async_trait]
 impl auditv1::api_audit_log_service_server::ApiAuditLogService for ApiAuditLogService {
@@ -132,4 +127,3 @@ impl auditv1::api_audit_log_service_server::ApiAuditLogService for ApiAuditLogSe
         Ok(Response::new(pbjson_types::Empty {}))
     }
 }
-

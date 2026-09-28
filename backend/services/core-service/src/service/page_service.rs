@@ -1,7 +1,6 @@
 //! The page service — CRUD with the translation sub-tables
 //! (the reference's page_service.go).
 
-
 use std::sync::Arc;
 
 use sea_orm::{ActiveModelTrait, ColumnTrait, EntityTrait, QueryFilter, Set};
@@ -246,8 +245,12 @@ impl contentv1::page_service_server::PageService for PageService {
             Some(contentv1::get_page_request::QueryBy::Id(id)) => id as i64,
             _ => 0,
         };
-        let row =
-            page_translation_repo::get_page_translation(&self.state.db, id, &req.locale.unwrap_or_default()).await?;
+        let row = page_translation_repo::get_page_translation(
+            &self.state.db,
+            id,
+            &req.locale.unwrap_or_default(),
+        )
+        .await?;
         Ok(Response::new(
             row.map(page_translation_proto).unwrap_or_default(),
         ))

@@ -1,6 +1,5 @@
 //! The data-access-audit-log service (data_access_audit_log_service.go).
 
-
 use sea_orm::EntityTrait as _;
 use sea_orm::Set;
 use tonic::{Request, Response, Status};
@@ -37,7 +36,6 @@ fn data_access_audit_proto(
     }
 }
 
-
 fn data_access_type_name(v: i32) -> Option<String> {
     auditv1::data_access_audit_log::AccessType::try_from(v)
         .ok()
@@ -49,7 +47,6 @@ fn sensitive_level_name(v: i32) -> Option<String> {
         .ok()
         .map(|e| e.as_str_name().to_string())
 }
-
 
 /// The old/new value text → the JSON column (valid JSON keeps its
 /// shape; free text lands as a JSON string).
@@ -89,7 +86,6 @@ pub async fn insert_data_access_audit(
     .map_err(db_status)?;
     Ok(())
 }
-
 
 audit_impl!(
     DataAccessAuditLogService,

@@ -3,16 +3,13 @@
 //! asynq registration/execution history is intentionally not
 //! ported), mirroring the reference's task_service.go.
 
-
 use std::sync::Arc;
 
 use sea_orm::{ActiveModelTrait, ColumnTrait, EntityTrait, Set};
 use tonic::{Request, Response, Status};
 
-use crate::data::{task_repo};
-use crate::service::context::{
-    optional_operator_user_id, tenant_of as request_tenant_of,
-};
+use crate::data::task_repo;
+use crate::service::context::{optional_operator_user_id, tenant_of as request_tenant_of};
 use crate::state::{bad, db_status, not_found, ts_to_proto, AppState};
 use store::entities::sys_tasks;
 use store::paging::fetch_paged;
@@ -381,7 +378,8 @@ impl taskv1::task_service_server::TaskService for TaskService {
         // The reference gets the row first (a missing id 404s there),
         // then deletes, then stops the scheduler registration.
         task_repo::tasks_by_id(&self.state.db, id).await?;
-        task_repo::delete_task_scoped(&self.state.db, id, (tenant_id > 0).then_some(tenant_id)).await?;
+        task_repo::delete_task_scoped(&self.state.db, id, (tenant_id > 0).then_some(tenant_id))
+            .await?;
         // 偏差：参照仓随后 stopTask 移除 asynq 注册项；本移植无调度执行
         // 体，无需额外动作。
         Ok(Response::new(pbjson_types::Empty {}))

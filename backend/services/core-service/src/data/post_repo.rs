@@ -1,15 +1,9 @@
 //! The `post` repository (post_repo.go).
 
-use sea_orm::{
-    ActiveModelTrait, ColumnTrait, DatabaseConnection, EntityTrait, QueryFilter,
-};
+use sea_orm::{ActiveModelTrait, ColumnTrait, DatabaseConnection, EntityTrait, QueryFilter};
 
 use crate::state::StatusResult;
-use store::entities::{
-    post_categories, post_tags,
-    post_translations, posts,
-};
-
+use store::entities::{post_categories, post_tags, post_translations, posts};
 
 pub async fn post_by_id(db: &DatabaseConnection, id: i64) -> StatusResult<posts::Model> {
     posts::Entity::find_by_id(id)
@@ -77,5 +71,3 @@ pub async fn delete_post(db: &DatabaseConnection, id: i64) -> StatusResult<()> {
         .map_err(crate::db_status)?;
     Ok(())
 }
-
-

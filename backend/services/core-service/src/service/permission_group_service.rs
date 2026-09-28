@@ -1,18 +1,14 @@
 //! The permission-group service (permission_group_service.go).
 
-
 use std::sync::Arc;
 
 use sea_orm::{ActiveModelTrait, EntityTrait, PaginatorTrait, Set};
 use tonic::{Request, Response, Status};
 
-use proto::proto::permission::service::v1 as permissionv1;
 use crate::state::{bad, db_status, not_found, ts_to_proto, AppState};
-use store::entities::{
-    sys_permission_groups,
-};
+use proto::proto::permission::service::v1 as permissionv1;
+use store::entities::sys_permission_groups;
 use store::paging::fetch_paged;
-
 
 // ── PermissionGroup ──────────────────────────────────────────────────
 
@@ -148,5 +144,5 @@ impl permissionv1::permission_group_service_server::PermissionGroupService
         permission_group_repo::delete_permission_groups(&self.state.db, id as i64).await?;
         Ok(Response::new(pbjson_types::Empty {}))
     }
-}use crate::data::{permission_group_repo};
-
+}
+use crate::data::permission_group_repo;

@@ -363,8 +363,8 @@ fn button_action(title: &str) -> String {
         "edit", "update", "modify", "save", "patch", "保存", "修改", "更新", "编辑",
     ];
     const DELETE: &[&str] = &[
-        "delete", "del", "remove", "destroy", "drop", "discard", "trash", "删除", "移除",
-        "弃用", "清除",
+        "delete", "del", "remove", "destroy", "drop", "discard", "trash", "删除", "移除", "弃用",
+        "清除",
     ];
     const EXPORT: &[&str] = &[
         "export",
@@ -725,9 +725,7 @@ fn match_lit(word: &str, pos: usize, lit: &str, mode: CaseMode) -> Option<usize>
     let hit = match mode {
         CaseMode::Upper => rest.starts_with(&lit.to_ascii_uppercase()),
         CaseMode::Exact => rest.starts_with(lit),
-        CaseMode::Fold => {
-            rest.len() >= lit.len() && rest[..lit.len()].eq_ignore_ascii_case(lit)
-        }
+        CaseMode::Fold => rest.len() >= lit.len() && rest[..lit.len()].eq_ignore_ascii_case(lit),
     };
     hit.then_some(lit.len())
 }
@@ -808,8 +806,7 @@ fn rule_axis(word: &str, mode: CaseMode) -> Option<String> {
         CaseMode::Exact => (*set).contains(c),
         CaseMode::Fold => (*set).contains(c) || (*set).to_ascii_uppercase().contains(c),
     };
-    if !hit(chars[0], "a") || !hit(chars[1], "x") || !hit(chars[2], "ie") || !hit(chars[3], "s")
-    {
+    if !hit(chars[0], "a") || !hit(chars[1], "x") || !hit(chars[2], "ie") || !hit(chars[3], "s") {
         return None;
     }
     let repl = match mode {
@@ -870,7 +867,10 @@ const BARE: SRule = SRule {
     end_anchor: true,
     repl: "",
 };
-use crate::data::{api_repo, menu_repo, permission_api_repo, permission_group_repo, permission_menu_repo, permission_repo};
+use crate::data::{
+    api_repo, menu_repo, permission_api_repo, permission_group_repo, permission_menu_repo,
+    permission_repo,
+};
 
 /// 编译序的常规规则（声明倒序 × Upper/Exact/Fold）。
 fn regular_rules() -> Vec<(&'static str, SRule)> {

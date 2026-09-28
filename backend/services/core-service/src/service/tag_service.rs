@@ -1,7 +1,6 @@
 //! The tag service — CRUD with the translation sub-tables
 //! (the reference's tag_service.go).
 
-
 use std::sync::Arc;
 
 use sea_orm::{ActiveModelTrait, ColumnTrait, EntityTrait, QueryFilter, Set};
@@ -236,8 +235,12 @@ impl contentv1::tag_service_server::TagService for TagService {
             Some(contentv1::get_tag_request::QueryBy::Id(id)) => id as i64,
             _ => 0,
         };
-        let row =
-            tag_translation_repo::get_tag_translation(&self.state.db, id, &req.locale.unwrap_or_default()).await?;
+        let row = tag_translation_repo::get_tag_translation(
+            &self.state.db,
+            id,
+            &req.locale.unwrap_or_default(),
+        )
+        .await?;
         Ok(Response::new(
             row.map(tag_translation_proto).unwrap_or_default(),
         ))

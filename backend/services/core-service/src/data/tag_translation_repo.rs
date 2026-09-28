@@ -2,18 +2,15 @@
 
 use sea_orm::sea_query::Condition;
 use sea_orm::{
-    ActiveModelTrait, ColumnTrait, DatabaseConnection, EntityTrait,
-    PaginatorTrait, QueryFilter, QueryOrder, Set,
+    ActiveModelTrait, ColumnTrait, DatabaseConnection, EntityTrait, PaginatorTrait, QueryFilter,
+    QueryOrder, Set,
 };
 
 use super::language_repo::language_of;
 use crate::state::StatusResult;
 use store::entities::tag_translations;
 
-
-
 pub(crate) use super::category_translation_repo::NamedTranslationFields;
-
 
 pub(crate) enum TagTranslationQuery {
     Id(i64),

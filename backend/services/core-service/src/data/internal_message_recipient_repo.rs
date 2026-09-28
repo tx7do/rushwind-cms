@@ -9,18 +9,6 @@ use sea_orm::{ColumnTrait, DatabaseConnection, EntityTrait, QueryFilter, Set};
 use crate::state::{db_status, not_found_status, StatusResult};
 use store::entities::internal_message_recipients;
 
-
-
-
-
-
-
-
-
-
-
-
-
 // ── domain-specific queries ──────────────────────────────────────────
 
 pub async fn internal_message_recipients_by_id(

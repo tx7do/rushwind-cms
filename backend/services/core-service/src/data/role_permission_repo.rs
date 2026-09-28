@@ -8,30 +8,6 @@ use sea_orm::{ColumnTrait as _, DatabaseConnection, EntityTrait, QueryFilter as 
 use crate::state::{db_status, not_found_status, StatusResult};
 use store::entities::sys_role_permissions;
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 // ── domain-specific queries ─────────────────────────────────────────
 // (the role/user-role read helpers behind RoleService — the port of the
 // reference's role_repo / user_role_repo query faces)

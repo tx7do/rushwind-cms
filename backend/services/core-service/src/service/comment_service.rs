@@ -2,19 +2,15 @@
 //! author type, the post/page content types), mirroring the
 //! reference's comment_service.go.
 
-
 use std::sync::Arc;
 
 use sea_orm::{ActiveModelTrait, ColumnTrait, EntityTrait, PaginatorTrait, QueryFilter, Set};
 use tonic::{Request, Response, Status};
 
-
-use crate::data::{comment_repo};
+use crate::data::comment_repo;
 use crate::service::context::request_tenant_of;
 use crate::state::{bad, db_status, forbidden, not_found, ts_to_proto, AppState};
-use store::entities::{
-    comments, site_settings,
-};
+use store::entities::{comments, site_settings};
 use store::paging::fetch_paged;
 
 use proto::proto::comment::service::v1 as commentv1;

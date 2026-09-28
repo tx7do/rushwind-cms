@@ -7,15 +7,12 @@ use std::sync::Arc;
 use sea_orm::{ActiveModelTrait, ColumnTrait, EntityTrait, QueryFilter, Set, TransactionTrait};
 use tonic::{Request, Response, Status};
 
-use crate::data::{tenant_repo};
-use crate::service::context::{
-    optional_operator_user_id,
-};
+use crate::data::tenant_repo;
+use crate::service::context::optional_operator_user_id;
 use crate::service::user_service::insert_credential;
 use crate::state::{bad, db_status, not_found, ts_to_proto, AppState};
 use store::entities::{
-    sys_role_metadata, sys_role_permissions, sys_roles, sys_tenants, sys_user_roles,
-    sys_users,
+    sys_role_metadata, sys_role_permissions, sys_roles, sys_tenants, sys_user_roles, sys_users,
 };
 use store::paging::fetch_paged;
 
@@ -49,7 +46,6 @@ pub(crate) fn tenant_proto(r: sys_tenants::Model) -> identityv1::Tenant {
 pub struct TenantService {
     pub state: Arc<AppState>,
 }
-
 
 #[async_trait::async_trait]
 impl identityv1::tenant_service_server::TenantService for TenantService {

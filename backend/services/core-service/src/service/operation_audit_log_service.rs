@@ -1,6 +1,5 @@
 //! The operation-audit-log service (operation_audit_log_service.go).
 
-
 use sea_orm::EntityTrait as _;
 use sea_orm::Set;
 use tonic::{Request, Response, Status};
@@ -34,7 +33,6 @@ fn operation_audit_proto(
     }
 }
 
-
 pub async fn insert_operation_audit(
     db: &sea_orm::DatabaseConnection,
     d: auditv1::OperationAuditLog,
@@ -62,15 +60,9 @@ pub async fn insert_operation_audit(
     Ok(())
 }
 
-
-
-
-
-
 pub struct OperationAuditLogService {
     pub state: std::sync::Arc<crate::state::AppState>,
 }
-
 
 #[async_trait::async_trait]
 impl auditv1::operation_audit_log_service_server::OperationAuditLogService

@@ -135,5 +135,5 @@ impl sitev1::site_setting_service_server::SiteSettingService for SiteSettingServ
         site_setting_repo::delete_site_settings(&self.state.db, id as i64).await?;
         Ok(Response::new(pbjson_types::Empty {}))
     }
-}use crate::data::{site_setting_repo};
-
+}
+use crate::data::site_setting_repo;

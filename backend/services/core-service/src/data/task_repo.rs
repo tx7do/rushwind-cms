@@ -8,18 +8,6 @@ use sea_orm::{ColumnTrait, DatabaseConnection, EntityTrait, QueryFilter};
 use crate::state::{db_status, not_found_status, StatusResult};
 use store::entities::sys_tasks;
 
-
-
-
-
-
-
-
-
-
-
-
-
 // ── domain-specific queries ──────────────────────────────────────────
 
 pub async fn tasks_by_id(db: &DatabaseConnection, id: i64) -> StatusResult<sys_tasks::Model> {

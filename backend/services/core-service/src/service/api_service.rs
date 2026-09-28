@@ -12,8 +12,6 @@ use store::paging::fetch_paged;
 
 use proto::proto::permission::service::v1 as permissionv1;
 
-
-
 fn api_proto(r: sys_apis::Model) -> permissionv1::Api {
     permissionv1::Api {
         id: Some(r.id as u32),
@@ -185,6 +183,5 @@ impl permissionv1::api_service_server::ApiService for ApiService {
         }
         Ok(Response::new(pbjson_types::Empty {}))
     }
-
-}use crate::data::{api_repo};
-
+}
+use crate::data::api_repo;

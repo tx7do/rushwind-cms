@@ -11,22 +11,6 @@ use sea_orm::{
 use crate::state::{db_status, not_found_status, StatusResult};
 use store::entities::{comment_likes, interaction_counters, post_likes, post_watches};
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 // ── Interaction purge/recount helpers (the reference's
 //    adjustCounterRow / purge / reset tail of interaction_repo.go) ────
 

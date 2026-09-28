@@ -31,9 +31,7 @@ pub struct LanguageService {
 }
 
 #[async_trait::async_trait]
-impl proto::proto::dict::service::v1::language_service_server::LanguageService
-    for LanguageService
-{
+impl proto::proto::dict::service::v1::language_service_server::LanguageService for LanguageService {
     async fn list(
         &self,
         request: Request<proto::proto::pagination::PagingRequest>,
@@ -191,5 +189,5 @@ impl proto::proto::dict::service::v1::language_service_server::LanguageService
         language_repo::delete_languages(&self.state.db, id).await?;
         Ok(Response::new(pbjson_types::Empty {}))
     }
-}use crate::data::{language_repo};
-
+}
+use crate::data::language_repo;

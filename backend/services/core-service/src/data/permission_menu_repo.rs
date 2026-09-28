@@ -8,24 +8,7 @@ use sea_orm::{DatabaseConnection, EntityTrait, Set};
 use crate::state::{db_status, StatusResult};
 use store::entities::sys_permission_menus;
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 // ── domain-specific queries ─────────────────────────────────────────
-
 
 // ── the sync face's rebuild pipeline ────────────────────────────────
 

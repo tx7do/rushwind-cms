@@ -5,7 +5,6 @@ use sea_orm::{DatabaseConnection, EntityTrait};
 use crate::state::{db_status, not_found_status, StatusResult};
 use store::entities::sys_languages;
 
-
 pub async fn languages_by_id(
     db: &DatabaseConnection,
     id: i64,
@@ -41,10 +40,8 @@ pub async fn delete_languages(db: &DatabaseConnection, id: i64) -> StatusResult<
     Ok(())
 }
 
-
 // ── the language-code → column-value helper ──────────────────────────
 
 pub(crate) fn language_of(code: &Option<String>) -> &str {
     code.as_deref().unwrap_or("")
 }
-

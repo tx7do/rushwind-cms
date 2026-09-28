@@ -2,15 +2,13 @@
 
 use sea_orm::sea_query::Condition;
 use sea_orm::{
-    ActiveModelTrait, ColumnTrait, DatabaseConnection, EntityTrait,
-    PaginatorTrait, QueryFilter, QueryOrder, Set,
+    ActiveModelTrait, ColumnTrait, DatabaseConnection, EntityTrait, PaginatorTrait, QueryFilter,
+    QueryOrder, Set,
 };
 
 use super::language_repo::language_of;
 use crate::state::StatusResult;
 use store::entities::page_translations;
-
-
 
 /// The client-visible fields of a page translation.
 pub(crate) struct PageTranslationFields {

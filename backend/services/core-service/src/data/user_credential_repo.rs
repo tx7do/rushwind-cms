@@ -17,7 +17,7 @@ use store::entities::sys_user_credentials;
 use store::entities::sys_user_credentials as entity;
 use store::paging::fetch_paged;
 
-use crate::state::{StatusResult, db_status, not_found_status};
+use crate::state::{db_status, not_found_status, StatusResult};
 
 /// The proto enum number → the varchar value the golden schema stores
 /// (the proto string names ARE the stored values); unknown numbers

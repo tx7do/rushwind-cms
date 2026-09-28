@@ -6,29 +6,9 @@
 use sea_orm::{DatabaseConnection, EntityTrait};
 
 use crate::state::{db_status, not_found_status, StatusResult};
-use store::entities::{
-    sys_permission_apis, sys_permission_menus,
-    sys_permissions,
-};
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
+use store::entities::{sys_permission_apis, sys_permission_menus, sys_permissions};
 
 // ── domain-specific queries ─────────────────────────────────────────
-
 
 // ── the sync face's rebuild pipeline ────────────────────────────────
 

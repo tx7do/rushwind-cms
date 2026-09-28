@@ -3,16 +3,13 @@
 //! removal, mirroring the reference's
 //! internal_message_recipient_service.go.
 
-
 use std::sync::Arc;
 
 use sea_orm::{ActiveModelTrait, ColumnTrait, EntityTrait, QueryFilter, Set};
 use tonic::{Request, Response, Status};
 
-use crate::data::{internal_message_recipient_repo};
-use crate::service::context::{
-    operator_of,
-};
+use crate::data::internal_message_recipient_repo;
+use crate::service::context::operator_of;
 use crate::state::{bad, db_status, ts_to_proto, AppState};
 use store::entities::{internal_message_recipients, internal_messages};
 use store::paging::fetch_paged;
@@ -40,7 +37,9 @@ fn recipient_status_name(v: i32) -> Option<&'static str> {
         _ => return None,
     })
 }
-pub(crate) fn recipient_proto(r: internal_message_recipients::Model) -> imv1::InternalMessageRecipient {
+pub(crate) fn recipient_proto(
+    r: internal_message_recipients::Model,
+) -> imv1::InternalMessageRecipient {
     imv1::InternalMessageRecipient {
         id: Some(r.id as u32),
         message_id: r.message_id.map(|v| v as u32),
@@ -88,7 +87,11 @@ impl imv1::internal_message_recipient_service_server::InternalMessageRecipientSe
         else {
             return Err(bad("query_by required"));
         };
-        let row = internal_message_recipient_repo::internal_message_recipients_by_id(&self.state.db, id as i64).await?;
+        let row = internal_message_recipient_repo::internal_message_recipients_by_id(
+            &self.state.db,
+            id as i64,
+        )
+        .await?;
         Ok(Response::new(recipient_proto(row)))
     }
 
@@ -259,5 +262,4 @@ mod tests {
             assert_eq!(recipient_status_num(name), None, "{name}");
         }
     }
-
 }

@@ -8,18 +8,6 @@ use sea_orm::{DatabaseConnection, EntityTrait};
 use crate::state::{db_status, not_found_status, StatusResult};
 use store::entities::internal_messages;
 
-
-
-
-
-
-
-
-
-
-
-
-
 // ── domain-specific queries ──────────────────────────────────────────
 
 pub async fn internal_messages_by_id(

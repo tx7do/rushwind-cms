@@ -1,6 +1,5 @@
 //! The permission-audit-log service (permission_audit_log_service.go).
 
-
 use sea_orm::EntityTrait as _;
 use sea_orm::Set;
 use tonic::{Request, Response, Status};
@@ -33,7 +32,6 @@ fn permission_audit_proto(
 }
 
 // The five service impls — one per audit family.
-
 
 fn permission_action_name(v: i32) -> Option<String> {
     auditv1::permission_audit_log::ActionType::try_from(v)
@@ -74,7 +72,6 @@ pub async fn insert_permission_audit(
     .map_err(db_status)?;
     Ok(())
 }
-
 
 audit_impl!(
     PermissionAuditLogService,

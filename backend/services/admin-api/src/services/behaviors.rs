@@ -41,11 +41,7 @@ pub async fn file_create(
 /// The route-table sync into sys_apis: the generated route corpus this
 /// very binary was compiled from (the shadowed entries the mux cannot
 /// reach are skipped).
-pub async fn sync_apis(
-    state: &AppState,
-    ctx: &Ctx,
-    _req: Empty,
-) -> Result<Empty, StatusError> {
+pub async fn sync_apis(state: &AppState, ctx: &Ctx, _req: Empty) -> Result<Empty, StatusError> {
     let mut req = proto::proto::permission::service::v1::SyncApisRequest::default();
     for r in proto::gen_admin::routes::ROUTES {
         if r.shadowed {
@@ -65,10 +61,9 @@ pub async fn sync_apis(
             ..Default::default()
         });
     }
-    let mut core =
-        proto::proto::permission::service::v1::api_service_client::ApiServiceClient::new(
-            state.core_channel.clone(),
-        );
+    let mut core = proto::proto::permission::service::v1::api_service_client::ApiServiceClient::new(
+        state.core_channel.clone(),
+    );
     core.sync_apis(with_operator(ctx, req))
         .await
         .map_err(map_status)?;
@@ -83,10 +78,9 @@ pub async fn edit_user_password(
     ctx: &Ctx,
     req: proto::proto::identity::service::v1::EditUserPasswordRequest,
 ) -> Result<Empty, StatusError> {
-    let mut core =
-        proto::proto::identity::service::v1::user_service_client::UserServiceClient::new(
-            state.core_channel.clone(),
-        );
+    let mut core = proto::proto::identity::service::v1::user_service_client::UserServiceClient::new(
+        state.core_channel.clone(),
+    );
     core.update(with_operator(
         ctx,
         proto::proto::identity::service::v1::UpdateUserRequest {

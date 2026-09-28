@@ -1,12 +1,9 @@
 //! The `category` repository (category_repo.go).
 
-use sea_orm::{
-    ActiveModelTrait, DatabaseConnection, EntityTrait,
-};
+use sea_orm::{ActiveModelTrait, DatabaseConnection, EntityTrait};
 
 use crate::state::StatusResult;
 use store::entities::categories;
-
 
 pub async fn category_by_id(db: &DatabaseConnection, id: i64) -> StatusResult<categories::Model> {
     categories::Entity::find_by_id(id)

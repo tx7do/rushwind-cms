@@ -5,7 +5,7 @@ use std::sync::Arc;
 use sea_orm::{ActiveModelTrait, EntityTrait, Set};
 use tonic::{Request, Response, Status};
 
-use crate::data::{navigation_item_repo};
+use crate::data::navigation_item_repo;
 use crate::service::navigation_service::navigation_item_proto;
 use crate::service::site_service::link_type_name;
 use crate::state::{bad, db_status, not_found, AppState};

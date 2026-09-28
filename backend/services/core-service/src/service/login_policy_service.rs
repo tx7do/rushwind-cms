@@ -2,9 +2,7 @@
 //! (type/method as the varchar enum names the reference stores).
 use std::sync::Arc;
 
-use sea_orm::{
-    ActiveModelTrait, ColumnTrait, EntityTrait, QueryFilter, Set,
-};
+use sea_orm::{ActiveModelTrait, ColumnTrait, EntityTrait, QueryFilter, Set};
 use tonic::{Request, Response, Status};
 
 use crate::state::{bad, db_status, ts_to_proto, AppState};
@@ -174,5 +172,4 @@ impl authv1::login_policy_service_server::LoginPolicyService for LoginPolicyServ
         Ok(Response::new(pbjson_types::Empty {}))
     }
 }
-use crate::data::{login_policy_repo};
-
+use crate::data::login_policy_repo;

@@ -9,13 +9,9 @@ use sea_orm::{ActiveModelTrait, ColumnTrait, EntityTrait, QueryFilter, Set, Tran
 use tonic::{Request, Response, Status};
 
 use crate::data::{role_metadata_repo, role_permission_repo, role_repo, user_role_repo};
-use crate::service::context::{
-    operator_of, operator_tenant_id,
-};
+use crate::service::context::{operator_of, operator_tenant_id};
 use crate::state::{bad, db_status, forbidden, not_found, ts_to_proto, AppState};
-use store::entities::{
-    sys_role_permissions, sys_roles, sys_user_roles, sys_users,
-};
+use store::entities::{sys_role_permissions, sys_roles, sys_user_roles, sys_users};
 use store::paging::fetch_paged;
 
 use proto::proto::permission::service::v1 as permissionv1;
@@ -334,7 +330,8 @@ impl permissionv1::role_service_server::RoleService for RoleService {
         let mut permission_ids: Vec<i64> = Vec::new();
         match req.query_by {
             Some(permissionv1::list_permission_ids_request::QueryBy::RoleId(role_id)) => {
-                permission_ids = role_permission_repo::permission_ids_by_role_ids(db, &[role_id as i64]).await?;
+                permission_ids =
+                    role_permission_repo::permission_ids_by_role_ids(db, &[role_id as i64]).await?;
             }
             Some(permissionv1::list_permission_ids_request::QueryBy::RoleCode(code)) => {
                 if caller_tenant_id == 0 {
@@ -342,19 +339,23 @@ impl permissionv1::role_service_server::RoleService for RoleService {
                 }
                 let role_ids =
                     role_repo::role_ids_by_codes(db, &[code], caller_tenant_id as i64).await?;
-                permission_ids = role_permission_repo::permission_ids_by_role_ids(db, &role_ids).await?;
+                permission_ids =
+                    role_permission_repo::permission_ids_by_role_ids(db, &role_ids).await?;
             }
             Some(permissionv1::list_permission_ids_request::QueryBy::UserId(user_id)) => {
                 // 校验目标用户归属当前调用者租户，避免跨租户枚举他人权限 ID
                 validate_target_user_tenant(db, caller_tenant_id, user_id).await?;
                 // the reference keeps expired bindings on this path
                 let role_ids = user_role_repo::user_role_ids(db, user_id as i64, true).await?;
-                permission_ids = role_permission_repo::permission_ids_by_role_ids(db, &role_ids).await?;
+                permission_ids =
+                    role_permission_repo::permission_ids_by_role_ids(db, &role_ids).await?;
             }
             None => {
                 if !req.role_ids.is_empty() {
                     let role_ids: Vec<i64> = req.role_ids.iter().map(|v| *v as i64).collect();
-                    permission_ids.extend(role_permission_repo::permission_ids_by_role_ids(db, &role_ids).await?);
+                    permission_ids.extend(
+                        role_permission_repo::permission_ids_by_role_ids(db, &role_ids).await?,
+                    );
                 }
                 if !req.role_codes.is_empty() {
                     if caller_tenant_id == 0 {
@@ -363,7 +364,9 @@ impl permissionv1::role_service_server::RoleService for RoleService {
                     let role_ids =
                         role_repo::role_ids_by_codes(db, &req.role_codes, caller_tenant_id as i64)
                             .await?;
-                    permission_ids.extend(role_permission_repo::permission_ids_by_role_ids(db, &role_ids).await?);
+                    permission_ids.extend(
+                        role_permission_repo::permission_ids_by_role_ids(db, &role_ids).await?,
+                    );
                 }
             }
         }
@@ -404,9 +407,12 @@ impl permissionv1::role_service_server::RoleService for RoleService {
         }
         // 校验目标用户归属当前调用者租户，避免跨租户枚举他人角色绑定
         validate_target_user_tenant(&self.state.db, caller_tenant_id, req.user_id).await?;
-        let bindings =
-            user_role_repo::user_roles_by_user_id(&self.state.db, req.user_id as i64, req.include_expired)
-                .await?;
+        let bindings = user_role_repo::user_roles_by_user_id(
+            &self.state.db,
+            req.user_id as i64,
+            req.include_expired,
+        )
+        .await?;
         Ok(Response::new(permissionv1::GetUserRolesResponse {
             bindings: bindings.into_iter().map(user_role_proto).collect(),
         }))

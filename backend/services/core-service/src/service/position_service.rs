@@ -3,12 +3,10 @@
 
 use std::sync::Arc;
 
-use sea_orm::{
-    ActiveModelTrait, ColumnTrait, EntityTrait, PaginatorTrait, QueryFilter, Set,
-};
+use sea_orm::{ActiveModelTrait, ColumnTrait, EntityTrait, PaginatorTrait, QueryFilter, Set};
 use tonic::{Request, Response, Status};
 
-use crate::data::{position_repo};
+use crate::data::position_repo;
 use crate::service::org_unit_service::ts_to_column;
 use crate::state::{bad, db_status, AppState};
 use store::entities::sys_positions;
@@ -28,7 +26,6 @@ macro_rules! enum_name {
         }
     };
 }
-
 
 // ── Position ─────────────────────────────────────────────────────────
 
@@ -244,5 +241,3 @@ impl identityv1::position_service_server::PositionService for PositionService {
         Ok(Response::new(pbjson_types::Empty {}))
     }
 }
-
-

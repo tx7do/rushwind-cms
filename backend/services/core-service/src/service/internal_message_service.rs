@@ -3,13 +3,12 @@
 //! messages and the revoke, mirroring the reference's
 //! internal_message_service.go.
 
-
 use std::sync::Arc;
 
 use sea_orm::{ActiveModelTrait, ColumnTrait, EntityTrait, QueryFilter, Set, TransactionTrait};
 use tonic::{Request, Response, Status};
 
-use crate::data::{internal_message_repo};
+use crate::data::internal_message_repo;
 use crate::service::context::{
     operator_of, optional_operator_user_id, tenant_of as request_tenant_of,
 };
@@ -114,9 +113,7 @@ fn internal_message_insert_model(
 }
 
 #[async_trait::async_trait]
-impl imv1::internal_message_service_server::InternalMessageService
-    for InternalMessageService
-{
+impl imv1::internal_message_service_server::InternalMessageService for InternalMessageService {
     async fn list_message(
         &self,
         request: Request<proto::proto::pagination::PagingRequest>,
@@ -436,5 +433,4 @@ mod tests {
             assert_eq!(message_type_num(name), None, "{name}");
         }
     }
-
 }

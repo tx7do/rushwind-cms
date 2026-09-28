@@ -1,12 +1,9 @@
 //! The search repository — the SQL ILIKE fallback over posts
 //! (search_repo.go), with the summary/html helpers it rides on.
 
-use sea_orm::{
-    ConnectionTrait, DatabaseConnection,
-};
+use sea_orm::{ConnectionTrait, DatabaseConnection};
 
 use crate::state::StatusResult;
-
 
 /// The search fallback: (post_id, language, title) hits.
 pub async fn search_hits(

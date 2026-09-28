@@ -1,7 +1,6 @@
 //! The post service — CRUD with the translation sub-tables
 //! (the reference's post_service.go).
 
-
 use std::sync::Arc;
 
 use sea_orm::{ActiveModelTrait, ColumnTrait, EntityTrait, QueryFilter, Set};
@@ -9,9 +8,7 @@ use tonic::{Request, Response, Status};
 
 use crate::data::post_translation_repo as repo;
 use crate::state::{bad, db_status, not_found, ts_to_proto, AppState};
-use store::entities::{
-    post_categories, post_tags, post_translations, posts,
-};
+use store::entities::{post_categories, post_tags, post_translations, posts};
 use store::paging::fetch_paged;
 
 use proto::proto::content::service::v1 as contentv1;
@@ -113,10 +110,6 @@ async fn post_relations(
 pub struct PostService {
     pub state: Arc<AppState>,
 }
-
-
-
-
 
 #[async_trait::async_trait]
 impl contentv1::post_service_server::PostService for PostService {
@@ -400,8 +393,12 @@ impl contentv1::post_service_server::PostService for PostService {
             Some(contentv1::get_post_request::QueryBy::Id(id)) => id as i64,
             _ => 0,
         };
-        let row =
-            post_translation_repo::get_post_translation(&self.state.db, id, &req.locale.unwrap_or_default()).await?;
+        let row = post_translation_repo::get_post_translation(
+            &self.state.db,
+            id,
+            &req.locale.unwrap_or_default(),
+        )
+        .await?;
         Ok(Response::new(
             row.map(post_translation_proto).unwrap_or_default(),
         ))

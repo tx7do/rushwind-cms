@@ -3,7 +3,6 @@
 //! (permission_service.go; the rebuild itself lives in
 //! permission_sync.rs).
 
-
 use std::sync::Arc;
 
 use sea_orm::{ActiveModelTrait, ColumnTrait, EntityTrait, PaginatorTrait, QueryFilter, Set};
@@ -11,13 +10,10 @@ use tonic::{Request, Response, Status};
 
 use crate::data::{permission_repo, role_permission_repo};
 use crate::service::permission_sync;
-use proto::proto::permission::service::v1 as permissionv1;
 use crate::state::{bad, db_status, not_found, ts_to_proto, AppState};
-use store::entities::{
-    sys_permission_apis, sys_permission_menus, sys_permissions,
-};
+use proto::proto::permission::service::v1 as permissionv1;
+use store::entities::{sys_permission_apis, sys_permission_menus, sys_permissions};
 use store::paging::fetch_paged;
-
 
 // ── Permission ───────────────────────────────────────────────────────
 

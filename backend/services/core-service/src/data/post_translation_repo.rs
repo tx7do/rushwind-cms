@@ -2,8 +2,8 @@
 
 use sea_orm::sea_query::Condition;
 use sea_orm::{
-    ActiveModelTrait, ColumnTrait, DatabaseConnection, EntityTrait,
-    PaginatorTrait, QueryFilter, QueryOrder, Set,
+    ActiveModelTrait, ColumnTrait, DatabaseConnection, EntityTrait, PaginatorTrait, QueryFilter,
+    QueryOrder, Set,
 };
 
 use super::language_repo::language_of;
@@ -11,8 +11,6 @@ use super::search_repo::generate_summary;
 use super::search_repo::raw_chars;
 use crate::state::StatusResult;
 use store::entities::post_translations;
-
-
 
 /// The client-visible fields of a post translation. A missing `summary`
 /// and the `word_count` are server-derived here, never trusted from the

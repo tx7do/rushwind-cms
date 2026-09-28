@@ -6,10 +6,8 @@ use std::sync::Arc;
 
 use tonic::{Request, Response, Status};
 
-use crate::data::{user_repo};
-use crate::service::context::{
-    operator_of,
-};
+use crate::data::user_repo;
+use crate::service::context::operator_of;
 use crate::service::user_service::{user_proto, UserService};
 use crate::state::AppState;
 

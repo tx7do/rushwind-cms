@@ -1,19 +1,15 @@
 //! The menu service — the menu-tree CRUD with the meta JSON
 //! round-trip (menu_service.go).
 
-
 use std::sync::Arc;
 
 use sea_orm::{ActiveModelTrait, ColumnTrait, EntityTrait, PaginatorTrait, QueryFilter, Set};
 use tonic::{Request, Response, Status};
 
-use proto::proto::permission::service::v1 as permissionv1;
 use crate::state::{bad, db_status, not_found, ts_to_proto, AppState};
-use store::entities::{
-    sys_menus,
-};
+use proto::proto::permission::service::v1 as permissionv1;
+use store::entities::sys_menus;
 use store::paging::fetch_paged;
-
 
 fn menu_meta(json: Option<sea_orm::JsonValue>) -> Option<permissionv1::MenuMeta> {
     let v = json?;
@@ -206,5 +202,5 @@ impl permissionv1::menu_service_server::MenuService for MenuService {
         menu_repo::delete_menus(&self.state.db, id as i64).await?;
         Ok(Response::new(pbjson_types::Empty {}))
     }
-}use crate::data::{menu_repo};
-
+}
+use crate::data::menu_repo;

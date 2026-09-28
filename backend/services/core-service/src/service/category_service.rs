@@ -1,7 +1,6 @@
 //! The category service — CRUD with the translation sub-tables
 //! (the reference's category_service.go).
 
-
 use std::sync::Arc;
 
 use sea_orm::{ActiveModelTrait, ColumnTrait, EntityTrait, QueryFilter, Set};
@@ -249,9 +248,12 @@ impl contentv1::category_service_server::CategoryService for CategoryService {
             Some(contentv1::get_category_request::QueryBy::Id(id)) => id as i64,
             _ => 0,
         };
-        let row =
-            category_translation_repo::get_category_translation(&self.state.db, id, &req.locale.unwrap_or_default())
-                .await?;
+        let row = category_translation_repo::get_category_translation(
+            &self.state.db,
+            id,
+            &req.locale.unwrap_or_default(),
+        )
+        .await?;
         Ok(Response::new(
             row.map(category_translation_proto).unwrap_or_default(),
         ))

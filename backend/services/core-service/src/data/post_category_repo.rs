@@ -1,12 +1,9 @@
 //! The `post_category` relation repository (post_category_repo.go).
 
-use sea_orm::{
-    ActiveModelTrait, DatabaseConnection, Set,
-};
+use sea_orm::{ActiveModelTrait, DatabaseConnection, Set};
 
 use crate::state::StatusResult;
 use store::entities::post_categories;
-
 
 pub async fn link_post_category(
     db: &DatabaseConnection,

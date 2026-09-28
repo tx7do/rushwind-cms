@@ -2,20 +2,19 @@
 //! counter table (the ledger writes), mirroring the reference's
 //! interaction_service.go.
 
-
 use std::sync::Arc;
 
 use sea_orm::{ActiveModelTrait, ColumnTrait, EntityTrait, QueryFilter, Set};
 use tonic::{Request, Response, Status};
 
-use crate::data::{post_repo};
+use crate::data::post_repo;
 use crate::service::context::operator_of;
 use crate::state::{bad, db_status, AppState};
 use store::entities::{comment_likes, interaction_counters, post_likes, post_watches};
 use store::paging::fetch_paged;
 
-use proto::proto::interaction::service::v1 as interactionv1;
 use proto::proto::content::service::v1 as contentv1;
+use proto::proto::interaction::service::v1 as interactionv1;
 
 // ── Interaction ──────────────────────────────────────────────────────
 

@@ -1,6 +1,5 @@
 //! The login-audit-log service (login_audit_log_service.go).
 
-
 use sea_orm::EntityTrait as _;
 use sea_orm::Set;
 use tonic::{Request, Response, Status};
@@ -33,7 +32,6 @@ fn login_audit_proto(r: store::entities::sys_login_audit_logs::Model) -> auditv1
         ..Default::default()
     }
 }
-
 
 fn audit_status_name(v: i32) -> String {
     match v {
@@ -73,7 +71,6 @@ pub async fn insert_login_audit(
     Ok(())
 }
 
-
 pub struct LoginAuditLogService {
     pub state: std::sync::Arc<crate::state::AppState>,
 }
@@ -81,7 +78,6 @@ pub struct LoginAuditLogService {
 pub struct OperationAuditLogServiceImpl {
     pub state: std::sync::Arc<crate::state::AppState>,
 }
-
 
 #[async_trait::async_trait]
 impl auditv1::login_audit_log_service_server::LoginAuditLogService for LoginAuditLogService {
@@ -130,4 +126,3 @@ impl auditv1::login_audit_log_service_server::LoginAuditLogService for LoginAudi
         Ok(Response::new(pbjson_types::Empty {}))
     }
 }
-

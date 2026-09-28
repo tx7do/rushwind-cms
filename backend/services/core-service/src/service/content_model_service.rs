@@ -308,7 +308,8 @@ impl contentv1::content_model_service_server::ContentModelService for ContentMod
         a.updated_at = Set(Some(store::now()));
         let row = content_model_repo::update_content_models(&txn, a).await?;
         // 字段定义与翻译整体替换（对位 replace-fields / replace-translations）
-        let old_field_ids = content_model_repo::content_model_field_ids(&txn, req.id as i64).await?;
+        let old_field_ids =
+            content_model_repo::content_model_field_ids(&txn, req.id as i64).await?;
         content_model_repo::delete_field_definition_translations_of(&txn, &old_field_ids).await?;
         content_model_repo::delete_field_definitions_of(&txn, req.id as i64).await?;
         batch_create_fields(&txn, req.id as i64, &data.fields).await?;
@@ -350,10 +351,13 @@ impl contentv1::content_model_service_server::ContentModelService for ContentMod
         if req.content_model_id == 0 {
             return Err(bad("invalid parameter"));
         }
-        let rows = content_model_repo::field_definitions_of(&self.state.db, req.content_model_id as i64).await?;
+        let rows =
+            content_model_repo::field_definitions_of(&self.state.db, req.content_model_id as i64)
+                .await?;
         let mut items = Vec::with_capacity(rows.len());
         for r in rows {
-            let translations = content_model_repo::field_definition_translations_of(&self.state.db, r.id).await?;
+            let translations =
+                content_model_repo::field_definition_translations_of(&self.state.db, r.id).await?;
             items.push(field_definition_proto(r, translations));
         }
         let total = items.len() as u64;
@@ -363,5 +367,4 @@ impl contentv1::content_model_service_server::ContentModelService for ContentMod
         }))
     }
 }
-use crate::data::{content_model_repo};
-
+use crate::data::content_model_repo;

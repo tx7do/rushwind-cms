@@ -2,15 +2,13 @@
 
 use sea_orm::sea_query::Condition;
 use sea_orm::{
-    ActiveModelTrait, ColumnTrait, DatabaseConnection, EntityTrait,
-    PaginatorTrait, QueryFilter, QueryOrder, Set,
+    ActiveModelTrait, ColumnTrait, DatabaseConnection, EntityTrait, PaginatorTrait, QueryFilter,
+    QueryOrder, Set,
 };
 
 use super::language_repo::language_of;
 use crate::state::StatusResult;
 use store::entities::category_translations;
-
-
 
 /// Category and tag translations share this shape.
 pub struct NamedTranslationFields {

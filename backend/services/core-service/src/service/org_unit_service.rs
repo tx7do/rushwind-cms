@@ -4,18 +4,15 @@
 
 use std::sync::Arc;
 
-use sea_orm::{
-    ColumnTrait, EntityTrait, PaginatorTrait, QueryFilter, Set,
-    TransactionTrait,
-};
+use sea_orm::{ColumnTrait, EntityTrait, PaginatorTrait, QueryFilter, Set, TransactionTrait};
 use tonic::{Request, Response, Status};
 
 use crate::state::{bad, db_status, ts_from_proto, AppState};
 use store::entities::sys_org_units;
 use store::paging::fetch_paged;
 
+use crate::data::org_unit_repo;
 use proto::proto::identity::service::v1 as identityv1;
-use crate::data::{org_unit_repo};
 
 /// The proto enum ordinal → the varchar value name the golden schema
 /// stores (the EnumTypeConverter name-map behavior; unknown ordinals
@@ -29,7 +26,6 @@ macro_rules! enum_name {
         }
     };
 }
-
 
 fn compute_tree_path(parent_path: &str, node_id: i64) -> String {
     if parent_path.is_empty() {

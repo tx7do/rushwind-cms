@@ -11,7 +11,7 @@ use std::sync::Arc;
 use sea_orm::{EntityTrait, PaginatorTrait, Set};
 use tonic::{Request, Response, Status};
 
-use crate::data::{file_repo};
+use crate::data::file_repo;
 use crate::service::context::{operator_of, tenant_of};
 use crate::state::{bad, db_status, ts_to_proto, AppState};
 use store::entities::files;
