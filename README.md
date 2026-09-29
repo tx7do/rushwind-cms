@@ -119,7 +119,7 @@ rushwind-cms/
 ├── backend/
 │   ├── api/                        # API 契约（唯一契约源）
 │   │   ├── protos/                 # proto 契约副本（MANIFEST.sha256 校验门）
-│   │   ├── third_party/            # 第三方 proto（google.api 等，PROVENANCE）
+│   │   ├── buf.lock                # buf 依赖 commit 钉定（六 BSR 模块，与上游 lock 同源）
 │   │   └── sync-protos.sh          # 契约同步与校验脚本
 │   ├── crates/
 │   │   ├── proto/                  # 契约 crate（prost/pbjson 类型 + 描述符池 + REST/gRPC 双生成面）

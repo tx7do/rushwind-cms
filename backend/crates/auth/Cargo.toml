@@ -13,9 +13,9 @@ workspace = true
 [dependencies]
 proto = { path = "../proto" }
 async-trait = { workspace = true }
-rushwind-authn = { git = "https://github.com/tx7do/rushwind", rev = "cc80e1cfecc98cb7b027f56ea6adaf46c62cee1e" }
-rushwind-authn-gate = { git = "https://github.com/tx7do/rushwind", rev = "cc80e1cfecc98cb7b027f56ea6adaf46c62cee1e" }
-rushwind-http-binding = { git = "https://github.com/tx7do/rushwind", rev = "cc80e1cfecc98cb7b027f56ea6adaf46c62cee1e" }
+rushwind-authn = { git = "https://github.com/tx7do/rushwind", rev = "eaa813e1c26819251060a0ac7af0b75fe871bcea" }
+rushwind-authn-gate = { git = "https://github.com/tx7do/rushwind", rev = "eaa813e1c26819251060a0ac7af0b75fe871bcea" }
+rushwind-http-binding = { git = "https://github.com/tx7do/rushwind", rev = "eaa813e1c26819251060a0ac7af0b75fe871bcea" }
 axum = { version = "0.8", default-features = false, features = ["matched-path"] }
 base64 = "0.22"
 serde_json = { workspace = true }

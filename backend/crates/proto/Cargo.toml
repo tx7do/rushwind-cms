@@ -20,12 +20,12 @@ async-trait = { workspace = true }
 axum = { version = "0.8", default-features = false }
 tonic = { version = "0.14", default-features = false, features = ["codegen", "channel", "server", "transport"] }
 tonic-prost = "0.14"
-rushwind-http-binding = { git = "https://github.com/tx7do/rushwind", rev = "cc80e1cfecc98cb7b027f56ea6adaf46c62cee1e" }
-rushwind-redact = { git = "https://github.com/tx7do/rushwind", rev = "cc80e1cfecc98cb7b027f56ea6adaf46c62cee1e" }
-rushwind-storage-seaorm-support = { git = "https://github.com/tx7do/rushwind", rev = "cc80e1cfecc98cb7b027f56ea6adaf46c62cee1e" }
+rushwind-http-binding = { git = "https://github.com/tx7do/rushwind", rev = "eaa813e1c26819251060a0ac7af0b75fe871bcea" }
+rushwind-redact = { git = "https://github.com/tx7do/rushwind", rev = "eaa813e1c26819251060a0ac7af0b75fe871bcea" }
+rushwind-storage-seaorm-support = { git = "https://github.com/tx7do/rushwind", rev = "eaa813e1c26819251060a0ac7af0b75fe871bcea" }
 
 [build-dependencies]
-rushwind-proto-build = { git = "https://github.com/tx7do/rushwind", rev = "cc80e1cfecc98cb7b027f56ea6adaf46c62cee1e", features = ["tonic"] }
+rushwind-proto-build = { git = "https://github.com/tx7do/rushwind", rev = "eaa813e1c26819251060a0ac7af0b75fe871bcea", features = ["tonic"] }
 
 [dev-dependencies]
 tokio = { version = "1", features = ["macros", "rt"] }

@@ -1,29 +1,37 @@
-# buf 工作区（本地、无 BSR 依赖）——把同步/vendoring 模型显式化给 buf CLI：
+# buf 工作区——契约树 + BSR 依赖，无 vendored 第三方：
 #
 #   cd backend/api
 #   buf lint                              # 样式报告（仅契约树；快照禁手改，
 #                                         #   发现的问题在契约源头修复后再同步）
-#   buf build -o /tmp/api-image.binpb     # 编译全工作区（含注解闭包，选项字节保真）
+#   buf build -o /tmp/api-image.binpb     # 编译全工作区（含注解闭包，选项字节保真；
+#                                         #   首次构建会按 buf.lock 拉取六个依赖模块
+#                                         #   进模块缓存，之后离线可用）
 #   buf breaking --against "../../.git#branch=main,subdir=backend/api"
 #                                         # 接受新契约 vintage 前的演进检查
+#   buf dep update                        # 升级第三方依赖（重生成 buf.lock，
+#                                         #   随提交走全量差分回归）
 #
-# 契约树为字节同步快照（api/sync-protos.sh + api/MANIFEST.sha256 门），第三方
-# 注解为本地 vendoring（third_party/PROVENANCE.md）。因此这里【不做】buf format
-# （会砸字节清单门）、【不挂】BSR deps（本地直接把 vendored 子树声明为 workspace
-# 模块，import 跨模块自动解析）。
+# 契约树为字节同步快照（api/sync-protos.sh + api/MANIFEST.sha256 门），因此这里
+# 【不做】buf format（会砸字节清单门）。第三方注解声明不再 vendor 进仓：六个 BSR
+# 模块由 deps 声明、由 buf.lock 钉定 commit——buf.lock 与上游同源（上游 lock 是
+# 唯一版本事实源；再同步时比对两边 commit 即可）。import 按模块根相对路径解析，
+# 与契约树的写法天然同构；google/protobuf 由 buf 内置 WKT 解析。
 version: v2
 
 modules:
-  # 契约树：字节同步快照（api/MANIFEST.sha256 门）。
+  # 契约树：136 个 proto，字节同步快照（api/MANIFEST.sha256 门）。
   - path: protos
     lint:
       use:
         - STANDARD
-  # 手工 vendored 的第三方注解声明（见 third_party/PROVENANCE.md）。整个子树
-  # 声明为一个模块：契约里的 import 全部以 third_party/ 为根
-  # （google/api/...、gnostic/...、pagination/...），与 build.rs 的
-  # `-I third_party` 同构；google/protobuf 由 buf 内置 WKT 解析。
-  - path: third_party
+
+deps:
+  - 'buf.build/googleapis/googleapis'          # google.api.http / field_behavior / HttpBody
+  - 'buf.build/kratos/apis'                    # (errors.code) reason→HTTP 状态注解
+  - 'buf.build/tx7do/pagination'               # go-crud PagingRequest（列请求信封）
+  - 'buf.build/envoyproxy/protoc-gen-validate' # PGV 校验注解声明
+  - 'buf.build/gnostic/gnostic'                # OpenAPI 扩展注解（免鉴权端点标注）
+  - 'buf.build/go-wind/redact'                 # 静态脱敏注解声明
 
 breaking:
   use:

@@ -36,13 +36,22 @@ jobs:
         with:
           workspaces: backend
 
-      # The proto crate's build script compiles the annotated closure
-      # through `buf build` (backend/api/buf.yaml workspace) — buf
-      # preserves the custom-option bytes (google.api.http / errors.code /
-      # gnostic / redact) that protox's serializer drops.
+      # The proto crate's build script compiles the api workspace through
+      # `buf build` — buf preserves the custom-option bytes (google.api.http /
+      # errors.code / gnostic / redact) that a Rust-side serializer drops.
       - uses: bufbuild/buf-setup-action@v1
         with:
           version: "1.73.0"
+
+      # The api workspace resolves its six annotation modules through
+      # buf.lock-pinned BSR deps (no vendored third_party tree) — cache
+      # the module cache keyed on the lock so the steady state builds
+      # offline; a lock change refetches.
+      - uses: actions/cache@v4
+        with:
+          path: ~/.cache/buf
+          key: buf-modules-${{ hashFiles('backend/api/buf.lock') }}
+          restore-keys: buf-modules-
 
       # Vendored protos must match MANIFEST.sha256 (anti-tamper gate).
       # The go source repo is absent on CI, so the upstream-drift
@@ -62,7 +71,7 @@ jobs:
           bash ../frontend/app/sync-frontend.sh taro --check
           bash ../frontend/app/sync-frontend.sh flutter_app --check
 
-      # Report, not a gate: the vendored Kratos-style contract violates buf
+      # Report, not a gate: the synced Kratos-style contract violates buf
       # STANDARD naming lints wholesale (snapshots are byte-frozen; findings
       # belong upstream). Surfaced to catch NEW violation classes on re-sync.
       - name: Buf lint (report)

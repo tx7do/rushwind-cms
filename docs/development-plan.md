@@ -47,8 +47,9 @@
 
 - [x] 仓库脚手架：workspace（crates/proto + crates/auth + services/*）、CI（fmt / clippy /
       test / proto 门 / 五前端快照门，ubuntu + windows 矩阵）
-- [x] proto 同步 + MANIFEST 门 + third_party vendor（六模块，与 rushwind-admin 同源）
-- [x] 契约 crate：buf 注解闭包（选项字节保真）+ protox 过滤集 → prost/pbjson 类型 +
+- [x] proto 同步 + MANIFEST 门；第三方注解转 buf.lock 钉定（六 BSR 模块，与上游 lock
+      同源；原 third_party vendor 已退役）
+- [x] 契约 crate：buf 注解闭包（选项字节保真）+ 过滤解码 → prost/pbjson 类型 +
       双 BFF 生成面（路由 / 绑定计划 / trait / 错误表 / null 桩 / 公网-门控挂载拆分）
 - [x] 白名单语料守卫（双向钉死 + 遮蔽集钉死）
 - [x] admin-api / app-api 装配：bind 预绑定层 + HS256 鉴权门（四字段信封，消息文案

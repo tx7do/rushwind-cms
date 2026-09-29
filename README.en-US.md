@@ -119,7 +119,7 @@ rushwind-cms/
 ├── backend/
 │   ├── api/                        # API contracts (the single source of truth)
 │   │   ├── protos/                 # proto contract copies (MANIFEST.sha256 gate)
-│   │   ├── third_party/            # third-party protos (google.api etc., see PROVENANCE)
+│   │   ├── buf.lock                # buf dependency commit pins (six BSR modules, same lock as upstream)
 │   │   └── sync-protos.sh          # contract sync & check script
 │   ├── crates/
 │   │   ├── proto/                  # contract crate (prost/pbjson types + descriptor pool + REST/gRPC generated surfaces)

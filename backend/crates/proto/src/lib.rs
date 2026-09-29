@@ -31,8 +31,8 @@ pub mod proto {
 
 /// The CMS proto compile closure as raw `FileDescriptorSet` bytes —
 /// annotations included — compiled by the build script from the checksummed
-/// contract tree and its vendored annotation declarations
-/// (`backend/api/third_party`).
+/// contract tree and the buf.lock-pinned dependency modules
+/// (`backend/api/buf.yaml`).
 pub static DESCRIPTOR_BYTES: &[u8] =
     include_bytes!(concat!(env!("OUT_DIR"), "/annotated_descriptor.bin"));
 

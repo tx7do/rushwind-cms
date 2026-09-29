@@ -119,7 +119,7 @@ rushwind-cms/
 ├── backend/
 │   ├── api/                        # API 契約（唯一の契約ソース）
 │   │   ├── protos/                 # proto 契約コピー（MANIFEST.sha256 検証ゲート）
-│   │   ├── third_party/            # サードパーティ proto（google.api など、PROVENANCE 参照）
+│   │   ├── buf.lock                # buf 依存 commit ピン（6 つの BSR モジュール、上流の lock と同源）
 │   │   └── sync-protos.sh          # 契約同期・検証スクリプト
 │   ├── crates/
 │   │   ├── proto/                  # 契約 crate（prost/pbjson 型 + ディスクリプタプール + REST/gRPC 二重生成面）
