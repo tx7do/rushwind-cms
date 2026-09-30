@@ -16,6 +16,10 @@
 # 再同步接受新 vintage 时，建议先跑契约演进检查（api/buf.yaml 工作区）：
 #   cd backend/api && buf breaking --against "../../.git#branch=main,subdir=backend/api"
 set -euo pipefail
+# 字节序排序跨机稳定：MANIFEST 的行序由 sort 决定，UTF-8 locale 的 collation
+# 会忽略标点（i_api.proto 与 i_api_audit_log.proto 的先后随环境翻转），CI 的
+# C locale 因此必红。前端 sync-frontend.sh 早有此钉，此处补齐。
+export LC_ALL=C
 
 MODE="${1:-sync}"
 HERE="$(cd "$(dirname "$0")" && pwd)"
