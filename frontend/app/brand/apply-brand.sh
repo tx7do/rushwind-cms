@@ -54,6 +54,36 @@ case "$FRONTEND" in
     replace .env.production \
       -e "s/NEXT_PUBLIC_APP_TITLE='GoWind Content Hub'/NEXT_PUBLIC_APP_TITLE='RushWind Content Hub'/" \
       -e 's|api.cms.gowind.cloud|api.cms.rushwind.cloud|'
+
+    replace messages/zh-CN/app.json \
+      -e 's/风行内容中台/锐风内容中台/'
+
+    replace messages/en-US/app.json \
+      -e 's/GoWind Content Hub/RushWind Content Hub/'
+
+    replace messages/zh-CN/authentication.json \
+      -e 's/GoWind Content Hub/RushWind Content Hub/' \
+      -e 's/风行内容中台/锐风内容中台/'
+
+    replace messages/en-US/authentication.json \
+      -e 's/GoWind Content Hub/RushWind Content Hub/'
+
+    replace messages/zh-CN/page.json \
+      -e 's/基于 Go + React 的高性能/基于 Rust + React 的高性能/' \
+      -e 's/GoWind Content Hub/RushWind Content Hub/g' \
+      -e 's/风行内容中台/锐风内容中台/g' \
+      -e 's/gowind.cloud/rushwind.cloud/g'
+
+    replace messages/en-US/page.json \
+      -e 's/Based on Go + React/Based on Rust + React/' \
+      -e 's/GoWind Content Hub/RushWind Content Hub/g' \
+      -e 's/gowind.cloud/rushwind.cloud/g'
+
+    replace messages/zh-CN/ui.json \
+      -e 's/© 2026 GoWind Team/© 2026 RushWind Team/'
+
+    replace messages/en-US/ui.json \
+      -e 's/© 2026 GoWind Team/© 2026 RushWind Team/'
     ;;
 
   vue)

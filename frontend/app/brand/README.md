@@ -16,6 +16,8 @@
 | react | `src/config/env.ts` / `.env.*` | 标题回退 / 演示域名 |
 | react | `src/app/page.tsx` / `src/app/[locale]/post/detail/client-page.tsx` | 页头与 document.title 品牌名 |
 | react | `src/store/core/access/store.ts` | appNamespace |
+| react | `messages/{zh-CN,en-US}/app.json` / `authentication.json` / `ui.json` | 应用标题 / 认证页品牌名 / 版权行 |
+| react | `messages/{zh-CN,en-US}/page.json` | hero 副标题（Go + React → Rust + React）/ 关于与特性文案 / 联系邮箱域名 |
 | vue | `public/logo.png` / `public/favicon.ico` | RushWind 标 |
 | vue | `app/core/preferences/config/default.ts` | 应用名 / 标题 / companyName / companySiteLink |
 | vue | `app/constants/core.ts` / `app/plugins/preferences.ts` | 命名空间与存储键 |
