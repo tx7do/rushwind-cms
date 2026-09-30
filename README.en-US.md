@@ -24,6 +24,16 @@ RushWind CMS is a **full-stack Headless content platform written in Rust**: buil
 - **Zero-modification frontends**: five frontend snapshots are kept in sync in-repo (sync scripts + RushWind brand overlay + dual-manifest check gate against hand edits); just point the API base URL at this repo's backends
 - **Wire-protocol compatibility**: four-field error envelope (code/reason/message/metadata, protojson codec — 64-bit integers as strings, EmitUnpopulated), gorilla-compatible CORS, HS256 JWT auth gate, HttpOnly cookie sessions
 
+## Screenshots
+
+| Admin · Post Management | Admin · Tag Management |
+|:---:|:---:|
+| ![Admin · Post Management](docs/screenshots/admin-posts.webp) | ![Admin · Tag Management](docs/screenshots/admin-tags.webp) |
+
+| Front Portal · Next.js |
+|:---:|
+| ![Front Portal · Next.js](docs/screenshots/app-home.webp) |
+
 ## Quick Start
 
 ### Prerequisites

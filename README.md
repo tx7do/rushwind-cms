@@ -24,6 +24,16 @@ RushWind CMS 是一套 **Rust 全栈 Headless 内容平台**：以 [rushwind](ht
 - **前端零改动**：五个前端快照随仓同步（同步脚本 + RushWind 品牌覆写层 + 双清单校验门防手改），API 基址指向本仓后端即可
 - **线上协议兼容**：四字段错误信封（code/reason/message/metadata，protojson 编解码——64 位整数字符串化、EmitUnpopulated）、gorilla 兼容 CORS、HS256 JWT 鉴权门、HttpOnly Cookie 会话
 
+## 界面预览
+
+| 管理后台 · 帖子管理 | 管理后台 · 标签管理 |
+|:---:|:---:|
+| ![管理后台 · 帖子管理](docs/screenshots/admin-posts.webp) | ![管理后台 · 标签管理](docs/screenshots/admin-tags.webp) |
+
+| 前台 · 内容门户（Next.js） |
+|:---:|
+| ![前台 · 内容门户（Next.js）](docs/screenshots/app-home.webp) |
+
 ## 快速开始
 
 ### 环境要求

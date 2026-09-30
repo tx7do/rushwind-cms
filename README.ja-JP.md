@@ -24,6 +24,16 @@ RushWind CMS は、[rushwind](https://github.com/tx7do/rushwind) フレームワ
 - **フロントエンドゼロ改修**：5 つのフロントエンドスナップショットをリポジトリ内で同期（同期スクリプト + RushWind ブランドオーバーレイ + 手改変防止の二重マニフェスト検証ゲート）。API ベース URL を本リポジトリのバックエンドに向けるだけ
 - **ワイヤープロトコル互換**：4 フィールドエラーエンベロープ（code/reason/message/metadata、protojson コーデック — 64 ビット整数の文字列化、EmitUnpopulated）、gorilla 互換 CORS、HS256 JWT 認証ゲート、HttpOnly Cookie セッション
 
+## スクリーンショット
+
+| 管理画面 · 投稿管理 | 管理画面 · タグ管理 |
+|:---:|:---:|
+| ![管理画面 · 投稿管理](docs/screenshots/admin-posts.webp) | ![管理画面 · タグ管理](docs/screenshots/admin-tags.webp) |
+
+| フロントサイト · Next.js |
+|:---:|
+| ![フロントサイト · Next.js](docs/screenshots/app-home.webp) |
+
 ## クイックスタート
 
 ### 前提条件
