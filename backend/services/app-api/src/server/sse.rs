@@ -5,6 +5,8 @@
 //! sequence as a Gate adapter — signature + expiry via the local JWT
 //! engine, then the core service's remote ValidateToken.
 
+use authenticationv1::authentication_service_client::AuthenticationServiceClient;
+use proto::proto::authentication::service::v1 as authenticationv1;
 use std::sync::Arc;
 
 use crate::state::{status_error, AppState, StatusError};
@@ -17,9 +19,7 @@ pub use rushwind_transport_sse::Hub;
 /// category).
 struct CoreGate {
     authenticator: Arc<dyn rushwind_authn::Authenticator>,
-    core: proto::proto::authentication::service::v1::authentication_service_client::AuthenticationServiceClient<
-        tonic::transport::Channel,
-    >,
+    core: AuthenticationServiceClient<tonic::transport::Channel>,
 }
 
 impl Gate for CoreGate {

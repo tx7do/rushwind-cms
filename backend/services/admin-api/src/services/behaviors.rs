@@ -6,7 +6,11 @@
 //! the core hashes; the reference sets no NeedDecrypt here), and the
 //! not-yet-built contact faces (501, the reference's status).
 
+use authenticationv1::user_credential_service_client::UserCredentialServiceClient;
 use pbjson_types::Empty;
+use permissionv1::permission_service_client::PermissionServiceClient;
+use proto::proto::authentication::service::v1 as authenticationv1;
+use proto::proto::permission::service::v1 as permissionv1;
 
 use crate::services::{map_status, with_operator};
 use crate::state::{operator_of, AppState, StatusError};
@@ -101,10 +105,7 @@ pub async fn sync_permissions(
     ctx: &Ctx,
     _req: Empty,
 ) -> Result<Empty, StatusError> {
-    let mut core =
-        proto::proto::permission::service::v1::permission_service_client::PermissionServiceClient::new(
-            state.core_channel.clone(),
-        );
+    let mut core = PermissionServiceClient::new(state.core_channel.clone());
     core.sync_permissions(with_operator(
         ctx,
         proto::proto::permission::service::v1::SyncPermissionsRequest::default(),
@@ -155,9 +156,7 @@ pub async fn change_password(
     req: proto::proto::identity::service::v1::ChangePasswordRequest,
 ) -> Result<Empty, StatusError> {
     let op = operator_of(ctx)?;
-    let mut core = proto::proto::authentication::service::v1::user_credential_service_client::UserCredentialServiceClient::new(
-        state.core_channel.clone(),
-    );
+    let mut core = UserCredentialServiceClient::new(state.core_channel.clone());
     core.change_credential(with_operator(
         ctx,
         proto::proto::authentication::service::v1::ChangeCredentialRequest {

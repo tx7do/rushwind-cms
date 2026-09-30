@@ -10,11 +10,12 @@ use std::sync::Arc;
 
 use tonic::{Request, Response, Status};
 
+use authenticationv1::user_credential_service_server::UserCredentialService;
 use proto::proto::authentication::service::v1 as authv1;
+use proto::proto::authentication::service::v1 as authenticationv1;
 use proto::proto::authentication::service::v1::user_credential::{
     CredentialType, IdentityType, Status as CredentialStatus,
 };
-use proto::proto::authentication::service::v1::user_credential_service_server::UserCredentialService;
 
 use crate::data::user_credential_repo as repo;
 use crate::state::{bad, ts_to_proto, AppState};

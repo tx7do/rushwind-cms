@@ -18,6 +18,7 @@ use std::sync::Arc;
 
 use axum::routing::MethodRouter;
 
+use crate::services::proxies;
 use crate::state::AppState;
 use auth::auth_gate;
 use proto::pool;
@@ -84,7 +85,7 @@ pub fn pack(
 pub fn build_router(state: Arc<AppState>) -> axum::Router {
     let descriptor_pool = pool();
     let authenticator = Arc::clone(&state.authenticator);
-    let checker = Arc::new(CoreTokenChecker(std::sync::Arc::clone(&state)))
+    let checker = Arc::new(CoreTokenChecker(Arc::clone(&state)))
         as Arc<dyn auth::AccessTokenChecker + 'static>;
 
     // The per-route layer composition (see the module docs): bind layer
@@ -132,24 +133,28 @@ pub fn build_router(state: Arc<AppState>) -> axum::Router {
 }
 
     mount_services!(
-        mount_authentication_service => std::sync::Arc::new(
+        mount_authentication_service => Arc::new(
             crate::services::authentication::AuthenticationService {
-                state: std::sync::Arc::clone(&state),
+                state: Arc::clone(&state),
             },
         ),
-        mount_user_profile_service => std::sync::Arc::new(
-            crate::services::proxies::UserProfileProxy {
-                state: std::sync::Arc::clone(&state),
+        mount_user_profile_service => Arc::new(
+            proxies::UserProfileProxy {
+                state: Arc::clone(&state),
             },
         ),
-        mount_navigation_service => std::sync::Arc::new(crate::services::proxies::NavigationProxy { state: std::sync::Arc::clone(&state) }),
-        mount_site_service => std::sync::Arc::new(crate::services::proxies::SiteProxy { state: std::sync::Arc::clone(&state) }),
-        mount_post_service => std::sync::Arc::new(crate::services::proxies::PostProxy { state: std::sync::Arc::clone(&state) }),
-        mount_category_service => std::sync::Arc::new(crate::services::proxies::CategoryProxy { state: std::sync::Arc::clone(&state) }),
-        mount_tag_service => std::sync::Arc::new(crate::services::proxies::TagProxy { state: std::sync::Arc::clone(&state) }),
-        mount_page_service => std::sync::Arc::new(crate::services::proxies::PageProxy { state: std::sync::Arc::clone(&state) }),
-        mount_comment_service => std::sync::Arc::new(crate::services::proxies::CommentProxy { state: std::sync::Arc::clone(&state) }),
-        mount_interaction_service => std::sync::Arc::new(crate::services::proxies::InteractionProxy { state: std::sync::Arc::clone(&state) }),
+        mount_navigation_service => Arc::new(proxies::NavigationProxy {
+            state: Arc::clone(&state),
+        }),
+        mount_site_service => Arc::new(proxies::SiteProxy { state: Arc::clone(&state) }),
+        mount_post_service => Arc::new(proxies::PostProxy { state: Arc::clone(&state) }),
+        mount_category_service => Arc::new(proxies::CategoryProxy { state: Arc::clone(&state) }),
+        mount_tag_service => Arc::new(proxies::TagProxy { state: Arc::clone(&state) }),
+        mount_page_service => Arc::new(proxies::PageProxy { state: Arc::clone(&state) }),
+        mount_comment_service => Arc::new(proxies::CommentProxy { state: Arc::clone(&state) }),
+        mount_interaction_service => Arc::new(proxies::InteractionProxy {
+            state: Arc::clone(&state),
+        }),
     );
 
     // ── Hand-mounted: the C-side register route (POST /app/v1/register) ──
@@ -163,7 +168,7 @@ pub fn build_router(state: Arc<AppState>) -> axum::Router {
         let fq = "authentication.service.v1.RegisterUserRequest";
         async move { bind_run(pool(), fq, true, REGISTERED_SUBTYPES, req, next).await }
     });
-    let register_state = std::sync::Arc::clone(&state);
+    let register_state = Arc::clone(&state);
     let register = axum::Router::new().route(
         "/app/v1/register",
         axum::routing::post(
@@ -171,7 +176,7 @@ pub fn build_router(state: Arc<AppState>) -> axum::Router {
                 rushwind_http_binding::bindgate::BoundMessage,
             >,
                   http_req: axum::extract::Request| {
-                let state = std::sync::Arc::clone(&register_state);
+                let state = Arc::clone(&register_state);
                 async move {
                     // The bind layer's DynamicMessage → the typed prost
                     // request (prost-reflect transcode).
@@ -224,8 +229,7 @@ pub fn build_router(state: Arc<AppState>) -> axum::Router {
         let checker = Arc::clone(&transfer_checker);
         async move { auth_gate(auth, checker, PACKAGE, req, next).await }
     });
-    let transfer =
-        crate::services::file_transfer::router(std::sync::Arc::clone(&state)).layer(transfer_gate);
+    let transfer = crate::services::file_transfer::router(Arc::clone(&state)).layer(transfer_gate);
 
     router_pub
         .merge(router_gate)

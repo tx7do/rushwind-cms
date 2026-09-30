@@ -3,6 +3,8 @@
 //! to the core domain service (the ONLY data path — the BFF never
 //! touches the database).
 
+use authenticationv1::authentication_service_client::AuthenticationServiceClient;
+use proto::proto::authentication::service::v1 as authenticationv1;
 use std::sync::Arc;
 
 use redis::aio::ConnectionManager;
@@ -18,7 +20,7 @@ pub struct AppState {
     /// every per-service client clones.
     pub core_channel: tonic::transport::Channel,
     /// The authentication face (the login/logout/validate client).
-    pub core: proto::proto::authentication::service::v1::authentication_service_client::AuthenticationServiceClient<tonic::transport::Channel>,
+    pub core: AuthenticationServiceClient<tonic::transport::Channel>,
     /// The SSE notification hub (`/events` subscribers).
     pub hub: crate::server::sse::Hub,
 }
@@ -44,10 +46,7 @@ impl AppState {
             .connect()
             .await
             .map_err(|e| format!("core connect {}: {e}", cfg.core_addr))?;
-        let core =
-            proto::proto::authentication::service::v1::authentication_service_client::AuthenticationServiceClient::new(
-                channel.clone(),
-            );
+        let core = AuthenticationServiceClient::new(channel.clone());
 
         Ok(Self {
             cfg,

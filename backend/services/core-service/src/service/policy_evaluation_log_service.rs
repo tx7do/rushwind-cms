@@ -6,8 +6,9 @@ use std::sync::Arc;
 
 use tonic::{Request, Response, Status};
 
+use permissionv1::policy_evaluation_log_service_server::PolicyEvaluationLogService;
 use proto::proto::permission::service::v1 as permv1;
-use proto::proto::permission::service::v1::policy_evaluation_log_service_server::PolicyEvaluationLogService;
+use proto::proto::permission::service::v1 as permissionv1;
 
 use crate::data::policy_evaluation_log_repo as repo;
 use crate::state::{bad, ts_to_proto, AppState};

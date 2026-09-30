@@ -5,7 +5,10 @@
 //! comment policy, and the profile/password pinning. The generated
 //! proxies route here by the generator's behavior table.
 
+use authenticationv1::authentication_service_client::AuthenticationServiceClient;
+use authenticationv1::user_credential_service_client::UserCredentialServiceClient;
 use pbjson_types::Empty;
+use proto::proto::authentication::service::v1 as authenticationv1;
 use rushwind_http_binding::ctx::RequestContext;
 
 use crate::services::{map_status, with_operator};
@@ -84,10 +87,7 @@ async fn optional_operator(state: &AppState, ctx: &Ctx) -> Option<UserTokenPaylo
     let headers = vec![(String::from("authorization"), format!("Bearer {token}"))];
     let claims = state.authenticator.authenticate(&headers).ok()?;
     let payload = UserTokenPayload::from_claims(&claims.0)?;
-    let mut core =
-        proto::proto::authentication::service::v1::authentication_service_client::AuthenticationServiceClient::new(
-            state.core_channel.clone(),
-        );
+    let mut core = AuthenticationServiceClient::new(state.core_channel.clone());
     let valid = core
         .validate_token(tonic::Request::new(
             proto::proto::authentication::service::v1::ValidateTokenRequest {
@@ -476,9 +476,7 @@ pub async fn change_password(
     req: proto::proto::identity::service::v1::ChangePasswordRequest,
 ) -> Result<Empty, StatusError> {
     let op = operator_of(ctx)?;
-    let mut core = proto::proto::authentication::service::v1::user_credential_service_client::UserCredentialServiceClient::new(
-        state.core_channel.clone(),
-    );
+    let mut core = UserCredentialServiceClient::new(state.core_channel.clone());
     core.change_credential(tonic::Request::new(
         proto::proto::authentication::service::v1::ChangeCredentialRequest {
             identity_type:
@@ -574,9 +572,7 @@ pub async fn register(
     let plain = store::crypto::decrypt_login_credential(&req.password)
         .map_err(|_| bad_request("invalid password encoding"))?;
     req.password = plain;
-    let mut core = proto::proto::authentication::service::v1::authentication_service_client::AuthenticationServiceClient::new(
-        state.core_channel.clone(),
-    );
+    let mut core = AuthenticationServiceClient::new(state.core_channel.clone());
     let resp = core
         .register_user(tonic::Request::new(req))
         .await

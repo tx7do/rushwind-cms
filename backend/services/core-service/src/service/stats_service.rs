@@ -115,9 +115,9 @@ impl statsv1::stats_service_server::StatsService for StatsService {
                     sea_orm::DatabaseBackend::Postgres,
                     format!(
                         "SELECT \
-                           (SELECT COUNT(*) FROM sys_users WHERE created_at::date::text = '{p}')::bigint AS u, \
-                           (SELECT COUNT(*) FROM posts WHERE created_at::date::text = '{p}')::bigint AS po, \
-                           (SELECT COUNT(*) FROM comments WHERE created_at::date::text = '{p}')::bigint AS c",
+               (SELECT COUNT(*) FROM sys_users WHERE created_at::date::text = '{p}')::bigint AS u, \
+                (SELECT COUNT(*) FROM posts WHERE created_at::date::text = '{p}')::bigint AS po, \
+                (SELECT COUNT(*) FROM comments WHERE created_at::date::text = '{p}')::bigint AS c",
                         p = day_prefix
                     ),
                 ))

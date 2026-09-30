@@ -327,7 +327,9 @@ impl imv1::internal_message_service_server::InternalMessageService for InternalM
                     "status": "RECEIVED",
                     "title": req.title,
                     "content": req.content,
-                    "receivedAt": proto.received_at.map(|ts| serde_json::json!({"seconds": ts.seconds, "nanos": ts.nanos})),
+                    "receivedAt": proto.received_at.map(|ts| {
+                        serde_json::json!({"seconds": ts.seconds, "nanos": ts.nanos})
+                    }),
                 },
             }));
         }

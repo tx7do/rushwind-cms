@@ -10,6 +10,10 @@
 //! never fail the request), best-effort concurrent — the response
 //! passes through untouched.
 
+use auditv1::api_audit_log_service_client::ApiAuditLogServiceClient;
+use auditv1::login_audit_log_service_client::LoginAuditLogServiceClient;
+use auditv1::operation_audit_log_service_client::OperationAuditLogServiceClient;
+use proto::proto::audit::service::v1 as auditv1;
 use std::sync::Arc;
 
 use axum::extract::Request;
@@ -90,7 +94,7 @@ pub async fn layer(
             status_code: Some(status.parse::<u32>().unwrap_or(500)),
             ..Default::default()
         };
-        let mut core = proto::proto::audit::service::v1::api_audit_log_service_client::ApiAuditLogServiceClient::new(state2.core_channel.clone());
+        let mut core = ApiAuditLogServiceClient::new(state2.core_channel.clone());
         let _ = core
             .create(tonic::Request::new(
                 proto::proto::audit::service::v1::CreateApiAuditLogRequest {
@@ -119,7 +123,7 @@ pub async fn layer(
                     ip_address: Some(ip),
                     ..Default::default()
                 };
-                let mut core = proto::proto::audit::service::v1::operation_audit_log_service_client::OperationAuditLogServiceClient::new(state2.core_channel.clone());
+                let mut core = OperationAuditLogServiceClient::new(state2.core_channel.clone());
                 let _ = core
                     .create(tonic::Request::new(
                         proto::proto::audit::service::v1::CreateOperationAuditLogRequest {
@@ -167,7 +171,7 @@ pub async fn write_login_audit(state: &AppState, a: LoginAudit<'_>) {
         request_id: Some(a.request_id.to_string()),
         ..Default::default()
     };
-    let mut core = proto::proto::audit::service::v1::login_audit_log_service_client::LoginAuditLogServiceClient::new(state.core_channel.clone());
+    let mut core = LoginAuditLogServiceClient::new(state.core_channel.clone());
     let _ = core
         .create(tonic::Request::new(
             proto::proto::audit::service::v1::CreateLoginAuditLogRequest { data: Some(log) },

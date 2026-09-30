@@ -23,6 +23,7 @@ use std::sync::Arc;
 use axum::response::IntoResponse;
 use axum::routing::MethodRouter;
 
+use crate::services::proxies;
 use crate::state::AppState;
 use auth::auth_gate;
 use proto::pool;
@@ -140,57 +141,97 @@ pub fn build_router(state: Arc<AppState>) -> axum::Router {
 }
 
     mount_services!(
-        mount_admin_portal_service => std::sync::Arc::new(
+        mount_admin_portal_service => Arc::new(
             crate::services::admin_portal::AdminPortalService {
-                state: std::sync::Arc::clone(&state),
+                state: Arc::clone(&state),
             },
         ),
-        mount_api_audit_log_service => std::sync::Arc::new(crate::services::proxies::ApiAuditLogProxy { state: std::sync::Arc::clone(&state) }),
-        mount_api_service => std::sync::Arc::new(crate::services::proxies::ApiProxy { state: std::sync::Arc::clone(&state) }),
+        mount_api_audit_log_service => Arc::new(proxies::ApiAuditLogProxy {
+            state: Arc::clone(&state),
+        }),
+        mount_api_service => Arc::new(proxies::ApiProxy { state: Arc::clone(&state) }),
         mount_authentication_service => Arc::new(
             crate::services::authentication::AuthenticationService {
                 state: Arc::clone(&state),
             },
         ),
-        mount_category_service => std::sync::Arc::new(crate::services::proxies::CategoryProxy { state: std::sync::Arc::clone(&state) }),
-        mount_comment_service => std::sync::Arc::new(crate::services::proxies::CommentProxy { state: std::sync::Arc::clone(&state) }),
-        mount_content_model_service => std::sync::Arc::new(crate::services::proxies::ContentModelProxy { state: std::sync::Arc::clone(&state) }),
-        mount_data_access_audit_log_service => std::sync::Arc::new(crate::services::proxies::DataAccessAuditLogProxy { state: std::sync::Arc::clone(&state) }),
-        mount_dict_entry_service => std::sync::Arc::new(crate::services::proxies::DictEntryProxy { state: std::sync::Arc::clone(&state) }),
-        mount_dict_type_service => std::sync::Arc::new(crate::services::proxies::DictTypeProxy { state: std::sync::Arc::clone(&state) }),
-        mount_file_service => std::sync::Arc::new(crate::services::proxies::FileProxy { state: std::sync::Arc::clone(&state) }),
-        mount_interaction_admin_service => std::sync::Arc::new(crate::services::proxies::InteractionAdminProxy { state: std::sync::Arc::clone(&state) }),
-        mount_internal_message_category_service => std::sync::Arc::new(crate::services::proxies::InternalMessageCategoryProxy { state: std::sync::Arc::clone(&state) }),
-        mount_internal_message_recipient_service => std::sync::Arc::new(crate::services::proxies::InternalMessageRecipientProxy { state: std::sync::Arc::clone(&state) }),
+        mount_category_service => Arc::new(proxies::CategoryProxy { state: Arc::clone(&state) }),
+        mount_comment_service => Arc::new(proxies::CommentProxy { state: Arc::clone(&state) }),
+        mount_content_model_service => Arc::new(proxies::ContentModelProxy {
+            state: Arc::clone(&state),
+        }),
+        mount_data_access_audit_log_service => Arc::new(proxies::DataAccessAuditLogProxy {
+            state: Arc::clone(&state),
+        }),
+        mount_dict_entry_service => Arc::new(proxies::DictEntryProxy { state: Arc::clone(&state) }),
+        mount_dict_type_service => Arc::new(proxies::DictTypeProxy { state: Arc::clone(&state) }),
+        mount_file_service => Arc::new(proxies::FileProxy { state: Arc::clone(&state) }),
+        mount_interaction_admin_service => Arc::new(proxies::InteractionAdminProxy {
+            state: Arc::clone(&state),
+        }),
+        mount_internal_message_category_service => Arc::new(proxies::InternalMessageCategoryProxy {
+            state: Arc::clone(&state),
+        }),
+        mount_internal_message_recipient_service => Arc::new(
+            proxies::InternalMessageRecipientProxy { state: Arc::clone(&state) },
+        ),
         // The hand impl (not the generated proxy): send_message fans the
         // notification payload out over the SSE hub after the core RPC.
-        mount_internal_message_service => std::sync::Arc::new(crate::services::internal_message::InternalMessageService { state: std::sync::Arc::clone(&state) }),
-        mount_language_service => std::sync::Arc::new(crate::services::proxies::LanguageProxy { state: std::sync::Arc::clone(&state) }),
-        mount_login_audit_log_service => std::sync::Arc::new(crate::services::proxies::LoginAuditLogProxy { state: std::sync::Arc::clone(&state) }),
-        mount_login_policy_service => std::sync::Arc::new(crate::services::proxies::LoginPolicyProxy { state: std::sync::Arc::clone(&state) }),
-        mount_media_asset_service => std::sync::Arc::new(crate::services::proxies::MediaAssetProxy { state: std::sync::Arc::clone(&state) }),
-        mount_menu_service => std::sync::Arc::new(crate::services::proxies::MenuProxy { state: std::sync::Arc::clone(&state) }),
-        mount_navigation_item_service => std::sync::Arc::new(crate::services::proxies::NavigationItemProxy { state: std::sync::Arc::clone(&state) }),
-        mount_navigation_service => std::sync::Arc::new(crate::services::proxies::NavigationProxy { state: std::sync::Arc::clone(&state) }),
-        mount_operation_audit_log_service => std::sync::Arc::new(crate::services::proxies::OperationAuditLogProxy { state: std::sync::Arc::clone(&state) }),
-        mount_org_unit_service => std::sync::Arc::new(crate::services::proxies::OrgUnitProxy { state: std::sync::Arc::clone(&state) }),
-        mount_page_service => std::sync::Arc::new(crate::services::proxies::PageProxy { state: std::sync::Arc::clone(&state) }),
-        mount_permission_audit_log_service => std::sync::Arc::new(crate::services::proxies::PermissionAuditLogProxy { state: std::sync::Arc::clone(&state) }),
-        mount_permission_group_service => std::sync::Arc::new(crate::services::proxies::PermissionGroupProxy { state: std::sync::Arc::clone(&state) }),
-        mount_permission_service => std::sync::Arc::new(crate::services::proxies::PermissionProxy { state: std::sync::Arc::clone(&state) }),
-        mount_policy_evaluation_log_service => std::sync::Arc::new(crate::services::proxies::PolicyEvaluationLogProxy { state: std::sync::Arc::clone(&state) }),
-        mount_position_service => std::sync::Arc::new(crate::services::proxies::PositionProxy { state: std::sync::Arc::clone(&state) }),
-        mount_post_service => std::sync::Arc::new(crate::services::proxies::PostProxy { state: std::sync::Arc::clone(&state) }),
-        mount_role_service => std::sync::Arc::new(crate::services::proxies::RoleProxy { state: std::sync::Arc::clone(&state) }),
-        mount_site_service => std::sync::Arc::new(crate::services::proxies::SiteProxy { state: std::sync::Arc::clone(&state) }),
-        mount_site_setting_service => std::sync::Arc::new(crate::services::proxies::SiteSettingProxy { state: std::sync::Arc::clone(&state) }),
-        mount_stats_service => std::sync::Arc::new(crate::services::proxies::StatsProxy { state: std::sync::Arc::clone(&state) }),
-        mount_tag_service => std::sync::Arc::new(crate::services::proxies::TagProxy { state: std::sync::Arc::clone(&state) }),
-        mount_task_service => std::sync::Arc::new(crate::services::proxies::TaskProxy { state: std::sync::Arc::clone(&state) }),
-        mount_tenant_service => std::sync::Arc::new(crate::services::proxies::TenantProxy { state: std::sync::Arc::clone(&state) }),
-        mount_translator_service => std::sync::Arc::new(crate::services::proxies::TranslatorProxy { state: std::sync::Arc::clone(&state) }),
-        mount_user_profile_service => std::sync::Arc::new(crate::services::proxies::UserProfileProxy { state: std::sync::Arc::clone(&state) }),
-        mount_user_service => std::sync::Arc::new(crate::services::proxies::UserProxy { state: std::sync::Arc::clone(&state) }),
+        mount_internal_message_service => Arc::new(
+            crate::services::internal_message::InternalMessageService { state: Arc::clone(&state) },
+        ),
+        mount_language_service => Arc::new(proxies::LanguageProxy { state: Arc::clone(&state) }),
+        mount_login_audit_log_service => Arc::new(proxies::LoginAuditLogProxy {
+            state: Arc::clone(&state),
+        }),
+        mount_login_policy_service => Arc::new(proxies::LoginPolicyProxy {
+            state: Arc::clone(&state),
+        }),
+        mount_media_asset_service => Arc::new(proxies::MediaAssetProxy {
+            state: Arc::clone(&state),
+        }),
+        mount_menu_service => Arc::new(proxies::MenuProxy { state: Arc::clone(&state) }),
+        mount_navigation_item_service => Arc::new(proxies::NavigationItemProxy {
+            state: Arc::clone(&state),
+        }),
+        mount_navigation_service => Arc::new(proxies::NavigationProxy {
+            state: Arc::clone(&state),
+        }),
+        mount_operation_audit_log_service => Arc::new(proxies::OperationAuditLogProxy {
+            state: Arc::clone(&state),
+        }),
+        mount_org_unit_service => Arc::new(proxies::OrgUnitProxy { state: Arc::clone(&state) }),
+        mount_page_service => Arc::new(proxies::PageProxy { state: Arc::clone(&state) }),
+        mount_permission_audit_log_service => Arc::new(proxies::PermissionAuditLogProxy {
+            state: Arc::clone(&state),
+        }),
+        mount_permission_group_service => Arc::new(proxies::PermissionGroupProxy {
+            state: Arc::clone(&state),
+        }),
+        mount_permission_service => Arc::new(proxies::PermissionProxy {
+            state: Arc::clone(&state),
+        }),
+        mount_policy_evaluation_log_service => Arc::new(proxies::PolicyEvaluationLogProxy {
+            state: Arc::clone(&state),
+        }),
+        mount_position_service => Arc::new(proxies::PositionProxy { state: Arc::clone(&state) }),
+        mount_post_service => Arc::new(proxies::PostProxy { state: Arc::clone(&state) }),
+        mount_role_service => Arc::new(proxies::RoleProxy { state: Arc::clone(&state) }),
+        mount_site_service => Arc::new(proxies::SiteProxy { state: Arc::clone(&state) }),
+        mount_site_setting_service => Arc::new(proxies::SiteSettingProxy {
+            state: Arc::clone(&state),
+        }),
+        mount_stats_service => Arc::new(proxies::StatsProxy { state: Arc::clone(&state) }),
+        mount_tag_service => Arc::new(proxies::TagProxy { state: Arc::clone(&state) }),
+        mount_task_service => Arc::new(proxies::TaskProxy { state: Arc::clone(&state) }),
+        mount_tenant_service => Arc::new(proxies::TenantProxy { state: Arc::clone(&state) }),
+        mount_translator_service => Arc::new(proxies::TranslatorProxy {
+            state: Arc::clone(&state),
+        }),
+        mount_user_profile_service => Arc::new(proxies::UserProfileProxy {
+            state: Arc::clone(&state),
+        }),
+        mount_user_service => Arc::new(proxies::UserProxy { state: Arc::clone(&state) }),
     );
 
     let mut app = router_pub.merge(router_gate);

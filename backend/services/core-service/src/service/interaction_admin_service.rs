@@ -14,6 +14,7 @@ use crate::service::interaction_service::InteractionService;
 use crate::state::{bad, db_status, AppState};
 use store::entities::{comment_likes, interaction_counters, post_likes, post_watches};
 
+use interactionv1::interaction_service_server;
 use proto::proto::audit::service::v1 as auditv1;
 use proto::proto::interaction::service::v1 as interactionv1;
 
@@ -249,7 +250,7 @@ impl InteractionAdminService {
         &self,
         request: Request<interactionv1::GetCountsRequest>,
     ) -> Result<Response<interactionv1::GetCountsResponse>, Status> {
-        <InteractionService as interactionv1::interaction_service_server::InteractionService>::get_counts(
+        <InteractionService as interaction_service_server::InteractionService>::get_counts(
             &InteractionService {
                 state: Arc::clone(&self.state),
             },

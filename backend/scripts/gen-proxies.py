@@ -187,10 +187,41 @@ def method_kind(service, method, face):
     return "pass", None
 
 
+def shorten(ty, pkgs):
+    """A type path against the package-root aliases — same type, shorter
+    line (the fully-qualified paths push the macro table past the
+    100-column width rustfmt holds elsewhere in the crate)."""
+    for pkg in pkgs:
+        ty = ty.replace(f"proto::proto::{pkg}::service::v1::", f"{pkg}_v1::")
+    return ty.replace("proto::proto::pagination::", "pagination::")
+
+
 def main():
     gen_path, face = sys.argv[1], sys.argv[2]
     traits = parse_traits(gen_path)
     gen_mod = "gen_admin" if face == "admin" else "gen_app"
+
+    # First pass — the emitted faces, so the alias block covers exactly
+    # the packages the output references.
+    faces = []
+    used_pkgs = set()
+    for trait_name, methods in sorted(traits.items()):
+        service = trait_name.removesuffix("Service")
+        if service in SKIP or service in SKIP_BY_FACE.get(face, set()):
+            continue
+        pkg = PACKAGE.get(service)
+        if pkg is None:
+            continue
+        kinds = [(m, *method_kind(service, m, face), req_ty, resp_ty)
+                 for m, req_ty, resp_ty in methods]
+        faces.append((trait_name, service, pkg, kinds))
+        used_pkgs.add(pkg)
+    uses_pagination = any(
+        "proto::proto::pagination::" in ty
+        for _, _, _, kinds in faces
+        for _, _, _, req_ty, resp_ty in kinds
+        for ty in (req_ty, resp_ty)
+    )
 
     out = []
     out.append("//! Generated thin-BFF proxies — a table of `passthrough_proxy!`")
@@ -205,40 +236,63 @@ def main():
     out.append("#![allow(missing_docs)]")
     out.append("")
     out.append("use crate::passthrough_proxy;")
+    # Package-root aliases: every type below addresses its package through
+    # one of these (see `shorten`), keeping the lines at the 100-column
+    # width. Sorted: rustfmt orders the block and would otherwise drift
+    # the committed file away from the generator's output.
+    import_lines = [
+        f"use proto::proto::{pkg}::service::v1 as {pkg}_v1;" for pkg in used_pkgs
+    ]
+    if uses_pagination:
+        import_lines.append("use proto::proto::pagination;")
+    out.extend(sorted(import_lines))
     out.append("")
 
     emitted = 0
-    for trait_name, methods in sorted(traits.items()):
-        service = trait_name.removesuffix("Service")
-        if service in SKIP or service in SKIP_BY_FACE.get(face, set()):
-            continue
-        pkg = PACKAGE.get(service)
-        if pkg is None:
-            continue
-        client_mod = f"{snake(trait_name.removesuffix('Service'))}_service_client"
+    for trait_name, service, pkg, kinds in faces:
+        client_mod = f"{snake(service)}_service_client"
         # The Channel-generic spelled out: the kit calls the client via a
         # qualified path (<Ty>::new), where inference does not apply.
-        client = (f"{client_mod}::{trait_name.removesuffix('Service')}"
-                  f"ServiceClient<tonic::transport::Channel>")
-        pkg_mod = "::".join(pkg.split("."))
-        struct_name = f"{trait_name.removesuffix('Service')}Proxy"
-        kinds = [(m, *method_kind(service, m, face), req_ty, resp_ty)
-                 for m, req_ty, resp_ty in methods]
+        client_head = f"        client: {pkg}_v1::{client_mod}::{service}ServiceClient"
+        struct_name = f"{service}Proxy"
         behaviors = "behaviors" if face == "admin" else "public"
         out.append("passthrough_proxy! {")
         out.append(f"    /// The pass-through proxy of `{trait_name}Handlers`.")
-        out.append(f"    proto::{gen_mod}::services::{trait_name}Handlers for {struct_name} {{")
-        out.append(f"        client: proto::proto::{pkg_mod}::service::v1::{client},")
+        for_line = (
+            f"    proto::{gen_mod}::services::{trait_name}Handlers for {struct_name} {{"
+        )
+        if len(for_line) <= 100:
+            out.append(for_line)
+        else:
+            out.append(f"    proto::{gen_mod}::services::{trait_name}Handlers")
+            out.append(f"        for {struct_name} {{")
+        client_tail = "<tonic::transport::Channel>,"
+        if len(client_head) + len(client_tail) <= 100:
+            out.append(client_head + client_tail)
+        elif len(client_head) + 1 <= 100:
+            out.append(client_head + "<")
+            out.append("            tonic::transport::Channel,")
+            out.append("        >,")
+        else:
+            out.append(f"        client: {pkg}_v1::{client_mod}::")
+            out.append(f"            {service}ServiceClient<tonic::transport::Channel>,")
         out.append(f"        behaviors: {behaviors},")
         out.append("        methods: [")
         for method, kind, behavior, req_ty, resp_ty in kinds:
             mname = f"r#{method}" if method in RUST_KEYWORDS else method
-            if kind == "hand":
-                out.append(
-                    f"            hand {mname}({req_ty}) -> {resp_ty} => {behavior},")
+            req = shorten(req_ty, used_pkgs)
+            resp = shorten(resp_ty, used_pkgs)
+            suffix = f" => {behavior}," if kind == "hand" else ","
+            line = f"            {kind} {mname}({req}) -> {resp}{suffix}"
+            if len(line) <= 100:
+                out.append(line)
+            elif len(f"            {kind} {mname}({req})") <= 100:
+                out.append(f"            {kind} {mname}({req})")
+                out.append(f"                -> {resp}{suffix}")
             else:
-                out.append(
-                    f"            {kind} {mname}({req_ty}) -> {resp_ty},")
+                out.append(f"            {kind} {mname}(")
+                out.append(f"                {req}")
+                out.append(f"            ) -> {resp}{suffix}")
         out.append("        ]")
         out.append("    }")
         out.append("}")
