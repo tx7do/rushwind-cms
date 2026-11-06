@@ -45,6 +45,9 @@ case "$FRONTEND" in
     replace 'src/app/[locale]/post/detail/client-page.tsx' \
       -e 's/GoWind Content Hub/RushWind Content Hub/'
 
+    replace 'src/app/[locale]/page/detail/client-page.tsx' \
+      -e 's/GoWind Content Hub/RushWind Content Hub/'
+
     replace src/store/core/access/store.ts \
       -e "s/const appNamespace = 'gowind'/const appNamespace = 'rushwind'/"
 
@@ -103,18 +106,40 @@ case "$FRONTEND" in
 
     replace nuxt.config.ts \
       -e "s/'GoWind Content Hub'/'RushWind Content Hub'/"
+
+    # messages 层（三语言包 zh-CN / en-US / ar，2026-11 批次扩张）：
+    # 品牌名、关于/特性/CTA 文案、联系邮箱。逐文件显式声明，g 全局仅限
+    # 品牌串本身。
+    for loc in zh-CN en-US ar; do
+      replace "locales/$loc/authentication.json" \
+        -e 's/GoWind Content Hub/RushWind Content Hub/g' \
+        -e 's/风行内容中台/锐风内容中台/g'
+      replace "locales/$loc/ui.json" \
+        -e 's/© 2026 GoWind Team/© 2026 RushWind Team/'
+      replace "locales/$loc/page.json" \
+        -e 's/GoWind Content Hub/RushWind Content Hub/g' \
+        -e 's/风行内容中台/锐风内容中台/g' \
+        -e 's/gowind\.cloud/rushwind.cloud/g'
+      replace "locales/$loc/app.json" \
+        -e 's/GoWind Content Hub/RushWind Content Hub/g' \
+        -e 's/风行内容中台/锐风内容中台/g'
+    done
     ;;
 
   taro)
     replace src/index.html \
-      -e 's/<title>GoWind CMS<\/title>/<title>RushWind CMS<\/title>/'
+      -e 's/<title>GoWind CMS<\/title>/<title>RushWind CMS<\/title>/' \
+      -e 's/<title>GoWind Content Hub<\/title>/<title>RushWind Content Hub<\/title>/'
 
     replace src/app.config.ts \
-      -e "s/navigationBarTitleText: 'GoWind CMS'/navigationBarTitleText: 'RushWind CMS'/"
+      -e "s/navigationBarTitleText: 'GoWind CMS'/navigationBarTitleText: 'RushWind CMS'/" \
+      -e "s/navigationBarTitleText: 'GoWind Content Hub'/navigationBarTitleText: 'RushWind Content Hub'/"
 
     replace src/core/preferences/config/default.ts \
       -e "s/name: 'GoWind CMS'/name: 'RushWind CMS'/" \
+      -e "s/name: '风行教育'/name: '锐风教育'/" \
       -e "s/title: 'GoWind Content Hub'/title: 'RushWind Content Hub'/" \
+      -e "s/title: '风行教育'/title: '锐风教育'/" \
       -e "s/companyName: 'GoWind'/companyName: 'RushWind'/" \
       -e "s|companySiteLink: 'https://www.gowind.cloud'|companySiteLink: 'https://github.com/tx7do/rushwind'|"
 
@@ -123,6 +148,38 @@ case "$FRONTEND" in
 
     replace src/store/core/access/store.ts \
       -e "s/name: 'gowind-access-storage'/name: 'rushwind-access-storage'/"
+
+    # 工程面（2026-11 批次：产品名归一 GoWind Content Hub）。
+    replace .env.development \
+      -e 's/TARO_APP_NAMESPACE=gowind-cms-app/TARO_APP_NAMESPACE=rushwind-cms-app/' \
+      -e "s/TARO_APP_TITLE='GoWind Content Hub'/TARO_APP_TITLE='RushWind Content Hub'/" \
+      -e 's|gowind\.cloud|rushwind.cloud|g'
+    replace .env.production \
+      -e 's/TARO_APP_NAMESPACE=gowind-cms-app/TARO_APP_NAMESPACE=rushwind-cms-app/' \
+      -e "s/TARO_APP_TITLE='GoWind Content Hub'/TARO_APP_TITLE='RushWind Content Hub'/" \
+      -e 's|gowind\.cloud|rushwind.cloud|g'
+    replace project.config.json \
+      -e 's/GoWind Content Hub/RushWind Content Hub/g'
+    replace package.json \
+      -e 's/GoWind Content Hub/RushWind Content Hub/g'
+    replace config/index.ts \
+      -e "s/'gowind-cms-app'/'rushwind-cms-app'/"
+
+    # messages 层（zh-CN / en-US，2026-11 批次扩张）。
+    for loc in zh-CN en-US; do
+      replace "messages/$loc/authentication.json" \
+        -e 's/GoWind Content Hub/RushWind Content Hub/g' \
+        -e 's/风行内容中台/锐风内容中台/g'
+      replace "messages/$loc/ui.json" \
+        -e 's/© 2026 GoWind Team/© 2026 RushWind Team/'
+      replace "messages/$loc/page.json" \
+        -e 's/GoWind Content Hub/RushWind Content Hub/g' \
+        -e 's/风行内容中台/锐风内容中台/g' \
+        -e 's/gowind\.cloud/rushwind.cloud/g'
+      replace "messages/$loc/app.json" \
+        -e 's/GoWind Content Hub/RushWind Content Hub/g' \
+        -e 's/风行内容中台/锐风内容中台/g'
+    done
     ;;
 
   flutter_app)
@@ -130,20 +187,35 @@ case "$FRONTEND" in
     # 保持 flutter gen-l10n 语义一致。
     replace lib/l10n/intl_zh_CN.arb \
       -e 's/"appName": "GoWind CMS"/"appName": "RushWind CMS"/' \
-      -e 's/© 2026 GoWind CMS/© 2026 RushWind CMS/'
+      -e 's/© 2026 GoWind CMS/© 2026 RushWind CMS/' \
+      -e 's/gowind\.dev/rushwind.dev/g'
 
     replace lib/l10n/intl_en_US.arb \
       -e 's/"appName": "GoWind CMS"/"appName": "RushWind CMS"/' \
-      -e 's/© 2026 GoWind CMS/© 2026 RushWind CMS/'
+      -e 's/© 2026 GoWind CMS/© 2026 RushWind CMS/' \
+      -e 's/gowind\.dev/rushwind.dev/g'
 
     replace lib/generated/l10n.dart \
-      -e 's/GoWind CMS/RushWind CMS/'
+      -e 's/GoWind CMS/RushWind CMS/' \
+      -e 's/gowind\.dev/rushwind.dev/g'
 
     replace lib/generated/intl/messages_en_US.dart \
-      -e 's/GoWind CMS/RushWind CMS/'
+      -e 's/GoWind CMS/RushWind CMS/' \
+      -e 's/gowind\.dev/rushwind.dev/g'
 
     replace lib/generated/intl/messages_zh_CN.dart \
-      -e 's/GoWind CMS/RushWind CMS/'
+      -e 's/GoWind CMS/RushWind CMS/' \
+      -e 's/gowind\.dev/rushwind.dev/g'
+
+    # 工程面（2026-11 批次：产品名归一 GoWind Content Hub）。
+    replace .env \
+      -e 's|flutter\.cms\.gowind\.cloud|flutter.cms.rushwind.cloud|g'
+    replace web/index.html \
+      -e 's/GoWind Content Hub/RushWind Content Hub/g'
+    replace android/app/src/main/AndroidManifest.xml \
+      -e 's/android:label="GoWind Content Hub"/android:label="RushWind Content Hub"/'
+    replace ios/Runner/Info.plist \
+      -e 's/<string>GoWind Content Hub<\/string>/<string>RushWind Content Hub<\/string>/g'
     ;;
 
   *)

@@ -1,8 +1,9 @@
 import { useRef } from 'react';
 import type { ProColumns, ActionType } from '@ant-design/pro-components';
 import TableExportButton from '@/components/common/TableExportButton';
-import { ProTable } from '@ant-design/pro-components';
-import { Button, Popconfirm, Tag, App } from 'antd';
+import ListTable from '@/components/common/ListTable';
+import TableActions from '@/components/common/TableActions';
+import { Button, Tag, App } from 'antd';
 import { EditOutlined, DeleteOutlined, PlusOutlined } from '@ant-design/icons';
 import { Icon } from '@iconify/react';
 import { useQueryClient } from '@tanstack/react-query';
@@ -134,62 +135,63 @@ const TagList = () => {
     {
       title: t('action'),
       valueType: 'option',
-      width: 100,
+      width: 150,
       fixed: 'right',
-      render: (_, record) => [
-        <a key="edit" onClick={() => handleEdit(record)}>
-          <EditOutlined />
-        </a>,
-        <Popconfirm
-          key="delete"
-          title={t('deleteConfirmTitle')}
-          description={t('deleteConfirmDesc', { moduleName: t('moduleName') })}
-          onConfirm={() => {
-            record.id && deleteMutation.mutate({ id: record.id });
-          }}
-          okText={t('common:button.ok')}
-          cancelText={t('common:button.cancel')}
-        >
-          <a style={{ color: 'var(--ant-color-error)' }}>
-            <DeleteOutlined />
-          </a>
-        </Popconfirm>,
-      ],
+      render: (_, record) => (
+        <TableActions
+          record={record}
+          actions={[
+            {
+              key: 'edit',
+              label: t('common:button.edit'),
+              icon: <EditOutlined />,
+              onClick: () => handleEdit(record),
+            },
+            {
+              key: 'delete',
+              label: t('common:button.delete'),
+              icon: <DeleteOutlined />,
+              danger: true,
+              confirm: {
+                title: t('deleteConfirmTitle'),
+                description: t('deleteConfirmDesc', { moduleName: t('moduleName') }),
+              },
+              onClick: () => record.id && deleteMutation.mutate({ id: record.id }),
+            },
+          ]}
+        />
+      ),
     },
   ];
 
   return (
     <div ref={containerRef} className="page-container-content" style={{ padding: '0 8px', height: '100%' }}>
-      <ProTable<any>
+      <ListTable<any>
         actionRef={actionRef}
         columns={columns}
         headerTitle={t('tagList')}
         request={async (params) => {
-          try {
-            const query = new PaginationQuery({
-              paging: {
-                page: params.current || 1,
-                pageSize: params.pageSize || TABLE.DEFAULT_PAGE_SIZE,
-              },
-              formValues: Object.fromEntries(
-                Object.entries(params).filter(
-                  ([key]) => !['current', 'pageSize'].includes(key),
-                ),
+          const query = new PaginationQuery({
+            paging: {
+              page: params.current || 1,
+              pageSize: params.pageSize || TABLE.DEFAULT_PAGE_SIZE,
+            },
+            formValues: Object.fromEntries(
+              Object.entries(params).filter(
+                ([key]) => !['current', 'pageSize'].includes(key),
               ),
-            });
+            ),
+          });
 
-            const response = await fetchListTags(query);
+          const response = await fetchListTags(query);
 
-            return {
-              data: response.items || [],
-              total: response.total || 0,
-              success: true,
-            };
-          } catch (error: any) {
-            message.error(error.message || t('fetchFailed'));
-            return { data: [], total: 0, success: false };
-          }
-        }}
+          return {
+            data: response.items || [],
+            total: response.total || 0,
+            success: true,
+          };
+        
+}}
         rowKey="id"
         search={{
           labelWidth: 'auto',

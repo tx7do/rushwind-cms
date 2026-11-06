@@ -49,7 +49,7 @@ HTTP/REST + SSE
 backend/
 ├── api/                          # 契约层（无业务逻辑）
 │   ├── protos/                   # ★ proto 快照（字节冻结，MANIFEST.sha256 校验门，禁止手改）
-│   │   └── <domain>/service/v1/  # 17 个领域：admin/app/identity/permission/content/audit/...
+│   │   └── <domain>/service/v1/  # 29 个领域：admin/app/identity/permission/content/audit/ai/notify/flow/...
 │   ├── buf.yaml / buf.lock       # buf 工作区 + 六个 BSR 依赖的 commit 钉定
 │   ├── MANIFEST.sha256           # 契约清单门（防手改）
 │   └── sync-protos.sh            # 契约同步 / --check 校验门

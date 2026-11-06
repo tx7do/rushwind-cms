@@ -13,7 +13,8 @@
     "privacy": "隐私政策",
     "terms": "服务条款",
     "settings": "设置",
-    "user": "个人中心"
+    "user": "个人中心",
+    "favorites": "收藏"
   },
   "home": {
     "untitled": "未命名",
@@ -111,7 +112,8 @@
     "shared": "分享成功",
     "share": "分享",
     "link_copied": "链接已复制到剪贴板",
-    "copy_failed": "复制失败，请手动复制"
+    "copy_failed": "复制失败，请手动复制",
+    "custom_fields": "自定义字段"
   },
   "error": {
     "not_found": "404 - 页面未找到",
@@ -155,19 +157,19 @@
     "about_page": "关于"
   },
   "about": {
-    "title": "关于 风行内容中台",
+    "title": "关于 锐风内容中台",
     "subtitle": "强大的多租户企业级内容中枢",
-    "description": "风行内容中台 是一个专为现代企业设计的 Headless 内容平台，提供灵活、可扩展的内容管理解决方案，助力企业实现内容高效管理与全域分发。",
+    "description": "锐风内容中台 是一个专为现代企业设计的 Headless 内容平台，提供灵活、可扩展的内容管理解决方案，助力企业实现内容高效管理与全域分发。",
     "about_us": "关于我们",
-    "about_us_desc_1": "GoWind Content Hub（风行内容中台）是一个专为现代企业设计的 Headless 内容平台，致力于为企业提供灵活、可扩展的内容管理解决方案。",
+    "about_us_desc_1": "RushWind Content Hub（锐风内容中台）是一个专为现代企业设计的 Headless 内容平台，致力于为企业提供灵活、可扩展的内容管理解决方案。",
     "about_us_desc_2": "我们深入了解企业的内容管理需求，通过多租户架构、企业级安全和高性能 API，帮助企业轻松管理和发布内容。",
-    "about_us_desc_3": "无论您是小型团队还是大型企业，风行内容中台 都能为您提供专业的内容管理体验。",
+    "about_us_desc_3": "无论您是小型团队还是大型企业，锐风内容中台 都能为您提供专业的内容管理体验。",
     "stat_users": "活跃用户",
     "stat_projects": "项目数量",
     "stat_uptime": "系统可用性",
     "stat_support": "技术支持",
     "features": "核心功能",
-    "features_desc": "GoWind Content Hub 提供企业级的内容管理功能，满足您的所有需求",
+    "features_desc": "RushWind Content Hub 提供企业级的内容管理功能，满足您的所有需求",
     "feature_content": "灵活的内容管理",
     "feature_content_desc": "支持多种内容类型和自定义字段，满足复杂的内容管理需求",
     "feature_multi_tenant": "多租户架构",
@@ -197,7 +199,7 @@
     "value_customer": "以客户为中心",
     "value_customer_desc": "客户的成功就是我们的成功，我们全力支持您的业务目标",
     "cta_title": "准备开始了吗？",
-    "cta_desc": "立即探索 GoWind Content Hub 的所有功能，或联系我们的团队获取专业建议",
+    "cta_desc": "立即探索 RushWind Content Hub 的所有功能，或联系我们的团队获取专业建议",
     "cta_explore": "探索功能",
     "cta_contact": "联系我们",
     "search_placeholder": "搜索内容、项目..."
@@ -206,8 +208,8 @@
     "contact": {
       "title": "联系我们",
       "description": "如需技术支持或商务合作，请通过以下方式联系我们。",
-      "item_1": "支持邮箱：support@gowind.cloud",
-      "item_2": "商务邮箱：business@gowind.cloud",
+      "item_1": "支持邮箱：support@rushwind.cloud",
+      "item_2": "商务邮箱：business@rushwind.cloud",
       "item_3": "服务时间：周一至周五 09:00-18:00（UTC+8）"
     },
     "disclaimer": {
@@ -285,5 +287,8 @@
     "likes": "点赞",
     "comments": "评论",
     "view_post": "查看文章"
+  },
+  "contact": {
+    "description": "如有合作或使用问题，欢迎通过以下渠道与我们联系。"
   }
 }

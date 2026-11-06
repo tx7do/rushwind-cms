@@ -46,4 +46,50 @@ service PageService {
       delete: "/admin/v1/pages/{id}"
     };
   }
+
+  // 列出页面版本（按版本号倒序）
+  rpc ListVersions(content.service.v1.ListPageVersionsRequest) returns (content.service.v1.ListPageVersionsResponse) {
+    option (google.api.http) = {
+      get: "/admin/v1/pages/{page_id}/versions"
+    };
+  }
+
+  // 获取页面版本详情
+  rpc GetVersion(content.service.v1.GetPageVersionRequest) returns (content.service.v1.PageVersion) {
+    option (google.api.http) = {
+      get: "/admin/v1/pages/versions/{id}"
+    };
+  }
+
+  // 恢复页面到指定版本（恢复动作本身会生成一个新版本）
+  rpc RestoreVersion(content.service.v1.RestorePageVersionRequest) returns (content.service.v1.Page) {
+    option (google.api.http) = {
+      post: "/admin/v1/pages/{page_id}/versions/{version_id}/restore"
+      body: "*"
+    };
+  }
+
+  // 提交页面审核：DRAFT → 审核中
+  rpc SubmitReview(content.service.v1.SubmitPageReviewRequest) returns (content.service.v1.Page) {
+    option (google.api.http) = {
+      post: "/admin/v1/pages/{page_id}/review/submit"
+      body: "*"
+    };
+  }
+
+  // 审核页面通过：审核中 → 已发布（角色经接口管理绑定到该端点即完成卡点）
+  rpc ApproveReview(content.service.v1.ReviewPageRequest) returns (content.service.v1.Page) {
+    option (google.api.http) = {
+      post: "/admin/v1/pages/{page_id}/review/approve"
+      body: "*"
+    };
+  }
+
+  // 页面审核驳回：审核中 → 草稿（带理由通知作者）
+  rpc RejectReview(content.service.v1.RejectPageReviewRequest) returns (content.service.v1.Page) {
+    option (google.api.http) = {
+      post: "/admin/v1/pages/{page_id}/review/reject"
+      body: "*"
+    };
+  }
 }

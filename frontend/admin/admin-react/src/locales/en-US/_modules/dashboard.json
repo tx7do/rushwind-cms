@@ -5,18 +5,111 @@
     "postCountTotal": "Total Posts",
     "commentCountTotal": "Total Comments",
     "interactionCountTotal": "Total Interactions",
+    "mediaCountTotal": "Total Media",
+    "storageUsed": "Storage Used",
     "weeklyNew": "New in 7 Days",
+    "todoTitle": "To-Do",
+    "pendingComments": "Pending Comments",
+    "draftPosts": "Draft Posts",
+    "scheduledPosts": "Scheduled",
     "contentTrend": "Content Growth Trend",
     "newUsers": "New Users",
     "newPosts": "New Posts",
     "newComments": "New Comments",
+    "aiUsageTrend": "AI Usage",
+    "aiCalls": "Calls",
+    "aiTokens": "Tokens",
+    "apiCallTrend": "API Calls",
+    "apiCalls": "Requests",
     "interactionTop": "Interaction Top",
+    "viewTop": "View Top",
     "interactionDistribution": "Interaction Distribution",
+    "postStatusDistribution": "Post Status",
+    "statusDraft": "Draft",
+    "statusPublished": "Published",
+    "statusScheduled": "Scheduled",
+    "commentStatusDistribution": "Comment Status",
+    "statusPending": "Pending",
+    "statusApproved": "Approved",
+    "statusRejected": "Rejected",
+    "statusSpam": "Spam",
+    "mediaTypeDistribution": "Media Types",
+    "assetImage": "Image",
+    "assetVideo": "Video",
+    "assetDocument": "Document",
+    "assetAudio": "Audio",
+    "assetArchive": "Archive",
+    "assetOther": "Other",
+    "unitPosts": "posts",
+    "unitComments": "comments",
+    "unitInteractions": "interactions",
+    "unitAssets": "assets",
     "totalLikes": "Likes",
     "totalWatches": "Favorites",
+    "totalViews": "Views",
     "loginActivity": "Login Activity",
     "loginSuccess": "Login Success",
     "loginFailed": "Login Failed",
+    "activeUsers": "Active Users",
     "titleFallback": "(Untitled)"
+  },
+  "aiInsights": {
+    "title": "Security & Anomaly Insights",
+    "subtitle": "24h audit trail · behavior pattern mining",
+    "generate": "Scan now",
+    "regenerate": "Rescan",
+    "empty": "Click \"Scan now\" to mine the last 24h of audit details for anomalies.",
+    "noAnomaly": "No anomalous behavior patterns detected in the last 24 hours.",
+    "failed": "Scan failed",
+    "assessment": "AI Assessment",
+    "generatedAt": "Generated at {{time}}",
+    "alerts": {
+      "bruteForce": {
+        "title": "Possible credential guessing: {{count}} failed logins for account {{username}} in 24h",
+        "detail": "Last failure from IP {{ip}}. Verify whether it was the account owner; reset the password and temporarily block the source if needed."
+      },
+      "nightOps": {
+        "title": "Off-hours activity: account {{username}} ran {{count}} operations between 00:00-06:00 local time",
+        "detail": "Late-night activity deviates from normal patterns. If this was not a planned change window, check with the account owner."
+      },
+      "failedOps": {
+        "title": "Clustered failures: account {{username}} had {{count}} failed operations ({{total}} total) in 24h",
+        "detail": "Repeated failures may indicate missing permissions or probing. Review the failed resources and reasons in the operation log."
+      },
+      "sensitiveOps": {
+        "title": "{{count}} sensitive operations detected (delete/export/authorization changes)"
+      }
+    }
+  },
+  "workspace": {
+    "greeting": {
+      "morning": "Good morning",
+      "afternoon": "Good afternoon",
+      "evening": "Good evening",
+      "night": "Working late",
+      "morningWith": "Good morning, {{name}}",
+      "afternoonWith": "Good afternoon, {{name}}",
+      "eveningWith": "Good evening, {{name}}",
+      "nightWith": "Working late, {{name}}"
+    },
+    "today": "Today is {{date}}",
+    "quickAccess": {
+      "title": "Quick Access",
+      "subtitle": "One-click access to common pages"
+    },
+    "myMessages": {
+      "title": "My Messages",
+      "unreadCount": "{{count}} unread",
+      "viewAll": "View all",
+      "empty": "No messages"
+    },
+    "mySessions": {
+      "title": "My Sessions",
+      "manage": "Manage",
+      "empty": "No active sessions",
+      "current": "Current",
+      "clientAdmin": "Admin",
+      "clientApp": "App"
+    }
   }
 }

@@ -220,24 +220,22 @@ ThemeData(
 | Windows | `Microsoft YaHei`                  |
 | 通用      | `Noto Color Emoji`（Emoji 支持）       |
 
-### 6.3 字重约定
+### 6.3 已注册字重
 
-不打包字体文件（Noto Sans SC / Noto Color Emoji / Roboto 共约 53 MiB，已从仓库移除），全部依赖系统字体回退。字重由系统字体动态匹配：
+`pubspec.yaml` 中注册的 Noto Sans SC 为官方**变量字体**（VF，wght 100–900 单文件
+`NotoSansSC-VF.ttf`，2026-11-04 由三档 static 替换而来，并移除了 24MB 的
+`NotoColorEmoji-Regular.ttf`——原生端走系统 emoji 兜底链，仅 web 端 emoji 渲染为 tofu）：
 
-| 字重            | 说明  |
-|---------------|-----|
-| 400 (Regular) | 正文  |
-| 500 (Medium)  | 副标题 |
-| 700 (Bold)    | 标题  |
+| 文件                     | 字重范围        | 说明                       |
+|------------------------|-------------|--------------------------|
+| `NotoSansSC-VF.ttf`    | wght 100–900 | 全字重单文件，FontWeight 自动映射 wght 轴 |
 
-使用方式：
+使用方式（无需手动 fontVariations）：
 ```dart
-fontWeight: FontWeight.w400    // → Regular
-fontWeight: FontWeight.w500    // → Medium
-fontWeight: FontWeight.bold   // → Bold (700)
+fontWeight: FontWeight.w400    // → 引擎映射 wght=400
+fontWeight: FontWeight.w500    // → 引擎映射 wght=500（VF 精确命中，static 时代会落到最近档）
+fontWeight: FontWeight.bold   // → 引擎映射 wght=700
 ```
-
-如后续需要统一各端字形，改用 Git LFS 或构建期下载，不再直接提交 ttf。
 
 ---
 

@@ -581,6 +581,41 @@ pub async fn register(
     Ok(resp.user_id)
 }
 
+// ── 内容模型辅助读（2026-11 契约批次）：BFF 把两个模型查询挂在
+// PostService 下，域对应在 ContentModelService——改名转发（消息同源）。
+
+/// C 端渲染 custom_fields 的公开数据源：帖子 → 内容模型定义。
+pub async fn post_content_model(
+    state: &AppState,
+    ctx: &Ctx,
+    req: proto::proto::content::service::v1::GetModelByPostRequest,
+) -> Result<proto::proto::content::service::v1::ContentModel, StatusError> {
+    let mut core = proto::proto::content::service::v1::content_model_service_client::ContentModelServiceClient::new(
+        state.core_channel.clone(),
+    );
+    Ok(core
+        .get_model_by_post(with_operator(ctx, req))
+        .await
+        .map_err(map_status)?
+        .into_inner())
+}
+
+/// RELATION 字段引用 → 目标内容摘要（公开关联卡片）。
+pub async fn resolve_content_references(
+    state: &AppState,
+    ctx: &Ctx,
+    req: proto::proto::content::service::v1::ResolveContentReferencesRequest,
+) -> Result<proto::proto::content::service::v1::ResolveContentReferencesResponse, StatusError> {
+    let mut core = proto::proto::content::service::v1::content_model_service_client::ContentModelServiceClient::new(
+        state.core_channel.clone(),
+    );
+    Ok(core
+        .resolve_content_references(with_operator(ctx, req))
+        .await
+        .map_err(map_status)?
+        .into_inner())
+}
+
 #[cfg(test)]
 mod host_tests {
     use super::*;

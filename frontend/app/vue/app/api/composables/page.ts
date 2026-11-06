@@ -7,6 +7,7 @@ import {
   type contentservicev1_PageTranslation,
 } from '@/api/generated/app/service/v1';
 import { type Paging, makeOrderBy, makeQueryString, makeUpdateMask } from '@/core/transport/rest';
+import { requestApi } from '@/core/transport/rest';
 import { apiClient } from '@/api/client';
 import { queryClient } from '@/plugins/vue-query';
 import { getCurrentLocale } from '@/utils/locale';
@@ -47,6 +48,22 @@ export async function listPage(
  */
 export async function getPage(id: number) {
   return await apiClient.pageService.Get({ id });
+}
+
+/**
+ * 按 slug（或纯数字 id）获取单个页面，附当前语言。
+ * 后端对 id=0 且带 slug 的请求按 slug 解析（app BFF Get 内重写 query_by）。
+ */
+export async function getPageBySlug(slug: string) {
+  const locale = getCurrentLocale();
+  const numericId = Number(slug);
+  // 纯数字别名直接按 id 走详情；否则走 by-slug 专用端点
+  // （Get({id:0, slug}) 会让 id+slug 双绑定冲突 oneof，后端 400）
+  if (Number.isInteger(numericId) && numericId > 0) {
+    return await apiClient.pageService.Get({ id: numericId, locale });
+  }
+  // @ts-ignore proto generated code is error.
+  return await apiClient.pageService.GetBySlug({ slug, locale });
 }
 
 /**
@@ -141,6 +158,34 @@ export async function fetchPage(id: number) {
   return queryClient.fetchQuery({
     queryKey: ['getPage', id],
     queryFn: () => getPage(id),
+    retry: 0,
+  });
+}
+
+/** 按 slug 获取单个页面（公开页面渲染用，键含 locale 避免语言串缓存） */
+export async function fetchPageBySlug(slug: string) {
+  const locale = getCurrentLocale();
+  return queryClient.fetchQuery({
+    queryKey: ['getPageBySlug', slug, locale],
+    queryFn: () => getPageBySlug(slug),
+    retry: 0,
+  });
+}
+
+/**
+ * 草稿预览取数：携带 admin 签发的短时效 preview_token，
+ * 后端校验通过则放行非已发布内容（preview_token 不在 proto 消息内，手拼 query 旁路传）。
+ */
+export async function fetchPagePreview(id: number, token: string) {
+  const locale = getCurrentLocale();
+  return queryClient.fetchQuery({
+    queryKey: ['getPagePreview', id, token, locale],
+    queryFn: () =>
+      requestApi({
+        path: `app/v1/pages/${id}?locale=${encodeURIComponent(locale)}&preview_token=${encodeURIComponent(token)}`,
+        method: 'GET',
+        body: null,
+      }),
     retry: 0,
   });
 }

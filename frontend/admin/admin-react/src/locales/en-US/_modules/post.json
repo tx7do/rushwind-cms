@@ -54,10 +54,15 @@
   "deleteConfirmDesc": "Are you sure you want to delete this {{moduleName}}?",
   "deleteSuccess": "Deleted successfully",
   "deleteFailed": "Delete failed",
-  "fetchFailed": "Failed to load",
   "draftFound": "Unpublished local draft detected",
-  "draftFoundMessage": "A local draft from your last edit was found. Restore it? Discarding keeps the server content.",
+  "draftFoundMessage": "A local draft from your last edit was found. You can restore it, discard it, or decide later; the server content is kept unless restored.",
   "draftRestore": "Restore Draft",
+  "draftDiscard": "Discard Draft",
+  "draftSavedAt": "Draft saved at {{time}}",
+  "previewDraft": "Preview Draft",
+  "draftPreviewBanner": "Local draft preview · Not saved to the server; not the real C-end site theme",
+  "draftPreviewTip": "Preview current edits in a new window (rendered locally, nothing is saved to the server)",
+  "draftPreviewUntitled": "Untitled Draft",
   "unsavedTitle": "Unsaved changes",
   "unsavedMessage": "Leaving this page will lose unsaved content. Are you sure you want to leave?",
   "settings": "Post Settings",
@@ -86,5 +91,37 @@
   "editorTypeMap": {
     "EDITOR_TYPE_MARKDOWN": "Markdown",
     "EDITOR_TYPE_RICH_TEXT": "Rich Text"
-  }
+  },
+  "distributeToSocial": "Distribute to Social",
+  "distributeNeedSave": "Save the post before distributing",
+  "versionHistory": "Version History",
+  "versionNeedSave": "Available after save",
+  "previewOnCend": "Preview",
+  "transfer": {
+    "import": "Import",
+    "importXlsx": "Bulk import (Excel)",
+    "importJson": "Import JSON",
+    "exportJson": "Export JSON",
+    "exportSuccess": "Exported {{count}} posts (with translations)",
+    "exportFailed": "Export failed",
+    "importSuccess": "Imported {{count}} posts (as drafts)",
+    "importPartial": "Import finished: {{ok}} succeeded, failed rows: {{failed}} (nothing published)",
+    "importFailed": "Import failed: file parse error",
+    "noPosts": "No posts found in file"
+  },
+  "review": {
+    "submit": "Submit",
+    "submitTitle": "Submit for review",
+    "submitted": "Submitted for review",
+    "approve": "Approve",
+    "approveTitle": "Approve & publish",
+    "approved": "Approved & published",
+    "reject": "Reject",
+    "rejectTitle": "Reject (back to draft)",
+    "rejected": "Rejected",
+    "reasonPlaceholder": "Reason (notifies the author, optional)"
+  },
+  "statusInReview": "In Review",
+  "editLockHeld": "{{name}} is editing this content ({{since}}). Concurrent saves may overwrite each other",
+  "customFieldsGroup": "Custom Fields"
 }

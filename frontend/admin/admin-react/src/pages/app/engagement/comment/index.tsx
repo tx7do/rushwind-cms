@@ -1,8 +1,10 @@
 import { useRef, useState } from 'react';
 import type { ProColumns, ActionType } from '@ant-design/pro-components';
 import TableExportButton from '@/components/common/TableExportButton';
-import { ProTable } from '@ant-design/pro-components';
-import { Popconfirm, Tag, App, Modal, Input } from 'antd';
+import ListTable from '@/components/common/ListTable';
+import TableActions from '@/components/common/TableActions';
+import { Tag, App, Modal, Input } from 'antd';
+import AiGenerateButton from '@/components/common/AiGenerateButton';
 import { EditOutlined, DeleteOutlined, MessageOutlined } from '@ant-design/icons';
 import { useQueryClient } from '@tanstack/react-query';
 import { useTranslation } from 'react-i18next';
@@ -220,82 +222,83 @@ const CommentList = () => {
     {
       title: t('action'),
       valueType: 'option',
-      width: 150,
+      width: 220,
       fixed: 'right',
-      render: (_, record) => [
-        <a key="reply" onClick={() => handleReply(record)}>
-          <MessageOutlined /> {t('reply')}
-        </a>,
-        <a
-          key="edit"
-          onClick={() => {
-            setEditingRow(record);
-            setDrawerOpen(true);
-          }}
-        >
-          <EditOutlined />
-        </a>,
-        <Popconfirm
-          key="delete"
-          title={t('deleteConfirmTitle')}
-          description={t('deleteConfirmDesc', { moduleName: t('moduleName') })}
-          onConfirm={() => {
-            record.id && deleteMutation.mutate({ id: record.id });
-          }}
-          okText={t('common:button.ok')}
-          cancelText={t('common:button.cancel')}
-        >
-          <a style={{ color: 'var(--ant-color-error)' }}>
-            <DeleteOutlined />
-          </a>
-        </Popconfirm>,
-      ],
+      render: (_, record) => (
+        <TableActions
+          record={record}
+          actions={[
+            {
+              key: 'reply',
+              label: t('reply'),
+              icon: <MessageOutlined />,
+              onClick: () => handleReply(record),
+            },
+            {
+              key: 'edit',
+              label: t('common:button.edit'),
+              icon: <EditOutlined />,
+              onClick: () => {
+                setEditingRow(record);
+                setDrawerOpen(true);
+              },
+            },
+            {
+              key: 'delete',
+              label: t('common:button.delete'),
+              icon: <DeleteOutlined />,
+              danger: true,
+              confirm: {
+                title: t('deleteConfirmTitle'),
+                description: t('deleteConfirmDesc', { moduleName: t('moduleName') }),
+              },
+              onClick: () => record.id && deleteMutation.mutate({ id: record.id }),
+            },
+          ]}
+        />
+      ),
     },
   ];
 
   return (
     <>
       <div ref={containerRef} className="page-container-content" style={{ padding: '0 8px', height: '100%' }}>
-        <ProTable<any>
+        <ListTable<any>
           actionRef={actionRef}
           columns={columns}
           headerTitle={t('commentList')}
           request={async (params) => {
-            try {
-              const query = new PaginationQuery({
-                paging: {
-                  page: params.current || 1,
-                  pageSize: params.pageSize || TABLE.DEFAULT_PAGE_SIZE,
-                },
-                formValues: Object.fromEntries(
-                  Object.entries(params).filter(
-                    ([key]) => !['current', 'pageSize'].includes(key),
-                  ),
+            const query = new PaginationQuery({
+              paging: {
+                page: params.current || 1,
+                pageSize: params.pageSize || TABLE.DEFAULT_PAGE_SIZE,
+              },
+              formValues: Object.fromEntries(
+                Object.entries(params).filter(
+                  ([key]) => !['current', 'pageSize'].includes(key),
                 ),
-                orderBy: ['-created_at'],
-              });
+              ),
+              orderBy: ['-created_at'],
+            });
 
-              const response = await fetchListComments(query);
+            const response = await fetchListComments(query);
 
-              // 全部展开：收集所有含 children 的父评论 id
-              const collectParentIds = (items: any[]): any[] =>
-                items.flatMap((item) =>
-                  item.children?.length
-                    ? [item.id, ...collectParentIds(item.children)]
-                    : [],
-                );
-              setExpandedKeys(collectParentIds(response.items || []));
+            // 全部展开：收集所有含 children 的父评论 id
+            const collectParentIds = (items: any[]): any[] =>
+              items.flatMap((item) =>
+                item.children?.length
+                  ? [item.id, ...collectParentIds(item.children)]
+                  : [],
+              );
+            setExpandedKeys(collectParentIds(response.items || []));
 
-              return {
-                data: response.items || [],
-                total: response.total || 0,
-                success: true,
-              };
-            } catch (error: any) {
-              message.error(error.message || t('fetchFailed'));
-              return { data: [], total: 0, success: false };
-            }
-          }}
+            return {
+              data: response.items || [],
+              total: response.total || 0,
+              success: true,
+            };
+          
+}}
           rowKey="id"
           search={{
             labelWidth: 'auto',
@@ -356,7 +359,14 @@ const CommentList = () => {
         destroyOnHidden
       >
         <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-          <div>{t('content')}</div>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+            <span>{t('content')}</span>
+            <AiGenerateButton
+              scene="REPLY"
+              context={replyRow?.content ? `用户评论原文：${replyRow.content}` : undefined}
+              onGenerate={(content) => setReplyContent(content)}
+            />
+          </div>
           <Input.TextArea
             rows={4}
             value={replyContent}

@@ -1,10 +1,42 @@
-import React, { useCallback, useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Form, Input, Button, Checkbox, App } from 'antd';
-import { UserOutlined, LockOutlined, SafetyOutlined } from '@ant-design/icons';
+import {
+  UserOutlined,
+  LockOutlined,
+  SafetyOutlined,
+  TeamOutlined,
+} from '@ant-design/icons';
 import { useAuthStore } from '@/stores';
-import { useNavigate, useSearchParams } from 'react-router-dom';
+import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { fetchGenerateCaptcha } from '@/api';
+import { fetchTenantBranding } from '@/api/hooks/tenant-branding';
+import { apiClient } from '@/api/client';
+
+/**
+ * 验证码控件：输入框与图片盒同排，组成单一受控组件挂进 Form.Item。
+ * value/onChange 由 Form.Item 注入后透传给 Input；校验错误渲染在整行下方，
+ * 验证码图不会被错误行挤偏（旧结构嵌套 Form.Item + items-center 会在报错时下坠）。
+ */
+const CaptchaField: React.FC<{
+  value?: string;
+  onChange?: (...event: any[]) => void;
+  label?: string;
+  placeholder?: string;
+  imageEl?: React.ReactNode;
+}> = ({ value, onChange, label, placeholder, imageEl }) => (
+  <div className="flex items-center gap-2">
+    <Input
+      prefix={<SafetyOutlined />}
+      aria-label={label}
+      placeholder={placeholder}
+      autoComplete="off"
+      value={value}
+      onChange={onChange}
+    />
+    {imageEl}
+  </div>
+);
 
 const Login: React.FC = () => {
   const { t } = useTranslation('auth');
@@ -17,6 +49,29 @@ const Login: React.FC = () => {
   const [captchaId, setCaptchaId] = useState<string>('');
   const [captchaImage, setCaptchaImage] = useState<string>('');
   const [captchaLoading, setCaptchaLoading] = useState(false);
+
+  // OIDC SSO 状态
+  const [ssoLoading, setSsoLoading] = useState(false);
+  // StrictMode 下 effect 双跑，OIDC 回调只允许消费一次
+  const ssoHandledRef = useRef(false);
+
+  // 租户白标：租户编号失焦后拉取（blur 语义自带防抖），命中则替换站牌
+  const [tenantBranding, setTenantBranding] = useState<{ found: boolean; name: string; logoUrl: string } | null>(null);
+  const applyTenantBranding = useCallback(async (code: string) => {
+    const trimmed = (code || '').trim();
+    if (!trimmed) {
+      setTenantBranding(null);
+      return;
+    }
+    try {
+      const branding = await fetchTenantBranding(trimmed);
+      setTenantBranding(branding.found ? branding : null);
+    } catch (brandingError) {
+      // 白标是非关键路径：失败静默保持默认品牌，原始错误留控制台
+      console.warn('fetch tenant branding failed', brandingError);
+      setTenantBranding(null);
+    }
+  }, []);
 
   // 获取验证码
   const refreshCaptcha = useCallback(async () => {
@@ -57,6 +112,61 @@ const Login: React.FC = () => {
       cancelled = true;
     };
   }, []);
+
+  // ===== OIDC 授权码回调：IdP 携 code+state 跳回本页，直接换发本仓令牌 =====
+  // 登录成功走 store 默认的整页跳 homePath：本页本就经整页跳转到达，
+  // 全页加载让 createBrowserRouter 以最终地址重建，规避 SPA 导航竞态。
+  useEffect(() => {
+    const code = searchParams.get('code');
+    const state = searchParams.get('state');
+    if (!code || !state || ssoHandledRef.current) return;
+    ssoHandledRef.current = true;
+
+    // 消费掉地址栏中的 code/state（服务端 state 一次性，前端同步清理防重放观感）
+    navigate(window.location.pathname, { replace: true });
+
+    setSsoLoading(true);
+    useAuthStore
+      .getState()
+      .login({
+        grant_type: 'authorization_code',
+        code,
+        oidc_state: state,
+      })
+      .catch((error: unknown) => {
+        console.error('OIDC login failed:', error);
+        message.error(
+          error instanceof Error && error.message
+            ? error.message
+            : t('ssoLoginFailed'),
+        );
+      })
+      .finally(() => setSsoLoading(false));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // 企业 SSO 登录：向后台换取授权跳转地址（state 由服务端生成暂存）后整页跳 IdP
+  const handleSsoLogin = async () => {
+    setSsoLoading(true);
+    try {
+      const resp = await apiClient.authenticationService.GetOidcAuthorizeUrl({
+        redirect_uri: `${window.location.origin}/auth/login`,
+      });
+      if (resp.authorizeUrl) {
+        window.location.href = resp.authorizeUrl;
+        return; // 跳转中，保持 loading 态
+      }
+      setSsoLoading(false);
+    } catch (error: unknown) {
+      console.error('Get OIDC authorize url failed:', error);
+      setSsoLoading(false);
+      message.error(
+        error instanceof Error && error.message
+          ? error.message
+          : t('ssoLoginFailed'),
+      );
+    }
+  };
 
   const handleSubmit = async (values: {
     username: string;
@@ -105,12 +215,12 @@ const Login: React.FC = () => {
   };
 
   /**
-   * 验证码图片组件，与输入框水平对齐（flex items-center space-x-2）。
-   * 点击刷新验证码。高度与输入框统一（h-11）。
+   * 验证码图片盒：与输入框等高（h-11=44px），宽 132px 与后端 240×80（3:1）等比，
+   * img object-cover 满高填充无留白。点击刷新验证码。
    */
   const captchaImageEl = (
     <div
-      className="flex items-center justify-center overflow-hidden w-[110px] h-11 shrink-0 rounded-lg cursor-pointer border border-solid bg-white light:border-black/10 light:bg-black/[0.03]"
+      className="flex items-center justify-center overflow-hidden w-[132px] h-11 shrink-0 rounded-lg cursor-pointer border border-solid bg-white light:border-black/10 light:bg-black/[0.03]"
       title={t('captchaRefresh')}
       onClick={() => !captchaLoading && refreshCaptcha()}
     >
@@ -118,10 +228,12 @@ const Login: React.FC = () => {
         <img
           src={captchaImage}
           alt="captcha"
-          className="h-full w-full object-contain"
+          className="h-full w-full object-cover"
         />
       ) : (
-        <span className="text-slate-400 text-xs">
+        // 占位文案走 §2.1 的实底暗墨而非次要文字档：外层盒子两态都是浅底
+        // （暗色 bg-white / 浅色 bg-black/[0.03]），实测次要档在浅底上只有 2.6:1。
+        <span className="text-[color:var(--gowind-solid-ink)] text-xs">
           {captchaLoading ? '...' : t('captchaRefresh')}
         </span>
       )}
@@ -130,14 +242,34 @@ const Login: React.FC = () => {
 
   return (
     <div className="w-full max-w-[420px]">
-      {/* 标题 */}
+      {/* 标题（租户白标命中时替换为租户 Logo/名称） */}
       <div className="mb-11">
-        <h2 className="text-[34px] font-extrabold tracking-[-0.5px] mb-2.5 text-[color:var(--ant-color-text)]">
-          {t('welcomeBack')}
-        </h2>
-        <p className="text-[15px] leading-relaxed text-[color:var(--ant-color-text-tertiary)]">
-          {t('loginDescription')}
-        </p>
+        {tenantBranding ? (
+          <>
+            {tenantBranding.logoUrl && (
+              <img
+                src={tenantBranding.logoUrl}
+                alt={tenantBranding.name}
+                className="h-12 mb-3 object-contain"
+              />
+            )}
+            <h2 className="text-[34px] font-extrabold tracking-[-0.5px] mb-2.5 text-[color:var(--ant-color-text)]">
+              {tenantBranding.name}
+            </h2>
+            <p className="text-[15px] leading-relaxed text-[color:var(--gowind-secondary-text)]">
+              {t('welcomeBack')}
+            </p>
+          </>
+        ) : (
+          <>
+            <h2 className="text-[34px] font-extrabold tracking-[-0.5px] mb-2.5 text-[color:var(--ant-color-text)]">
+              {t('welcomeBack')}
+            </h2>
+            <p className="text-[15px] leading-relaxed text-[color:var(--gowind-secondary-text)]">
+              {t('loginDescription')}
+            </p>
+          </>
+        )}
       </div>
 
       {/* 登录表单卡片 —— 实底表面色 + 24px 大圆角 + 主色柔影（对齐 vben 认证面板） */}
@@ -152,8 +284,10 @@ const Login: React.FC = () => {
           <Form.Item name="tenant_code" className="login-form-item">
             <Input
               prefix={<UserOutlined />}
+              aria-label={t('tenantCodeLabel')}
               placeholder={t('tenantCodePlaceholder')}
               autoComplete="off"
+              onBlur={(e) => applyTenantBranding(e.target.value)}
             />
           </Form.Item>
 
@@ -169,6 +303,7 @@ const Login: React.FC = () => {
           >
             <Input
               prefix={<UserOutlined />}
+              aria-label={t('usernameLabel')}
               placeholder={t('usernamePlaceholder')}
               autoComplete="username"
             />
@@ -186,43 +321,35 @@ const Login: React.FC = () => {
           >
             <Input.Password
               prefix={<LockOutlined />}
+              aria-label={t('passwordLabel')}
               placeholder={t('passwordPlaceholder')}
               autoComplete="current-password"
             />
           </Form.Item>
 
-          {/* 验证码 —— 输入框与图片水平对齐，等高 h-11，flex 布局。
-              name 必须挂在直接包裹 Input 的 Form.Item 上：antd 只向唯一子元素注入
-              value/onChange，中间隔一层 div 会让验证码值永远进不了表单状态 */}
-          <Form.Item className="login-form-item" style={{ marginBottom: 0 }}>
-            <div className="flex items-center space-x-2">
-              <Form.Item
-                name="captcha"
-                rules={[
-                  {
-                    required: true,
-                    message: t('captchaRequired'),
-                  },
-                ]}
-                className="flex-1"
-                style={{ marginBottom: 0 }}
-              >
-                <Input
-                  prefix={<SafetyOutlined />}
-                  placeholder={t('captchaPlaceholder')}
-                  autoComplete="off"
-                />
-              </Form.Item>
-              {captchaImageEl}
-            </div>
+          {/* 验证码 —— 输入框与图片盒组成单一受控组件（CaptchaField），
+              校验错误渲染在整行下方，图片盒与输入框始终保持等高对齐 */}
+          <Form.Item
+            name="captcha"
+            rules={[
+              {
+                required: true,
+                message: t('captchaRequired'),
+              },
+            ]}
+            className="login-form-item"
+          >
+            <CaptchaField
+              label={t('captchaLabel')}
+              placeholder={t('captchaPlaceholder')}
+              imageEl={captchaImageEl}
+            />
           </Form.Item>
 
           <Form.Item className="login-remember-item">
-            <div className="flex items-center justify-between">
-              <Form.Item name="remember" valuePropName="checked" noStyle>
-                <Checkbox>{t('rememberAccount')}</Checkbox>
-              </Form.Item>
-            </div>
+            <Form.Item name="remember" valuePropName="checked" noStyle>
+              <Checkbox>{t('rememberAccount')}</Checkbox>
+            </Form.Item>
           </Form.Item>
 
           <Form.Item className="login-form-item">
@@ -236,6 +363,30 @@ const Login: React.FC = () => {
               {loginLoading ? t('loggingIn') : t('loginButton')}
             </Button>
           </Form.Item>
+
+          {/* 企业 SSO 入口：OIDC 配置未启用时点击会有后端错误提示，不影响密码登录。
+              my-5 与表单 20px 行距同档（顶部经边距折叠维持 20px，底部补齐，
+              此前 mt-1 时分隔行下面是 0px、贴死 SSO 按钮） */}
+          <div className="my-5 flex items-center gap-3">
+            <div className="h-px flex-1 bg-[color:var(--ant-color-border-secondary)]" />
+            <span className="text-xs text-[color:var(--ant-color-text-quaternary)]">
+              {t('ssoOrDivider')}
+            </span>
+            <div className="h-px flex-1 bg-[color:var(--ant-color-border-secondary)]" />
+          </div>
+
+          <Form.Item className="login-form-item mb-0">
+            <Button
+              block
+              size="large"
+              icon={<TeamOutlined />}
+              loading={ssoLoading}
+              disabled={loginLoading}
+              onClick={handleSsoLogin}
+            >
+              {t('ssoLogin')}
+            </Button>
+          </Form.Item>
         </Form>
       </div>
 
@@ -244,15 +395,14 @@ const Login: React.FC = () => {
         <span className="text-[color:var(--ant-color-text-secondary)]">
           {t('noAccount')}{' '}
         </span>
-        {/* CMS 后端暂无找回密码 RPC，入口对齐 vben 侧改为禁用态（9e131069） */}
-        <span
-          className="cursor-not-allowed text-[color:var(--ant-color-text-quaternary)]"
+        {/* 忘记密码：邮件重置验证码两步流（/admin/v1/forgot-password 免鉴权） */}
+        <Link
+          to="/auth/forgot-password"
+          className="text-[color:var(--ant-color-text-secondary)] hover:text-[color:var(--ant-color-primary)]"
           style={{ fontSize: 13 }}
-          title={t('forgotPasswordDisabled')}
         >
           {t('forgotPassword')}
-        </span>
-        
+        </Link>
       </div>
     </div>
   );

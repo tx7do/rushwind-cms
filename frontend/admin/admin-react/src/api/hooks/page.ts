@@ -9,6 +9,9 @@ import {
   type contentservicev1_GetPageRequest,
   type contentservicev1_ListPageResponse,
   type contentservicev1_Page,
+  type contentservicev1_ReviewPageRequest,
+  type contentservicev1_RejectPageReviewRequest,
+  type contentservicev1_SubmitPageReviewRequest,
 } from '@/api/generated/admin/service/v1';
 import { makeUpdateMask, type PaginationQuery } from '@/core/transport/rest';
 import { queryClient } from '@/core';
@@ -49,7 +52,7 @@ export function useGetPage(
 }
 
 export function useCreatePage(
-  options?: UseMutationOptions<contentservicev1_Page, Error, Record<string, any>>,
+  options?: UseMutationOptions<contentservicev1_Page, Error, Record<string, unknown>>,
 ) {
   return useMutation({
     mutationFn: (values) =>
@@ -62,7 +65,7 @@ export function useUpdatePage(
   options?: UseMutationOptions<
     contentservicev1_Page,
     Error,
-    { id: number; data: Record<string, any>; excludeMaskKeys?: string[] }
+    { id: number; data: Record<string, unknown>; excludeMaskKeys?: string[] }
   >,
 ) {
   return useMutation({
@@ -78,8 +81,35 @@ export function useUpdatePage(
   });
 }
 
+export function useSubmitPageReview(
+  options?: UseMutationOptions<contentservicev1_Page, Error, contentservicev1_SubmitPageReviewRequest>,
+) {
+  return useMutation({
+    mutationFn: (req) => apiClient.pageService.SubmitReview(req),
+    ...options,
+  });
+}
+
+export function useApprovePageReview(
+  options?: UseMutationOptions<contentservicev1_Page, Error, contentservicev1_ReviewPageRequest>,
+) {
+  return useMutation({
+    mutationFn: (req) => apiClient.pageService.ApproveReview(req),
+    ...options,
+  });
+}
+
+export function useRejectPageReview(
+  options?: UseMutationOptions<contentservicev1_Page, Error, contentservicev1_RejectPageReviewRequest>,
+) {
+  return useMutation({
+    mutationFn: (req) => apiClient.pageService.RejectReview(req),
+    ...options,
+  });
+}
+
 export function useDeletePage(
-  options?: UseMutationOptions<{}, Error, contentservicev1_DeletePageRequest>,
+  options?: UseMutationOptions<unknown, Error, contentservicev1_DeletePageRequest>,
 ) {
   return useMutation({
     mutationFn: (data) => apiClient.pageService.Delete(data),

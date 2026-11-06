@@ -36,7 +36,6 @@
   "createFailed": "创建失败",
   "updateFailed": "更新失败",
   "deleteFailed": "删除失败",
-  "fetchFailed": "获取数据失败",
   "siteList": "站点列表",
   "statusMap": {
     "SITE_STATUS_ACTIVE": "正常",

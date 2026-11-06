@@ -33,6 +33,7 @@
   "folderId": "Folder ID",
   "createdAt": "Created At",
   "createdAtRange": "Created At Range",
+  "updatedAt": "Updated At",
   "action": "Action",
   "upload": "Upload",
   "uploadSuccess": "Uploaded successfully",
@@ -48,7 +49,6 @@
   "updateFailed": "Failed to update",
   "deleteSuccess": "Deleted successfully",
   "deleteFailed": "Failed to delete",
-  "fetchFailed": "Failed to load",
   "dateRange": {
     "today": "Today",
     "yesterday": "Yesterday",
@@ -70,5 +70,32 @@
     "PROCESSING_STATUS_PROCESSING": "Processing",
     "PROCESSING_STATUS_COMPLETED": "Completed",
     "PROCESSING_STATUS_FAILED": "Failed"
+  },
+  "uploadDuplicate": "Duplicate of an existing asset (existing one kept)",
+  "duplicates": {
+    "toolbar": "Duplicates",
+    "title": "Duplicate assets (same content hash)",
+    "empty": "No duplicate assets found",
+    "loadFailed": "Failed to load duplicates",
+    "count": "{count} copies",
+    "keepFirst": "Keep (earliest upload)",
+    "keepOrDelete": "Keep / Delete",
+    "deleteThis": "Delete this copy",
+    "cleanup": "Keep earliest, delete rest",
+    "cleanupConfirm": "Will delete {count} duplicate copies (keeping the earliest). Continue?",
+    "cleanupStarted": "Cleaning up {count} duplicates"
+  },
+  "references": {
+    "title": "Referenced by",
+    "sourceType": "Source",
+    "post": "Post",
+    "page": "Page",
+    "sourceTitle": "Title",
+    "sourceMissing": "Source no longer exists",
+    "field": "Location",
+    "fieldBody": "In content",
+    "fieldThumbnail": "Thumbnail",
+    "fieldCover": "Cover",
+    "empty": "No content references this asset"
   }
 }

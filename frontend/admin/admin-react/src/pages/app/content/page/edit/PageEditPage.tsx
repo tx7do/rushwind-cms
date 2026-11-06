@@ -1,18 +1,23 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import {
+  Alert,
   App,
   Button,
   Col,
+  Collapse,
+  Form,
   Input,
   Row,
   Select,
   Space,
-} from 'antd';
+  Tooltip } from 'antd';
 import {
   ArrowLeftOutlined,
   CheckOutlined,
   CloseOutlined,
   DownOutlined,
+  FileTextOutlined,
+  HistoryOutlined,
   TranslationOutlined,
   UpOutlined,
 } from '@ant-design/icons';
@@ -21,15 +26,23 @@ import { useTranslation } from 'react-i18next';
 
 import { apiClient } from '@/api/client';
 import { PaginationQuery } from '@/core';
+import { EyeOutlined } from '@ant-design/icons';
+import AiGenerateButton from '@/components/common/AiGenerateButton';
+import VersionHistoryDrawer from '@/components/version/VersionHistoryDrawer';
+import { cendBaseUrl, cendLocalePrefix, useCreatePagePreviewToken } from '@/api/hooks/preview';
 import ContentContainer from '@/layouts/components/PageContainer/ContentContainer';
+import { useEditLock } from '@/api/hooks/edit-lock';
+import { useCollaboration } from '@/hooks/useCollaboration';
 import { Editor, EditorType } from '@/components/common/Editor';
 import {
   fetchListContentModels,
   fetchListFieldDefinitions,
 } from '@/api/hooks/content-model';
+import CustomFieldsEditor from '@/components/content/CustomFieldsEditor';
 import { fetchListLanguages } from '@/api/hooks/language';
 import { uploadFile } from '@/api/hooks/file-transfer';
 import { useTranslate } from '@/api/hooks/tag';
+import { openDraftPreviewWindow } from '@/utils/draft-preview';
 import {
   editorTypeOptions,
   pageStatusOptions,
@@ -72,6 +85,16 @@ interface PageEditProps {
   customFields?: Record<string, string>;
   /** 页面嵌套区块列表。作为页面子部件随页面整体读写（对齐后端 Page.Sections 整体替换语义） */
   sections?: SectionFormItem[];
+  /** SEO 字段（翻译表 seo JSON；7 字段同 post 侧） */
+  seo?: {
+    seoTitle?: string;
+    metaKeywords?: string;
+    metaDescription?: string;
+    ogTitle?: string;
+    ogDescription?: string;
+    ogImage?: string;
+    canonicalUrl?: string;
+  };
 }
 
 interface LanguageOption {
@@ -103,19 +126,26 @@ function getDraftKey(pageId: null | number, lang: string, isCreateMode: boolean)
  * 嵌套区块管理、发布（主编辑器内容合并进首个正文区块）
  */
 const PageEditPage = () => {
-  const { t } = useTranslation('page');
+  const { t, i18n } = useTranslation('page');
   const navigate = useNavigate();
   const { id } = useParams();
   const [searchParams, setSearchParams] = useSearchParams();
-  const { message, notification } = App.useApp();
+  const { message, notification, modal } = App.useApp();
 
   const initLang = searchParams.get('lang') || 'zh-CN';
   const isCreateMode = !id;
   const pageId = isCreateMode ? null : Number(id);
+  // 编辑锁（协同 v1）：他人持锁时展示提示横幅
+  const editLock = useEditLock('page', pageId);
+  // 实时协同（仅富文本；房间按语言隔离，创建模式无 id 不启用）
 
   const [lang, setLang] = useState(initLang);
+  const collaboration = useCollaboration('page', pageId, lang);
+  const [collaborators, setCollaborators] = useState<{ name: string; color: string }[]>([]);
   const [formData, setFormData] = useState<PageEditProps>(() => emptyForm(initLang));
   const [languageOptions, setLanguageOptions] = useState<LanguageOption[]>([]);
+  const [versionsOpen, setVersionsOpen] = useState(false);
+  const createPreviewToken = useCreatePagePreviewToken();
   const [needTranslate, setNeedTranslate] = useState(false);
   const [saving, setSaving] = useState(false);
   const [contentModelOptions, setContentModelOptions] = useState<
@@ -131,6 +161,14 @@ const PageEditPage = () => {
   const updateForm = useCallback((patch: Partial<PageEditProps>) => {
     setFormData((prev) => ({ ...prev, ...patch }));
   }, []);
+
+  // SEO 7 字段局部更新（同 post 侧 patchSeo 语义：从空对象起步）
+  const patchSeo = (part: Partial<NonNullable<PageEditProps['seo']>>) => {
+    setFormData((prev) => ({
+      ...prev,
+      seo: { ...(prev.seo ?? {}), ...part },
+    }));
+  };
 
   const loadDraft = useCallback(
     (currentLang: string): PageEditProps | null => {
@@ -160,6 +198,27 @@ const PageEditPage = () => {
 
   const clearDraft = (currentLang: string) => {
     localStorage.removeItem(getDraftKey(pageId, currentLang, isCreateMode));
+  };
+
+  /** 丢弃本地草稿：清掉暂存并恢复为服务端当前内容（新建模式回空表单） */
+  const handleDiscardDraft = () => {
+    modal.confirm({
+      title: t('discardDraftConfirmTitle'),
+      content: t('discardDraftConfirmMessage'),
+      okText: t('discardDraft'),
+      okButtonProps: { danger: true },
+      cancelText: t('common:button.cancel'),
+      onOk: () => {
+        clearDraft(lang);
+        if (isCreateMode) {
+          setFormData(emptyForm(lang));
+        } else {
+          fetchPage(lang).catch((error) => {
+            console.error('Refetch page after draft discard failed:', error);
+          });
+        }
+      },
+    });
   };
 
   // 内容模型变化时拉取字段定义，驱动动态字段表单
@@ -246,6 +305,7 @@ const PageEditPage = () => {
           id: item.id,
           title: langItem?.title || '',
           slug: langItem?.slug || '',
+          seo: langItem?.seo as PageEditProps['seo'] | undefined,
           content: bodyContent,
           lang: currentLang,
           editorType: item.editorType || EditorType.MARKDOWN,
@@ -374,12 +434,14 @@ const PageEditPage = () => {
         '',
         file,
         'post',
-        (progressEvent: { loaded?: number; total?: number }) => {
-          if (!onProgress) return;
-          const total = progressEvent?.total ?? 0;
-          onProgress(total > 0 ? Math.floor(((progressEvent.loaded ?? 0) / total) * 100) : -1);
+        {
+          onUploadProgress: (progressEvent: { loaded?: number; total?: number }) => {
+            if (!onProgress) return;
+            const total = progressEvent?.total ?? 0;
+            onProgress(total > 0 ? Math.floor(((progressEvent.loaded ?? 0) / total) * 100) : -1);
+          },
         },
-      )) as any;
+      )) as { publicUrl?: string };
       return resp?.publicUrl || '';
     } catch (error) {
       console.error('Image upload failed:', error);
@@ -527,6 +589,10 @@ const PageEditPage = () => {
             title: formData.title,
             slug: formData.slug,
             languageCode: lang,
+            // SEO：有任一字段才携带（后端仅在 data.Seo != nil 时落库，不传不覆盖）
+            ...(formData.seo && Object.values(formData.seo).some((v) => v)
+              ? { seo: formData.seo }
+              : {}),
           },
         ],
       };
@@ -555,41 +621,17 @@ const PageEditPage = () => {
     }
   };
 
-  const renderCustomField = (field: any) => {
-    const name = field.name ?? '';
-    const value = formData.customFields?.[name] ?? '';
-    switch (field.type) {
-      case 'FIELD_TYPE_RICHTEXT':
-        return (
-          <Input.TextArea
-            rows={2}
-            value={value}
-            size="small"
-            onChange={(e) =>
-              updateForm({
-                customFields: { ...(formData.customFields ?? {}), [name]: e.target.value },
-              })
-            }
-          />
-        );
-      default:
-        return (
-          <Input
-            size="small"
-            value={value}
-            onChange={(e) =>
-              updateForm({
-                customFields: { ...(formData.customFields ?? {}), [name]: e.target.value },
-              })
-            }
-          />
-        );
-    }
-  };
-
   return (
     <ContentContainer heightMode="fixed" padding="0" bottomMargin={0}>
       <div style={{ height: '100%', display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
+        {editLock.heldByName && (
+          <Alert
+            type="warning"
+            showIcon
+            style={{ margin: '8px 16px 0' }}
+            message={t('editLockHeld', { name: editLock.heldByName, since: editLock.heldSince ?? '' })}
+          />
+        )}
         {/* 头部：返回 + 标题 + 别名 + 语言 + 翻译 + 编辑器/状态/类型 */}
         <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '12px 16px 8px', flexWrap: 'wrap' }}>
           <Button type="text" icon={<ArrowLeftOutlined />} onClick={goBack} />
@@ -599,6 +641,10 @@ const PageEditPage = () => {
             style={{ flex: 1, minWidth: 200 }}
             value={formData.title}
             onChange={(e) => updateForm({ title: e.target.value })}
+          />
+          <AiGenerateButton
+            scene="POST_TITLE"
+            onGenerate={(content) => updateForm({ title: content })}
           />
           <Input
             placeholder={t('slugPlaceholder')}
@@ -627,7 +673,6 @@ const PageEditPage = () => {
           />
           {needTranslate && (
             <Button
-              type="primary"
               icon={<TranslationOutlined />}
               loading={translateMutation.isPending}
               onClick={handleTranslate}
@@ -653,6 +698,33 @@ const PageEditPage = () => {
             onChange={(v) => updateForm({ type: v })}
             options={pageTypeOptions(t)}
           />
+          {collaborators.length > 0 && (
+            <Tooltip title={collaborators.map((u) => u.name).join('、')}>
+              <Space size={0} style={{ marginLeft: 'auto' }}>
+                {collaborators.map((u) => (
+                  <span
+                    key={u.name}
+                    title={u.name}
+                    style={{
+                      width: 24,
+                      height: 24,
+                      borderRadius: '50%',
+                      background: u.color,
+                      color: '#fff',
+                      fontSize: 12,
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      border: '2px solid var(--ant-color-bg-container)',
+                      marginLeft: -6,
+                    }}
+                  >
+                    {u.name.slice(0, 1)}
+                  </span>
+                ))}
+              </Space>
+            </Tooltip>
+          )}
         </div>
 
         <div style={{ flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column', overflow: 'auto', borderBottom: '1px solid var(--ant-color-split)' }}>
@@ -673,17 +745,83 @@ const PageEditPage = () => {
                     onChange={(v) => updateForm({ contentModelId: v })}
                   />
                 </Col>
-                {fieldDefinitions.map((field) => (
-                  <Col key={field.id} span={8}>
-                    <div style={{ fontSize: 12, color: 'var(--ant-color-text-secondary)', marginBottom: 4 }}>
-                      {field.label || field.name}
-                    </div>
-                    {renderCustomField(field)}
-                  </Col>
-                ))}
+                <Col span={16}>
+                  <CustomFieldsEditor
+                    fields={fieldDefinitions}
+                    value={formData.customFields}
+                    onChange={(next) => updateForm({ customFields: next })}
+                  />
+                </Col>
               </Row>
             </div>
           )}
+
+          {/* SEO 设置（翻译表 seo JSON；C 端详情页 head 输出消费） */}
+          <div style={{ padding: '8px 16px', borderBottom: '1px solid var(--ant-color-split)' }}>
+            <Collapse
+              size="small"
+              items={[
+                {
+                  key: 'seo',
+                  label: t('seoGroup'),
+                  children: (
+                    <Form layout="vertical">
+                      <Form.Item label={t('seoTitle')}>
+                        <Input
+                          value={formData.seo?.seoTitle}
+                          allowClear
+                          onChange={(e) => patchSeo({ seoTitle: e.target.value })}
+                        />
+                      </Form.Item>
+                      <Form.Item label={t('seoMetaKeywords')}>
+                        <Input
+                          value={formData.seo?.metaKeywords}
+                          allowClear
+                          onChange={(e) => patchSeo({ metaKeywords: e.target.value })}
+                        />
+                      </Form.Item>
+                      <Form.Item label={t('seoMetaDescription')}>
+                        <Input.TextArea
+                          rows={3}
+                          value={formData.seo?.metaDescription}
+                          onChange={(e) => patchSeo({ metaDescription: e.target.value })}
+                        />
+                      </Form.Item>
+                      <Form.Item label={t('seoOgTitle')}>
+                        <Input
+                          value={formData.seo?.ogTitle}
+                          allowClear
+                          onChange={(e) => patchSeo({ ogTitle: e.target.value })}
+                        />
+                      </Form.Item>
+                      <Form.Item label={t('seoOgDescription')}>
+                        <Input.TextArea
+                          rows={2}
+                          value={formData.seo?.ogDescription}
+                          onChange={(e) => patchSeo({ ogDescription: e.target.value })}
+                        />
+                      </Form.Item>
+                      <Form.Item label={t('seoOgImage')}>
+                        <Input
+                          value={formData.seo?.ogImage}
+                          allowClear
+                          placeholder="https://"
+                          onChange={(e) => patchSeo({ ogImage: e.target.value })}
+                        />
+                      </Form.Item>
+                      <Form.Item label={t('seoCanonicalUrl')}>
+                        <Input
+                          value={formData.seo?.canonicalUrl}
+                          allowClear
+                          onChange={(e) => patchSeo({ canonicalUrl: e.target.value })}
+                        />
+                      </Form.Item>
+                    </Form>
+                  ),
+                },
+              ]}
+            />
+          </div>
 
           {/* 嵌套区块管理 */}
           <div style={{ padding: '8px 16px', borderBottom: '1px solid var(--ant-color-split)' }}>
@@ -691,7 +829,7 @@ const PageEditPage = () => {
               <span style={{ fontSize: 12, color: 'var(--ant-color-text-secondary)' }}>
                 {t('section.moduleName')}
               </span>
-              <Button size="small" type="primary" onClick={addSection}>
+              <Button size="small" onClick={addSection}>
                 {t('section.create')}
               </Button>
             </div>
@@ -835,6 +973,8 @@ const PageEditPage = () => {
               editorType={formData.editorType}
               placeholder={t('contentPlaceholder')}
               uploadImage={handleUploadImage}
+              collaboration={collaboration}
+              onCollaboratorsChange={setCollaborators}
               onChange={(v) => updateForm({ content: v })}
             />
           </div>
@@ -844,12 +984,76 @@ const PageEditPage = () => {
         <div style={{ display: 'flex', justifyContent: 'flex-end', padding: '8px 16px' }}>
           <Space>
             <Button onClick={saveDraft}>{t('saveDraft')}</Button>
-            <Button type="primary" danger loading={saving} onClick={handlePublish}>
+            <Button danger onClick={handleDiscardDraft} title={t('discardDraftTip')}>
+              {t('discardDraft')}
+            </Button>
+            <Button type="primary" loading={saving} onClick={handlePublish}>
               {t('publish')}
+            </Button>
+            <Button
+              icon={<FileTextOutlined />}
+              disabled={!formData.content?.trim()}
+              title={t('draftPreviewTip')}
+              onClick={() =>
+                openDraftPreviewWindow({
+                  title: formData.title,
+                  content: formData.content ?? '',
+                  editorType: formData.editorType,
+                  bannerText: t('draftPreviewBanner'),
+                  docTitle: formData.title || t('draftPreviewUntitled'),
+                })
+              }
+            >
+              {t('previewDraft')}
+            </Button>
+            <Button
+              icon={<EyeOutlined />}
+              disabled={!pageId}
+              loading={createPreviewToken.isPending}
+              title={pageId ? undefined : t('versionNeedSave')}
+              onClick={async () => {
+                if (!pageId) return;
+                try {
+                  const tk = await createPreviewToken.mutateAsync({ id: pageId });
+                  window.open(
+                    `${cendBaseUrl()}/${cendLocalePrefix(i18n.language)}/page/detail?id=${pageId}&preview_token=${tk.token ?? ''}`,
+                    '_blank',
+                    'noopener',
+                  );
+                } catch (error) {
+                  console.error('Create preview token failed:', error);
+                }
+              }}
+            >
+              {t('previewOnCend')}
+            </Button>
+            <Button
+              icon={<HistoryOutlined />}
+              disabled={!pageId}
+              title={pageId ? undefined : t('versionNeedSave')}
+              onClick={() => setVersionsOpen(true)}
+            >
+              {t('versionHistory')}
             </Button>
           </Space>
         </div>
       </div>
+
+      {/* 版本历史：页面以区块整体快照恢复 */}
+      <VersionHistoryDrawer
+        open={versionsOpen}
+        onClose={() => setVersionsOpen(false)}
+        kind="page"
+        targetId={pageId}
+        lang={lang}
+        currentContent=""
+        onRestored={() => {
+          clearDraft(lang);
+          fetchPage(lang).catch((error) => {
+            console.error('Refetch page after restore failed:', error);
+          });
+        }}
+      />
     </ContentContainer>
   );
 };

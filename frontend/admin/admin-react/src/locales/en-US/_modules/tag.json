@@ -45,7 +45,6 @@
   "deleteConfirmDesc": "Are you sure you want to delete this {{moduleName}}?",
   "deleteSuccess": "Deleted successfully",
   "deleteFailed": "Failed to delete",
-  "fetchFailed": "Failed to load",
   "boolMap": {
     "true": "Yes",
     "false": "No"

@@ -38,7 +38,6 @@
   "updateFailed": "更新失败",
   "deleteSuccess": "删除成功",
   "deleteFailed": "删除失败",
-  "fetchFailed": "加载失败",
   "dateRange": {
     "today": "今天",
     "yesterday": "昨天",
@@ -53,6 +52,11 @@
     "FIELD_TYPE_RICHTEXT": "富文本",
     "FIELD_TYPE_IMAGE": "图片",
     "FIELD_TYPE_FILE": "文件",
-    "FIELD_TYPE_RELATION": "关联"
-  }
+    "FIELD_TYPE_RELATION": "关联",
+    "FIELD_TYPE_COMPONENT": "组件",
+    "FIELD_TYPE_DYNAMIC_ZONE": "动态区"
+  },
+  "componentSelect": "选择组件",
+  "componentRepeatable": "可重复（实例数组）",
+  "allowedComponents": "允许的组件（动态区白名单）"
 }

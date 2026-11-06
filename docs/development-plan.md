@@ -40,6 +40,24 @@
   被 `{id}` 模式吸收，与 rushwind-admin 同款注册顺序遮蔽）。
 - app 白名单 17 个 proto 操作 + 1 条手工路由；admin 白名单 4 个操作（Login /
   GenerateCaptcha / VerifyCaptcha / RefreshToken）。
+- **2026-11-06 契约批次刷新**：接受上游 vintage 至 161d991c——proto 136 → 209 文件
+  （AI 全家桶 / 通知 / 社交 / 监控 / 流程 / 表单 / 备份 / 配额 / MFA / AK-SK /
+  在线会话 / 编辑锁 / 实验 / 重定向 / 审批留痕 / 搜索词库等 76 个新文件，约 341
+  个新 RPC；既有 20 文件扩约 70 RPC）。admin 面 76 服务（薄代理 71 + 手写
+  authentication / admin-portal / file-transfer / component-definition /
+  preview）、app 面 14 服务（薄代理 12）；遮蔽路由两条（webhooks/deliveries
+  随新契约加入，钉子改为 method+path 有序对——索引随契约增长漂移）；
+  app 白名单 27 操作、admin 白名单 10 操作。生成器新通道：renamed（同服务
+  改名转发：MFA×3、OnlineSession×4）、stub（GetBySlug×2 / ListEnabled /
+  Chat——域无对应或流式错位）；MFA 挑战校验走 behaviors 逐字段映射
+  （LoginResponse ↔ VerifyMfaChallengeResponse，镜像上游 Go BFF）。
+  core 侧 tonic trait 自带 unimplemented 默认体——新 RPC 零 stub 编译通过，
+  逐域落实现随特性批次推进；薄代理先行拨号，运行期答 UNIMPLEMENTED。
+  Rust 底层同批升级：rushwind eaa813e1→a344105b、rust-utils 8c24baf4→7ff37eb1、
+  protox 0.9→0.10、jsonwebtoken 9→11、rustc 1.99.1。前端五快照整树重同步
+  （admin 上游切 React19+AntD v6；flutter 全量重写：token 化主题 + 四档断点
+  + 18MB 可变字体入库）；品牌表扩容（上游产品名归一 GoWind Content Hub、
+  新增 vue ar 语言包、flutter 原生工程显示名、taro 工程面），双清单重钉。
 
 ## 4. 分阶段计划
 

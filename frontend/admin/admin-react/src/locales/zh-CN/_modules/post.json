@@ -54,10 +54,15 @@
   "deleteConfirmDesc": "确定要删除该{{moduleName}}吗？",
   "deleteSuccess": "删除成功",
   "deleteFailed": "删除失败",
-  "fetchFailed": "加载失败",
   "draftFound": "检测到未发布的本地草稿",
-  "draftFoundMessage": "上次编辑留有本地草稿，是否恢复？放弃后将保留服务端内容",
+  "draftFoundMessage": "上次编辑留有本地草稿，可恢复、丢弃或稍后再处理；不恢复将保留服务端内容",
   "draftRestore": "恢复草稿",
+  "draftDiscard": "丢弃草稿",
+  "draftSavedAt": "草稿保存于 {{time}}",
+  "previewDraft": "预览草稿",
+  "draftPreviewBanner": "本地草稿预览 · 尚未保存到服务端，非真实 C 端站点样式",
+  "draftPreviewTip": "在新窗口预览当前编辑内容（仅本地渲染，不写服务端）",
+  "draftPreviewUntitled": "无标题草稿",
   "unsavedTitle": "有未保存的修改",
   "unsavedMessage": "离开页面将丢失未保存的内容，确定离开吗？",
   "settings": "文章设置",
@@ -86,5 +91,37 @@
   "editorTypeMap": {
     "EDITOR_TYPE_MARKDOWN": "Markdown",
     "EDITOR_TYPE_RICH_TEXT": "富文本"
-  }
+  },
+  "distributeToSocial": "分发到社交",
+  "distributeNeedSave": "请先保存文章再分发",
+  "versionHistory": "版本历史",
+  "versionNeedSave": "保存后可用",
+  "previewOnCend": "预览",
+  "transfer": {
+    "import": "导入",
+    "importXlsx": "Excel 批量导入",
+    "importJson": "JSON 导入",
+    "exportJson": "导出 JSON",
+    "exportSuccess": "已导出 {{count}} 篇（含翻译全文）",
+    "exportFailed": "导出失败",
+    "importSuccess": "已导入 {{count}} 篇（均为草稿）",
+    "importPartial": "导入完成：成功 {{ok}} 篇，失败行：{{failed}}（均未发布）",
+    "importFailed": "导入失败：文件解析错误",
+    "noPosts": "文件中没有帖子数据"
+  },
+  "review": {
+    "submit": "提交审核",
+    "submitTitle": "提交审核",
+    "submitted": "已提交审核",
+    "approve": "通过",
+    "approveTitle": "审核通过并发布",
+    "approved": "已通过并发布",
+    "reject": "驳回",
+    "rejectTitle": "驳回（退回草稿）",
+    "rejected": "已驳回",
+    "reasonPlaceholder": "驳回理由（将通知作者，可留空）"
+  },
+  "statusInReview": "审核中",
+  "editLockHeld": "{{name}} 正在编辑此内容（{{since}}），同时保存可能互相覆盖",
+  "customFieldsGroup": "自定义字段"
 }

@@ -4,8 +4,10 @@
 pub mod admin_portal;
 pub mod authentication;
 pub mod behaviors;
+pub mod component_definition;
 pub mod file_transfer;
 pub mod internal_message;
+pub mod preview;
 pub mod proxies;
 pub mod proxy_kit;
 

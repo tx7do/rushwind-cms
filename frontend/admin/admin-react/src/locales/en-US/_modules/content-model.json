@@ -38,7 +38,6 @@
   "updateFailed": "Failed to update",
   "deleteSuccess": "Deleted successfully",
   "deleteFailed": "Failed to delete",
-  "fetchFailed": "Failed to load",
   "dateRange": {
     "today": "Today",
     "yesterday": "Yesterday",
@@ -53,6 +52,11 @@
     "FIELD_TYPE_RICHTEXT": "Rich Text",
     "FIELD_TYPE_IMAGE": "Image",
     "FIELD_TYPE_FILE": "File",
-    "FIELD_TYPE_RELATION": "Relation"
-  }
+    "FIELD_TYPE_RELATION": "Relation",
+    "FIELD_TYPE_COMPONENT": "Component",
+    "FIELD_TYPE_DYNAMIC_ZONE": "Dynamic Zone"
+  },
+  "componentSelect": "Select component",
+  "componentRepeatable": "Repeatable (instance array)",
+  "allowedComponents": "Allowed components (dynamic zone whitelist)"
 }

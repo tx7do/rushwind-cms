@@ -82,12 +82,12 @@ class MessageLookup extends MessageLookupByLibrary {
     ),
     "contactEmail": MessageLookupByLibrary.simpleMessage("电子邮件"),
     "contactEmailDesc": MessageLookupByLibrary.simpleMessage(
-      "您可以通过 support@gowind.dev 联系我们，咨询任何问题、建议或反馈。我们通常在 1-2 个工作日内回复。",
+      "您可以通过 support@rushwind.dev 联系我们，咨询任何问题、建议或反馈。我们通常在 1-2 个工作日内回复。",
     ),
     "contactUs": MessageLookupByLibrary.simpleMessage("联系我们"),
     "contactWebsite": MessageLookupByLibrary.simpleMessage("官方网站"),
     "contactWebsiteDesc": MessageLookupByLibrary.simpleMessage(
-      "访问我们的官方网站 gowind.dev，获取最新动态、文档和社区资源。",
+      "访问我们的官方网站 rushwind.dev，获取最新动态、文档和社区资源。",
     ),
     "dark": MessageLookupByLibrary.simpleMessage("深色"),
     "darkMode": MessageLookupByLibrary.simpleMessage("深色模式"),

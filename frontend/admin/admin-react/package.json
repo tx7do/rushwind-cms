@@ -10,6 +10,7 @@
     "build:check": "tsc && vite build --mode production",
     "typecheck": "tsc -p tsconfig.app.json --noEmit",
     "lint": "eslint .",
+    "test:list-height": "node scripts/check-list-heights.mjs",
     "preview": "vite preview"
   },
   "dependencies": {
@@ -19,6 +20,8 @@
     "@tanstack/react-query": "^5.100.11",
     "@tiptap/core": "^3.23.6",
     "@tiptap/extension-code-block-lowlight": "^3.23.6",
+    "@tiptap/extension-collaboration": "3.23.6",
+    "@tiptap/extension-collaboration-caret": "3.23.6",
     "@tiptap/extension-color": "^3.23.6",
     "@tiptap/extension-heading": "^3.23.6",
     "@tiptap/extension-highlight": "^3.23.6",
@@ -40,6 +43,7 @@
     "@tiptap/pm": "^3.23.6",
     "@tiptap/react": "^3.23.6",
     "@tiptap/starter-kit": "^3.23.6",
+    "@xyflow/react": "^12.12.0",
     "antd": "^6.4.3",
     "axios": "^1.16.1",
     "classnames": "^2.5.1",
@@ -65,7 +69,12 @@
     "react-activation": "^0.13.4",
     "react-dom": "^19.2.6",
     "react-i18next": "^17.0.8",
+    "react-markdown": "^10.1.0",
     "react-router-dom": "^6.26.0",
+    "remark-gfm": "^4.0.1",
+    "y-indexeddb": "^9.0.12",
+    "y-websocket": "^3.1.0",
+    "yjs": "^13.6.33",
     "zustand": "^5.0.13"
   },
   "devDependencies": {
@@ -95,6 +104,7 @@
     "less": "^4.6.4",
     "lint-staged": "^17.0.5",
     "mockjs": "^1.1.0",
+    "playwright-core": "^1.64.1",
     "prettier": "^3.8.3",
     "rc-picker": "^4.11.3",
     "rollup-plugin-external-globals": "^0.13.0",

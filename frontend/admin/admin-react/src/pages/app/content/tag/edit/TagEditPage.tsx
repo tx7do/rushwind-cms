@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from 'react';
 import { Button, Form, Input, InputNumber, Select, Switch, App } from 'antd';
+import AiGenerateButton from '@/components/common/AiGenerateButton';
 import {
   ArrowLeftOutlined,
   CheckOutlined,
@@ -412,7 +413,19 @@ const TagEditPage = () => {
             </Form.Item>
           </div>
 
-          <Form.Item name="description" label={t('descriptionPlaceholder')}>
+          <Form.Item
+            name="description"
+            label={
+              <div style={{ display: 'flex', width: '100%', alignItems: 'center', justifyContent: 'space-between' }}>
+                <span>{t('descriptionPlaceholder')}</span>
+                <AiGenerateButton
+                  scene="DESCRIPTION"
+                  defaultTopic={form.getFieldValue('name')}
+                  onGenerate={(content) => form.setFieldValue('description', content)}
+                />
+              </div>
+            }
+          >
             <Input.TextArea rows={4} placeholder={t('descriptionPlaceholder')} />
           </Form.Item>
         </div>

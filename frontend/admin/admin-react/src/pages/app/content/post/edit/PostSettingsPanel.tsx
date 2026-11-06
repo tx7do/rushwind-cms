@@ -1,7 +1,12 @@
-import { Button, Collapse, DatePicker, Form, Input, InputNumber, Select, Switch } from 'antd';
+import { useEffect, useState } from 'react';
+import { Button, Collapse, DatePicker, Form, Input, InputNumber, Select, Skeleton, Switch } from 'antd';
+import CustomFieldsEditor from '@/components/content/CustomFieldsEditor';
+import { fetchListFieldDefinitions } from '@/api/hooks/content-model';
+import { apiClient } from '@/api/client';
 import dayjs, { type Dayjs } from 'dayjs';
 import { useTranslation } from 'react-i18next';
 
+import AiGenerateButton from '@/components/common/AiGenerateButton';
 import PostImageField from './PostImageField';
 import type { PostEditProps, SeoMetaForm } from './types';
 
@@ -63,6 +68,42 @@ const PostSettingsPanel = ({
   const { t } = useTranslation('post');
   const seo: SeoMetaForm = formData.seo ?? {};
 
+  // 自定义字段：按首个分类绑定的内容模型解析字段定义（无绑定模型则不渲染组）
+  const [modelFields, setModelFields] = useState<
+    Array<Partial<import('@/api/generated/admin/service/v1').contentservicev1_FieldDefinition>>
+  >([]);
+  const [fieldsLoading, setFieldsLoading] = useState(false);
+  const firstCategoryId = formData.categoryIds?.[0];
+
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      if (!firstCategoryId) {
+        if (!cancelled) setModelFields([]);
+        return;
+      }
+      if (!cancelled) setFieldsLoading(true);
+      try {
+        const cat = await apiClient.categoryService.Get({ id: firstCategoryId });
+        const modelId = cat.contentModelId;
+        if (!modelId) {
+          if (!cancelled) setModelFields([]);
+          return;
+        }
+        const resp = await fetchListFieldDefinitions({ contentModelId: modelId });
+        if (!cancelled) setModelFields(resp.items ?? []);
+      } catch (error) {
+        console.error('Load post model fields failed:', error);
+        if (!cancelled) setModelFields([]);
+      } finally {
+        if (!cancelled) setFieldsLoading(false);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [firstCategoryId]);
+
   const patchSeo = (p: Partial<SeoMetaForm>) => {
     patch({ seo: { ...seo, ...p } });
   };
@@ -100,15 +141,23 @@ const PostSettingsPanel = ({
             label={
               <div style={{ display: 'flex', width: '100%', alignItems: 'center', justifyContent: 'space-between' }}>
                 <span>{t('summary')}</span>
-                <Button
-                  size="small"
-                  type="link"
-                  style={{ padding: '0 4px' }}
-                  disabled={!formData.content}
-                  onClick={() => patch({ summary: generateSummary(formData.content || '') })}
-                >
-                  {t('autoSummary')}
-                </Button>
+                <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}>
+                  <AiGenerateButton
+                    scene="POST_SUMMARY"
+                    defaultTopic={formData.title}
+                    context={formData.content ? generateSummary(formData.content || '', 1200) : undefined}
+                    onGenerate={(content) => patch({ summary: content })}
+                  />
+                  <Button
+                    size="small"
+                    type="link"
+                    style={{ padding: '0 4px' }}
+                    disabled={!formData.content}
+                    onClick={() => patch({ summary: generateSummary(formData.content || '') })}
+                  >
+                    {t('autoSummary')}
+                  </Button>
+                </span>
               </div>
             }
           >
@@ -250,7 +299,26 @@ const PostSettingsPanel = ({
       <Collapse
         ghost
         defaultActiveKey={['base', 'media']}
-        items={collapseItems}
+        items={[
+          ...collapseItems,
+          ...(modelFields.length > 0 || fieldsLoading
+            ? [
+                {
+                  key: 'customFields',
+                  label: t('customFieldsGroup'),
+                  children: fieldsLoading ? (
+                    <Skeleton active paragraph={{ rows: 3 }} />
+                  ) : (
+                    <CustomFieldsEditor
+                      fields={modelFields}
+                      value={formData.customFields as Record<string, string> | undefined}
+                      onChange={(next) => patch({ customFields: next })}
+                    />
+                  ),
+                },
+              ]
+            : []),
+        ]}
       />
     </div>
   );

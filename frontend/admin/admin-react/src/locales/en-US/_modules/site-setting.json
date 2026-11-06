@@ -44,7 +44,6 @@
   "updateFailed": "Failed to update",
   "deleteSuccess": "Deleted successfully",
   "deleteFailed": "Failed to delete",
-  "fetchFailed": "Failed to load",
   "typeMap": {
     "SETTING_TYPE_TEXT": "Single Line Text",
     "SETTING_TYPE_TEXTAREA": "Multi-line Text",

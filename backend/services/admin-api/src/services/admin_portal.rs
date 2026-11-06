@@ -200,7 +200,12 @@ impl proto::gen_admin::services::AdminPortalServiceHandlers for AdminPortalServi
     ) -> Result<ListPermissionCodeResponse, StatusError> {
         let operator = operator_of(&ctx)?;
         let codes = self.permission_codes(&ctx, operator.user_id).await?;
-        Ok(ListPermissionCodeResponse { codes })
+        Ok(ListPermissionCodeResponse {
+            codes,
+            // 字段权限的隐藏字段集（"资源.字段" 串数组）随字段权限特性批次
+            // 落地；聚合面暂回空集（不做额外隐藏）。
+            hidden_fields: Vec::new(),
+        })
     }
 
     async fn get_initial_context(

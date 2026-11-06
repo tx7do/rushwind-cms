@@ -32,7 +32,6 @@
   "updateFailed": "Failed to update",
   "deleteSuccess": "Deleted successfully",
   "deleteFailed": "Failed to delete",
-  "fetchFailed": "Failed to load",
   "boolMap": {
     "true": "Yes",
     "false": "No"

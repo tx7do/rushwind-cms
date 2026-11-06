@@ -324,7 +324,8 @@ impl contentv1::post_service_server::PostService for PostService {
         let rows = db
             .query_all_raw(sea_orm::Statement::from_sql_and_values(
                 sea_orm::DatabaseBackend::Postgres,
-                r#"SELECT p.id AS post_id, t.language_code AS lang, t.title AS title
+                r#"SELECT p.id AS post_id, t.language_code AS lang, t.title AS title,
+                          COALESCE(t.summary, '') AS summary
                    FROM posts p
                    JOIN post_translations t ON t.post_id = p.id
                    WHERE p.status = 'POST_STATUS_PUBLISHED'
@@ -347,6 +348,10 @@ impl contentv1::post_service_server::PostService for PostService {
                 post_id: r.try_get::<i64>("", "post_id").unwrap_or(0) as u32,
                 language: r.try_get::<String>("", "lang").unwrap_or_default(),
                 title: r.try_get::<String>("", "title").unwrap_or_default(),
+                // 摘要随行返回（2026-11 契约批次扩字段）；<mark> 高亮片段
+                // 属 OpenSearch highlight，随搜索深化批次落地，暂空。
+                summary: r.try_get::<String>("", "summary").unwrap_or_default(),
+                highlight_fragments: Vec::new(),
             })
             .collect();
         let total = items.len() as i32;

@@ -1,0 +1,575 @@
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import type { ProColumns, ActionType } from '@ant-design/pro-components';
+import ListTable from '@/components/common/ListTable';
+import TableActions from '@/components/common/TableActions';
+import { Calendar, Card, Col, Row, Segmented, Statistic, Tag, App, Tooltip } from 'antd';
+import {
+  DeleteOutlined,
+  EditOutlined,
+  LineChartOutlined,
+  SendOutlined,
+  SyncOutlined,
+} from '@ant-design/icons';
+import { useQueryClient } from '@tanstack/react-query';
+import { useTranslation } from 'react-i18next';
+import dayjs from 'dayjs';
+
+import { PaginationQuery } from '@/core';
+import { TABLE } from '@/config/constants';
+import { useProTableScrollY } from '@/hooks/useProTableScrollY';
+import {
+  fetchListSocialDistributions,
+  useDeleteSocialDistribution,
+  useMoveSocialDistribution,
+  usePublishSocialDistribution,
+  useRefreshSocialDistributionStats,
+  useSocialDistributionSummary,
+} from '@/api/hooks/social';
+import {
+  getPlatformColor,
+  getPlatformLabel,
+  getStatusColor,
+  getStatusLabel,
+  platformOptions,
+  statusOptions,
+} from './constants';
+import TableExportButton from '@/components/common/TableExportButton';
+import SocialDistributionDrawer from './SocialDistributionDrawer';
+import StatsTrendModal from './StatsTrendModal';
+
+/**
+ * 内容分发列表页：CMS 文章 → 社交平台的发布记录（状态/统计/失败原因）
+ */
+const SocialDistributionList = () => {
+  const { t } = useTranslation('social');
+  const actionRef = useRef<ActionType>(null);
+  const containerRef = useRef<HTMLDivElement>(null);
+  const tableScrollY = useProTableScrollY(containerRef);
+  const queryClient = useQueryClient();
+  const { message } = App.useApp();
+
+  const [drawerOpen, setDrawerOpen] = useState(false);
+  const [editingRow, setEditingRow] = useState<any>(null);
+  const [calendarPrefillDate, setCalendarPrefillDate] = useState<string | undefined>();
+
+  // KPI 汇总：随列表刷新联动（invalidate 时 summary 一并失效）
+  const summary = useSocialDistributionSummary();
+  const [trendRow, setTrendRow] = useState<any>(null);
+
+  // ── 日历视图 ──
+  const [viewMode, setViewMode] = useState<'list' | 'calendar' | 'kanban'>('list');
+  const [monthItems, setMonthItems] = useState<any[]>([]);
+  const [calendarMonth, setCalendarMonth] = useState<dayjs.Dayjs>(dayjs());
+
+  const fetchMonthItems = useCallback(async (month: dayjs.Dayjs) => {
+    const query = new PaginationQuery({
+      paging: { page: 1, pageSize: 100 },
+      formValues: {
+        publish_time__gte: month.startOf('month').format('YYYY-MM-DD HH:mm:ss'),
+        publish_time__lte: month.endOf('month').format('YYYY-MM-DD HH:mm:ss'),
+      },
+      orderBy: ['publish_time'],
+    });
+    const resp = await fetchListSocialDistributions(query);
+    setMonthItems(resp.items || []);
+  }, []);
+
+  const handleViewChange = (mode: 'list' | 'calendar') => {
+    setViewMode(mode);
+    if (mode === 'calendar') {
+      fetchMonthItems(calendarMonth);
+    }
+  };
+
+  // ── 看板视图 ──
+  const [kanbanItems, setKanbanItems] = useState<any[]>([]);
+  const fetchKanbanItems = useCallback(async () => {
+    const query = new PaginationQuery({
+      paging: { page: 1, pageSize: 100 },
+      orderBy: ['-created_at'],
+    });
+    const resp = await fetchListSocialDistributions(query);
+    setKanbanItems(resp.items || []);
+  }, []);
+
+  useEffect(() => {
+    if (viewMode === 'kanban') {
+      fetchKanbanItems();
+    }
+  }, [viewMode, fetchKanbanItems]);
+
+  const KANBAN_COLUMNS: { status: string; labelKey: string }[] = [
+    { status: 'STATUS_DRAFT', labelKey: 'statusMap.STATUS_DRAFT' },
+    { status: 'STATUS_SCHEDULED', labelKey: 'statusMap.STATUS_SCHEDULED' },
+    { status: 'STATUS_FAILED', labelKey: 'statusMap.STATUS_FAILED' },
+    { status: 'STATUS_PUBLISHED', labelKey: 'statusMap.STATUS_PUBLISHED' },
+  ];
+
+  const itemsByStatus = useMemo(() => {
+    const map: Record<string, any[]> = {};
+    for (const item of kanbanItems) {
+      (map[item.status] ??= []).push(item);
+    }
+    return map;
+  }, [kanbanItems]);
+
+  const handleDropToStatus = (record: any, targetStatus: string) => {
+    if (record.status === targetStatus) return;
+    if (targetStatus === 'STATUS_PUBLISHED') {
+      message.warning(t('moveToPublishedForbidden'));
+      return;
+    }
+    moveMutation.mutate({ id: record.id, targetStatus } as any);
+  };
+
+  const itemsByDay = useMemo(() => {
+    const map: Record<string, any[]> = {};
+    for (const item of monthItems) {
+      if (!item.publishTime) continue;
+      const key = dayjs(item.publishTime).format('YYYY-MM-DD');
+      (map[key] ??= []).push(item);
+    }
+    return map;
+  }, [monthItems]);
+
+  const renderDateCell = (current: dayjs.Dayjs, info: any) => {
+    if (info.type !== 'date') return null;
+    const dayItems = itemsByDay[current.format('YYYY-MM-DD')] || [];
+    if (!dayItems.length) return null;
+    return (
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+        {dayItems.slice(0, 3).map((item: any) => (
+          <div
+            key={item.id}
+            style={{ fontSize: 12, lineHeight: '18px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}
+          >
+            <Tag color={getStatusColor(item.status)} style={{ marginRight: 4 }}>
+              {dayjs(item.publishTime).format('HH:mm')}
+            </Tag>
+            {getPlatformLabel(t, item.platform)}
+          </div>
+        ))}
+        {dayItems.length > 3 && (
+          <span style={{ fontSize: 12, color: 'var(--ant-color-text-tertiary)' }}>+{dayItems.length - 3}</span>
+        )}
+      </div>
+    );
+  };
+
+  const invalidate = () => {
+    queryClient.invalidateQueries({ queryKey: ['listSocialDistributions'] });
+    queryClient.invalidateQueries({ queryKey: ['socialDistributionSummary'] });
+    actionRef.current?.reload();
+  };
+
+  const deleteMutation = useDeleteSocialDistribution({
+    onSuccess: () => {
+      message.success(t('deleteSuccessDist'));
+      invalidate();
+    },
+    onError: (error: Error) => {
+      message.error(error.message || t('deleteFailedDist'));
+    },
+  });
+
+  const publishMutation = usePublishSocialDistribution({
+    onSuccess: () => {
+      message.success(t('publishQueued'));
+      invalidate();
+    },
+    onError: (error: Error) => {
+      message.error(error.message || t('publishFailed'));
+    },
+  });
+
+  const moveMutation = useMoveSocialDistribution({
+    onSuccess: () => {
+      message.success(t('moveSuccess'));
+      invalidate();
+      fetchKanbanItems();
+    },
+    onError: (error: Error) => {
+      message.error(error.message || t('moveFailed'));
+    },
+  });
+
+  const refreshStatsMutation = useRefreshSocialDistributionStats({
+    onSuccess: (row) => {
+      message.success(t('statsRefreshed', {
+        likes: row.likes ?? 0,
+        replies: row.replies ?? 0,
+        reposts: row.reposts ?? 0,
+      }));
+      invalidate();
+    },
+    onError: (error: Error) => {
+      message.error(error.message || t('statsRefreshFailed'));
+    },
+  });
+
+  const columns: ProColumns<any>[] = [
+    {
+      title: t('platform'),
+      dataIndex: 'platform',
+      valueType: 'select',
+      width: 110,
+      fieldProps: {
+        options: platformOptions(t),
+        showSearch: true,
+      },
+      render: (_, record) => (
+        <Tag color={getPlatformColor(record.platform)}>
+          {getPlatformLabel(t, record.platform)}
+        </Tag>
+      ),
+    },
+    {
+      title: t('socialAccount'),
+      dataIndex: 'accountName',
+      search: false,
+      width: 140,
+      ellipsis: true,
+      render: (_, record) => record.accountName || `#${record.accountId}`,
+    },
+    {
+      title: t('sourcePost'),
+      dataIndex: 'postTitle',
+      search: false,
+      width: 160,
+      ellipsis: true,
+      render: (_, record) => record.postTitle || (record.postId ? `#${record.postId}` : '—'),
+    },
+    {
+      title: t('overrideText'),
+      dataIndex: 'overrideText',
+      search: false,
+      ellipsis: true,
+      width: 220,
+    },
+    {
+      title: t('status'),
+      dataIndex: 'status',
+      valueType: 'select',
+      width: 100,
+      fieldProps: {
+        options: statusOptions(t),
+        showSearch: true,
+      },
+      render: (_, record) => (
+        <Tooltip title={record.status === 'STATUS_FAILED' ? record.errorMessage : undefined}>
+          <Tag color={getStatusColor(record.status)}>{getStatusLabel(t, record.status)}</Tag>
+        </Tooltip>
+      ),
+    },
+    {
+      title: t('publishTime'),
+      dataIndex: 'publishTime',
+      search: false,
+      width: 145,
+      render: (_, record) =>
+        record.publishTime ? dayjs(record.publishTime).format('MM-DD HH:mm') : '—',
+    },
+    {
+      title: t('publishedAt'),
+      dataIndex: 'publishedAt',
+      search: false,
+      width: 145,
+      render: (_, record) =>
+        record.publishedAt ? dayjs(record.publishedAt).format('MM-DD HH:mm') : '—',
+    },
+    {
+      title: t('stats'),
+      key: 'stats',
+      search: false,
+      width: 140,
+      render: (_, record) =>
+        record.status === 'STATUS_PUBLISHED' ? (
+          <span>
+            ❤ {record.likes ?? 0} · 💬 {record.replies ?? 0} · 🔁 {record.reposts ?? 0}
+          </span>
+        ) : (
+          '—'
+        ),
+    },
+    {
+      title: t('externalLink'),
+      dataIndex: 'externalUri',
+      search: false,
+      width: 100,
+      render: (_, record) =>
+        record.externalUri ? (
+          <a href={record.externalUri} target="_blank" rel="noreferrer">
+            {t('view')}
+          </a>
+        ) : (
+          '—'
+        ),
+    },
+    {
+      title: t('action'),
+      valueType: 'option',
+      width: 250,
+      fixed: 'right',
+      render: (_, record) => {
+        const publishable = ['STATUS_DRAFT', 'STATUS_SCHEDULED', 'STATUS_FAILED'].includes(
+          record.status,
+        );
+        return (
+          <TableActions
+            record={record}
+            actions={[
+              {
+                key: 'publish',
+                label: t('publishNow'),
+                icon: <SendOutlined />,
+                success: true,
+                hidden: !publishable,
+                onClick: () => record.id && publishMutation.mutate({ id: record.id }),
+              },
+              {
+                key: 'edit',
+                label: t('common:button.edit'),
+                icon: <EditOutlined />,
+                hidden: !publishable,
+                onClick: () => {
+                  setEditingRow(record);
+                  setDrawerOpen(true);
+                },
+              },
+              {
+                key: 'stats',
+                label: t('refreshStats'),
+                icon: <SyncOutlined />,
+                hidden: !(record.status === 'STATUS_PUBLISHED' && record.externalId),
+                onClick: () => record.id && refreshStatsMutation.mutate({ id: record.id }),
+              },
+              {
+                key: 'trend',
+                label: t('trend'),
+                icon: <LineChartOutlined />,
+                hidden: !(record.status === 'STATUS_PUBLISHED' && record.externalId),
+                onClick: () => setTrendRow(record),
+              },
+              {
+                key: 'delete',
+                label: t('common:button.delete'),
+                icon: <DeleteOutlined />,
+                danger: true,
+                confirm: {
+                  title: t('deleteConfirmTitle'),
+                  description: t('deleteDistributionConfirmDesc'),
+                },
+                onClick: () => record.id && deleteMutation.mutate({ id: record.id }),
+              },
+            ]}
+          />
+        );
+      },
+    },
+  ];
+
+  return (
+    <>
+      <div ref={containerRef} className="page-container-content" style={{ padding: '12px 8px 8px', height: '100%', display: 'flex', flexDirection: 'column' }}>
+        <Row gutter={12} style={{ marginBottom: 12 }}>
+          <Col span={6}>
+            <Card size="small" bordered={false}>
+              <Statistic title={t('kpiPublished')} value={Number(summary.data?.totalPublished) || 0} />
+            </Card>
+          </Col>
+          <Col span={6}>
+            <Card size="small" bordered={false}>
+              <Statistic title={t('kpiLikes')} value={Number(summary.data?.totalLikes) || 0} />
+            </Card>
+          </Col>
+          <Col span={6}>
+            <Card size="small" bordered={false}>
+              <Statistic title={t('kpiReplies')} value={Number(summary.data?.totalReplies) || 0} />
+            </Card>
+          </Col>
+          <Col span={6}>
+            <Card size="small" bordered={false}>
+              <Statistic title={t('kpiLast7Days')} value={Number(summary.data?.publishedLast7Days) || 0} />
+            </Card>
+          </Col>
+        </Row>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
+          <Segmented
+            value={viewMode}
+            onChange={(v) => handleViewChange(v as 'list' | 'calendar')}
+            options={[
+              { label: t('viewList'), value: 'list' },
+              { label: t('viewCalendar'), value: 'calendar' },
+              { label: t('viewKanban'), value: 'kanban' },
+            ]}
+          />
+          {viewMode === 'calendar' && (
+            <span style={{ color: 'var(--ant-color-text-tertiary)', fontSize: 12 }}>{t('calendarHint')}</span>
+          )}
+        </div>
+        {viewMode === 'kanban' ? (
+          <Row gutter={12} style={{ flex: 1, minHeight: 0, overflowX: 'auto' }}>
+            {KANBAN_COLUMNS.map((col) => {
+              const items = itemsByStatus[col.status] || [];
+              return (
+                <Col span={6} key={col.status}
+                  onDragOver={(e) => e.preventDefault()}
+                  onDrop={() => {
+                    const raw = sessionStorage.getItem('kanbanDragging');
+                    if (!raw) return;
+                    try {
+                      const record = JSON.parse(raw);
+                      if (record.id) handleDropToStatus(record, col.status);
+                    } finally {
+                      sessionStorage.removeItem('kanbanDragging');
+                    }
+                  }}
+                >
+                  <Card size="small" bordered={false} style={{ minHeight: 240 }} title={t(col.labelKey)}>
+                    {items.length === 0 && (
+                      <div style={{ color: 'var(--ant-color-text-tertiary)', fontSize: 12 }}>{t('kanbanEmpty')}</div>
+                    )}
+                    {items.map((item: any) => {
+                      const draggable = item.status !== 'STATUS_PUBLISHED';
+                      return (
+                        <Card
+                          key={item.id}
+                          size="small"
+                          style={{ marginBottom: 8, cursor: draggable ? 'grab' : 'default' }}
+                          draggable={draggable}
+                          onDragStart={(e) => {
+                            e.dataTransfer.setData('text/plain', String(item.id));
+                            sessionStorage.setItem('kanbanDragging', JSON.stringify(item));
+                          }}
+                        >
+                          <div style={{ display: 'flex', justifyContent: 'space-between', gap: 4 }}>
+                            <Tag color={getPlatformColor(item.platform)} style={{ marginRight: 0 }}>
+                              {getPlatformLabel(t, item.platform)}
+                            </Tag>
+                            {item.publishTime && (
+                              <span style={{ fontSize: 12, color: 'var(--ant-color-text-tertiary)' }}>
+                                {dayjs(item.publishTime).format('MM-DD HH:mm')}
+                              </span>
+                            )}
+                          </div>
+                          <div style={{ fontSize: 12, marginTop: 4, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                            {item.overrideText || '—'}
+                          </div>
+                        </Card>
+                      );
+                    })}
+                  </Card>
+                </Col>
+              );
+            })}
+          </Row>
+        ) : viewMode === 'calendar' ? (
+          <Card bordered={false} style={{ flex: 1, minHeight: 0, overflow: 'auto' }}>
+            <Calendar
+              cellRender={renderDateCell}
+              onPanelChange={(date) => {
+                setCalendarMonth(date);
+                fetchMonthItems(date);
+              }}
+              onSelect={(date, info) => {
+                if (info?.source === 'date') {
+                  setEditingRow(null);
+                  setCalendarPrefillDate(date.hour(10).minute(0).second(0).toISOString());
+                  setDrawerOpen(true);
+                }
+              }}
+            />
+          </Card>
+        ) : (
+        <ListTable<any>
+          actionRef={actionRef}
+          columns={columns}
+          headerTitle={t('distributionList')}
+          request={async (params) => {
+            const query = new PaginationQuery({
+              paging: {
+                page: params.current || 1,
+                pageSize: params.pageSize || TABLE.DEFAULT_PAGE_SIZE,
+              },
+              formValues: Object.fromEntries(
+                Object.entries(params).filter(
+                  ([key]) => !['current', 'pageSize'].includes(key),
+                ),
+              ),
+              orderBy: ['-created_at'],
+            });
+
+            const response = await fetchListSocialDistributions(query);
+
+            return {
+              data: response.items || [],
+              total: Number(response.total) || 0,
+              success: true,
+            };
+          }}
+          rowKey="id"
+          search={{
+            labelWidth: 'auto',
+            defaultCollapsed: false,
+            span: 12,
+          }}
+          pagination={{
+            defaultPageSize: TABLE.DEFAULT_PAGE_SIZE,
+            showSizeChanger: true,
+            showQuickJumper: true,
+          }}
+          toolBarRender={() => [
+            <TableExportButton
+              key="export"
+              fetcher={fetchListSocialDistributions}
+              columns={columns}
+              filename="social-distributions"
+            />,
+            <a
+              key="create"
+              onClick={() => {
+                setEditingRow(null);
+                setDrawerOpen(true);
+              }}
+            >
+              + {t('createDistribution')}
+            </a>,
+          ]}
+          options={{
+            density: false,
+            fullScreen: false,
+            setting: false,
+            reload: true,
+          }}
+          size="small"
+          bordered
+          cardBordered={false}
+          scroll={{ x: 1500, y: tableScrollY }}
+        />
+        )}
+      </div>
+
+      <StatsTrendModal
+        open={!!trendRow}
+        distributionId={trendRow?.id}
+        onClose={() => setTrendRow(null)}
+      />
+
+      <SocialDistributionDrawer
+        open={drawerOpen}
+        data={editingRow}
+        prefill={editingRow ? undefined : { publishTime: calendarPrefillDate }}
+        onClose={() => {
+          setDrawerOpen(false);
+          setEditingRow(null);
+          setCalendarPrefillDate(undefined);
+        }}
+        onSuccess={() => {
+          actionRef.current?.reload();
+        }}
+      />
+    </>
+  );
+};
+
+export default SocialDistributionList;

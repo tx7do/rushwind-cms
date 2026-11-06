@@ -34,7 +34,6 @@
   "updateFailed": "更新失败",
   "deleteSuccess": "删除成功",
   "deleteFailed": "删除失败",
-  "fetchFailed": "加载失败",
   "dateRange": {
     "today": "今天",
     "yesterday": "昨天",

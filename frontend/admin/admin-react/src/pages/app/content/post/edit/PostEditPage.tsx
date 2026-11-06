@@ -1,19 +1,25 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { App, Button, Input, Select, Space, Tag } from 'antd';
+import { Alert, App, Button, Input, Select, Space, Tag , Tooltip } from 'antd';
 import {
   ArrowLeftOutlined,
   CheckOutlined,
   CloseOutlined,
+  FileTextOutlined,
+  HistoryOutlined,
   MenuFoldOutlined,
   SettingOutlined,
+  ShareAltOutlined,
   TranslationOutlined,
 } from '@ant-design/icons';
 import { useNavigate, useParams, useSearchParams, useBlocker } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
+import dayjs from 'dayjs';
 
 import { apiClient } from '@/api/client';
 import { PaginationQuery } from '@/core';
 import ContentContainer from '@/layouts/components/PageContainer/ContentContainer';
+import { useEditLock } from '@/api/hooks/edit-lock';
+import { useCollaboration } from '@/hooks/useCollaboration';
 import { Editor, EditorType } from '@/components/common/Editor';
 import { fetchListLanguages } from '@/api/hooks/language';
 import { fetchFlattenedCategoryOptions } from '@/api/hooks/category';
@@ -21,12 +27,19 @@ import { uploadMediaAsset } from '@/api/hooks/media-asset';
 import { useTranslate } from '@/api/hooks/tag';
 import { POST_SAVE_MASK_KEYS, useCreatePost, useUpdatePost } from '@/api/hooks/post';
 import { compressImageFile } from '@/utils/image';
+import { openDraftPreviewWindow } from '@/utils/draft-preview';
 import {
   getPostStatusColor,
   getPostStatusLabel,
 } from '../constants';
+import { EyeOutlined } from '@ant-design/icons';
+import AiGenerateButton from '@/components/common/AiGenerateButton';
+import VersionHistoryDrawer from '@/components/version/VersionHistoryDrawer';
+import { cendBaseUrl, cendLocalePrefix, useCreatePostPreviewToken } from '@/api/hooks/preview';
+import SocialDistributionDrawer from '@/pages/app/social/distribution/SocialDistributionDrawer';
 import PostSettingsPanel from './PostSettingsPanel';
 import type { PostEditProps } from './types';
+import type { dictservicev1_Language as Language } from '@/api/generated/admin/service/v1';
 
 // 文章只提供富文本与 Markdown 两种编辑器；代码/JSON/纯文本编辑器不适合文章场景
 const POST_EDITOR_TYPE_OPTIONS = [
@@ -54,6 +67,7 @@ function snapshotPayload(f: PostEditProps) {
     editorType: f.editorType,
     code: f.code ?? '',
     categoryIds: [...(f.categoryIds ?? [])].sort(),
+    customFields: f.customFields ?? {},
     isFeatured: f.isFeatured ?? false,
     sortOrder: f.sortOrder ?? 0,
     disallowComment: f.disallowComment ?? false,
@@ -67,10 +81,10 @@ function snapshotPayload(f: PostEditProps) {
 
 /**
  * 文章编辑页（独立编辑页范式）：
- * 多语言翻译、本地草稿（自动暂存 + 恢复询问）、右栏设置、定时发布、未保存拦截
+ * 多语言翻译、本地草稿（自动暂存 + 恢复/丢弃询问 + 本地预览）、右栏设置、定时发布、未保存拦截
  */
 const PostEditPage = () => {
-  const { t } = useTranslation('post');
+  const { t, i18n } = useTranslation('post');
   const navigate = useNavigate();
   const { id } = useParams();
   const [searchParams, setSearchParams] = useSearchParams();
@@ -79,8 +93,13 @@ const PostEditPage = () => {
   const initLang = searchParams.get('lang') || 'zh-CN';
   const isCreateMode = !id;
   const postId = isCreateMode ? null : Number(id);
+  // 编辑锁（协同 v1）：他人持锁时展示提示横幅
+  const editLock = useEditLock('post', postId);
+  // 实时协同（仅富文本；房间按语言隔离，创建模式无 id 不启用）
 
   const [lang, setLang] = useState(initLang);
+  const collaboration = useCollaboration('post', postId, lang);
+  const [collaborators, setCollaborators] = useState<{ name: string; color: string }[]>([]);
   const [formData, setFormData] = useState<PostEditProps>(() => emptyForm(initLang));
   const [status, setStatus] = useState<string | undefined>(undefined);
   const [languageOptions, setLanguageOptions] = useState<
@@ -88,6 +107,9 @@ const PostEditPage = () => {
   >([]);
   const [saving, setSaving] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(true);
+  const [socialDistOpen, setSocialDistOpen] = useState(false);
+  const [versionsOpen, setVersionsOpen] = useState(false);
+  const createPreviewToken = useCreatePostPreviewToken();
   const [categoryOptions, setCategoryOptions] = useState<{ label: string; value: number }[]>([]);
   const [categoryOptionsLoading, setCategoryOptionsLoading] = useState(false);
 
@@ -99,6 +121,11 @@ const PostEditPage = () => {
   const savedSnapshotRef = useRef('');
   const draftSaveTimerRef = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
   const draftPromptShownRef = useRef(false);
+  /** 最新表单引用：防抖定时器触发时以此复检，避免闭包里的旧值绕过校验 */
+  const formDataRef = useRef(formData);
+  useEffect(() => {
+    formDataRef.current = formData;
+  }, [formData]);
   /** 发布成功后的返回跳过拦截 */
   const leavingBySaveRef = useRef(false);
   /** 新建保存成功后拿到的新文章 id（state 异步，路由切换需同步值） */
@@ -117,15 +144,17 @@ const PostEditPage = () => {
     [],
   );
 
-  const loadDraft = useCallback(
-    (currentLang: string): PostEditProps | null => {
+  /** 本地草稿：表单内容 + 暂存时间（旧格式草稿无 _savedAt，缺省不显示时间） */
+  const readDraft = useCallback(
+    (currentLang: string): { form: PostEditProps; savedAt?: number } | null => {
       const raw = localStorage.getItem(getDraftKey(postId, currentLang, isCreateMode));
       if (!raw) return null;
       try {
-        const draft = JSON.parse(raw) as PostEditProps;
+        const parsed = JSON.parse(raw) as PostEditProps & { _savedAt?: number };
+        const { _savedAt, ...draft } = parsed;
         // 早期草稿可能没有 seo 字段，补齐为对象避免绑定空引用
         if (!draft.seo) draft.seo = {};
-        return draft;
+        return { form: draft as PostEditProps, savedAt: _savedAt };
       } catch {
         return null;
       }
@@ -137,7 +166,7 @@ const PostEditPage = () => {
     (f: PostEditProps) => {
       localStorage.setItem(
         getDraftKey(postId, f.lang, isCreateMode),
-        JSON.stringify(f),
+        JSON.stringify({ ...f, _savedAt: Date.now() }),
       );
     },
     [postId, isCreateMode],
@@ -160,7 +189,12 @@ const PostEditPage = () => {
     if (draftSaveTimerRef.current) {
       clearTimeout(draftSaveTimerRef.current);
     }
-    draftSaveTimerRef.current = setTimeout(() => saveDraft(formData), 1500);
+    draftSaveTimerRef.current = setTimeout(() => {
+      // 定时器触发时按最新表单与快照复检：保存成功只刷新快照、不重跑本 effect，
+      // 不拦截会把已入库的内容写回草稿，下次进页误弹「本地草稿恢复」
+      if (!hasUnsavedChanges(formDataRef.current)) return;
+      saveDraft(formDataRef.current);
+    }, 1500);
     return () => {
       if (draftSaveTimerRef.current) clearTimeout(draftSaveTimerRef.current);
     };
@@ -186,6 +220,8 @@ const PostEditPage = () => {
   });
   const hasUnsavedChangesRef = useRef(false);
   useEffect(() => {
+    // ref 而非闭包：router 持有的是旧注册的 blocker 函数时闭包会读到过期脏标记
+    // eslint-disable-next-line react-hooks/immutability
     hasUnsavedChangesRef.current = hasUnsavedChanges(formData);
   }, [formData, hasUnsavedChanges]);
 
@@ -245,6 +281,7 @@ const PostEditPage = () => {
           status: item.status ?? undefined,
           code: item.code || '',
           categoryIds: item.categoryIds ? [...item.categoryIds] : [],
+          customFields: (item.customFields as Record<string, string>) ?? {},
           isFeatured: item.isFeatured ?? false,
           sortOrder: item.sortOrder ?? 0,
           disallowComment: item.disallowComment ?? false,
@@ -273,26 +310,53 @@ const PostEditPage = () => {
     [isCreateMode, postId],
   );
 
-  /** 存在未发布的本地草稿时询问用户是否恢复（不再静默覆盖服务端数据） */
+  /** 存在未发布的本地草稿时询问用户恢复/丢弃/稍后处理（不再静默覆盖服务端数据） */
   const maybePromptPendingDraft = useCallback(() => {
     if (draftPromptShownRef.current) return;
-    const pending = !!loadDraft(initLang);
+    const pending = readDraft(initLang);
     if (!pending) return;
     draftPromptShownRef.current = true;
-    modal.confirm({
+    const dialog = modal.confirm({
       title: t('draftFound'),
-      content: t('draftFoundMessage'),
-      okText: t('draftRestore'),
-      cancelText: t('common:button.cancel'),
-      onOk: () => {
-        const draft = loadDraft(initLang);
-        if (draft) {
-          setFormData(draft);
-        }
-      },
+      content: (
+        <>
+          <p style={{ marginBottom: pending.savedAt ? 4 : 0 }}>{t('draftFoundMessage')}</p>
+          {pending.savedAt && (
+            <p style={{ color: 'var(--ant-color-text-tertiary)', marginBottom: 0 }}>
+              {t('draftSavedAt', { time: dayjs(pending.savedAt).format('YYYY-MM-DD HH:mm') })}
+            </p>
+          )}
+        </>
+      ),
+      footer: (
+        <Space style={{ display: 'flex', justifyContent: 'flex-end' }}>
+          <Button onClick={() => dialog.destroy()}>{t('common:button.cancel')}</Button>
+          <Button
+            danger
+            onClick={() => {
+              clearDraft(initLang);
+              dialog.destroy();
+            }}
+          >
+            {t('draftDiscard')}
+          </Button>
+          <Button
+            type="primary"
+            onClick={() => {
+              const draft = readDraft(initLang);
+              if (draft) {
+                setFormData(draft.form);
+              }
+              dialog.destroy();
+            }}
+          >
+            {t('draftRestore')}
+          </Button>
+        </Space>
+      ),
     });
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [initLang, loadDraft]);
+  }, [initLang, readDraft, clearDraft]);
 
   useEffect(() => {
     (async () => {
@@ -311,8 +375,8 @@ const PostEditPage = () => {
         );
         setLanguageOptions(
           resp.items
-            ?.filter((l: any) => l.isEnabled !== false)
-            .map((l: any) => ({
+            ?.filter((l: Language) => l.isEnabled !== false)
+            .map((l: Language) => ({
               label: l.nativeName || '',
               value: l.languageCode || '',
             })) || [],
@@ -347,6 +411,10 @@ const PostEditPage = () => {
       .then(setCategoryOptions)
       .catch(() => setCategoryOptions([]))
       .finally(() => setCategoryOptionsLoading(false));
+    // 切语言前先把旧语言的未保存修改暂存本地草稿，避免被服务端数据覆盖丢失
+    if (hasUnsavedChanges(formData)) {
+      saveDraft(formData);
+    }
     if (!isCreateMode) {
       await fetchPost(newLang);
     } else {
@@ -449,7 +517,7 @@ const PostEditPage = () => {
     const hasSeo = Object.values(seo).some(
       (v) => typeof v === 'string' && v.length > 0,
     );
-    const data: Record<string, any> = {
+    const data: Record<string, unknown> = {
       editorType: formData.editorType,
       status: nextStatus,
       code: formData.code || '',
@@ -459,6 +527,11 @@ const PostEditPage = () => {
       categoryIds: formData.categoryIds ?? [],
       // 缩略图为帖子级字段，全语言共用一张
       thumbnail: formData.thumbnail || '',
+      // 自定义字段为帖子级：组件值为 JSON 字符串（后端按模型校验）
+      customFields:
+        formData.customFields && Object.keys(formData.customFields).length > 0
+          ? formData.customFields
+          : undefined,
       translations: [
         {
           title: formData.title,
@@ -495,6 +568,11 @@ const PostEditPage = () => {
 
       setStatus(nextStatus);
       refreshSavedSnapshot({ ...formData, status: nextStatus });
+      // 保存成功后丢弃挂起的本地暂存定时器，防止其晚于 clearDraft 触发、把已入库内容写回草稿
+      if (draftSaveTimerRef.current) {
+        clearTimeout(draftSaveTimerRef.current);
+        draftSaveTimerRef.current = undefined;
+      }
       return '';
     } catch (error) {
       console.error('Failed to save post:', error);
@@ -577,6 +655,14 @@ const PostEditPage = () => {
   return (
     <ContentContainer heightMode="fixed" padding="0" bottomMargin={0}>
       <div style={{ height: '100%', display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
+        {editLock.heldByName && (
+          <Alert
+            type="warning"
+            showIcon
+            style={{ margin: '8px 16px 0' }}
+            message={t('editLockHeld', { name: editLock.heldByName, since: editLock.heldSince ?? '' })}
+          />
+        )}
         {/* 头部：返回 + 标题 + 状态 + 语言 + 翻译 + 编辑器类型 */}
         <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '12px 16px 8px', flexWrap: 'wrap' }}>
           <Button type="text" icon={<ArrowLeftOutlined />} onClick={goBack} />
@@ -586,6 +672,10 @@ const PostEditPage = () => {
             style={{ flex: 1, minWidth: 200 }}
             value={formData.title}
             onChange={(e) => patch({ title: e.target.value })}
+          />
+          <AiGenerateButton
+            scene="POST_TITLE"
+            onGenerate={(content) => patch({ title: content })}
           />
           {!isCreateMode && status && (
             <Tag color={getPostStatusColor(status)}>{getPostStatusLabel(t, status)}</Tag>
@@ -609,7 +699,6 @@ const PostEditPage = () => {
             }))}
           />
           <Button
-            type="primary"
             icon={<TranslationOutlined />}
             loading={translateMutation.isPending}
             onClick={handleTranslate}
@@ -622,19 +711,79 @@ const PostEditPage = () => {
             onChange={(v: string) => patch({ editorType: v })}
             options={editorTypeOptions}
           />
+          {collaborators.length > 0 && (
+            <Tooltip title={collaborators.map((u) => u.name).join('、')}>
+              <Space size={0} style={{ marginLeft: 'auto' }}>
+                {collaborators.map((u) => (
+                  <span
+                    key={u.name}
+                    title={u.name}
+                    style={{
+                      width: 24,
+                      height: 24,
+                      borderRadius: '50%',
+                      background: u.color,
+                      color: '#fff',
+                      fontSize: 12,
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      border: '2px solid var(--ant-color-bg-container)',
+                      marginLeft: -6,
+                    }}
+                  >
+                    {u.name.slice(0, 1)}
+                  </span>
+                ))}
+              </Space>
+            </Tooltip>
+          )}
         </div>
 
         {/* 主体：左侧编辑器 + 右侧内嵌设置栏 */}
         <div style={{ flex: 1, minHeight: 0, display: 'flex', overflow: 'hidden' }}>
-          <div style={{ flex: 1, minWidth: 0, minHeight: 0 }}>
+          <div style={{ flex: 1, minWidth: 0, minHeight: 0, display: 'flex', flexDirection: 'column' }}>
+            {/* 富文本：AI 生成收进工具栏右侧；Markdown 等其他编辑器无工具栏槽，保留上方悬浮入口 */}
+            {formData.editorType !== EditorType.RICH_TEXT && (
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-end', padding: '4px 8px' }}>
+                <AiGenerateButton
+                  scene="POST_BODY"
+                  context={formData.title ? `文章标题：${formData.title}` : undefined}
+                  onGenerate={(content) => {
+                    // 正文生成是追加语义：已有内容换行拼接，避免覆盖用户已写内容
+                    const base = formData.content?.trim();
+                    patch({ content: base ? `${base}
+
+${content}` : content });
+                  }}
+                />
+              </div>
+            )}
+            <div style={{ flex: 1, minHeight: 0 }}>
             <Editor
               height="100%"
               value={formData.content}
               editorType={formData.editorType}
               placeholder={t('contentPlaceholder')}
               uploadImage={handleUploadImage}
+              collaboration={collaboration}
+              onCollaboratorsChange={setCollaborators}
+              toolbarExtra={
+                <AiGenerateButton
+                  scene="POST_BODY"
+                  context={formData.title ? `文章标题：${formData.title}` : undefined}
+                  onGenerate={(content) => {
+                    // 正文生成是追加语义：已有内容换行拼接，避免覆盖用户已写内容
+                    const base = formData.content?.trim();
+                    patch({ content: base ? `${base}
+
+${content}` : content });
+                  }}
+                />
+              }
               onChange={(v) => patch({ content: v })}
             />
+            </div>
           </div>
 
           {/* 右侧：内嵌设置栏 + 常驻竖向开关轨 */}
@@ -705,12 +854,96 @@ const PostEditPage = () => {
             <Button onClick={handleSaveDraft} loading={saving}>
               {t('saveDraft')}
             </Button>
-            <Button type="primary" danger onClick={handlePublish} loading={saving}>
+            <Button type="primary" onClick={handlePublish} loading={saving}>
               {t('publish')}
+            </Button>
+            <Button
+              icon={<ShareAltOutlined />}
+              disabled={!postId}
+              title={postId ? undefined : t('distributeNeedSave')}
+              onClick={() => setSocialDistOpen(true)}
+            >
+              {t('distributeToSocial')}
+            </Button>
+            <Button
+              icon={<FileTextOutlined />}
+              disabled={!formData.content?.trim()}
+              title={t('draftPreviewTip')}
+              onClick={() =>
+                openDraftPreviewWindow({
+                  title: formData.title,
+                  content: formData.content ?? '',
+                  editorType: formData.editorType,
+                  bannerText: t('draftPreviewBanner'),
+                  docTitle: formData.title || t('draftPreviewUntitled'),
+                })
+              }
+            >
+              {t('previewDraft')}
+            </Button>
+            <Button
+              icon={<EyeOutlined />}
+              disabled={!postId}
+              loading={createPreviewToken.isPending}
+              title={postId ? undefined : t('versionNeedSave')}
+              onClick={async () => {
+                if (!postId) return;
+                try {
+                  const tk = await createPreviewToken.mutateAsync({ id: postId });
+                  window.open(
+                    `${cendBaseUrl()}/${cendLocalePrefix(i18n.language)}/post/detail?id=${postId}&preview_token=${tk.token ?? ''}`,
+                    '_blank',
+                    'noopener',
+                  );
+                } catch (error) {
+                  console.error('Create preview token failed:', error);
+                }
+              }}
+            >
+              {t('previewOnCend')}
+            </Button>
+            <Button
+              icon={<HistoryOutlined />}
+              disabled={!postId}
+              title={postId ? undefined : t('versionNeedSave')}
+              onClick={() => setVersionsOpen(true)}
+            >
+              {t('versionHistory')}
             </Button>
           </Space>
         </div>
       </div>
+
+      {/* 社交分发：以本文章为源帖预填新建分发 */}
+      <SocialDistributionDrawer
+        open={socialDistOpen}
+        prefill={{
+          postId: postId ?? undefined,
+          postTitle: formData.title || undefined,
+          overrideText: formData.title ? `${formData.title}` : undefined,
+        }}
+        onClose={() => setSocialDistOpen(false)}
+        onSuccess={() => setSocialDistOpen(false)}
+      />
+
+      {/* 版本历史：查看快照/与当前内容 diff/一键恢复 */}
+      <VersionHistoryDrawer
+        open={versionsOpen}
+        onClose={() => setVersionsOpen(false)}
+        kind="post"
+        targetId={postId}
+        lang={lang}
+        currentContent={formData.content ?? ''}
+        onRestored={() => {
+          // 恢复后重新拉取服务端数据覆盖表单（本地草稿不再相关）；
+          // 待表单落定后再清草稿，防止拉取期间挂起的暂存定时器把旧内容写回
+          fetchPost(lang)
+            .then(() => clearDraft(lang))
+            .catch((error) => {
+              console.error('Refetch post after restore failed:', error);
+            });
+        }}
+      />
     </ContentContainer>
   );
 };

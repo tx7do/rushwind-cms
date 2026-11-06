@@ -14,6 +14,7 @@ use proto::proto::comment::service::v1 as comment_v1;
 use proto::proto::content::service::v1 as content_v1;
 use proto::proto::identity::service::v1 as identity_v1;
 use proto::proto::interaction::service::v1 as interaction_v1;
+use proto::proto::media::service::v1 as media_v1;
 use proto::proto::pagination;
 use proto::proto::site::service::v1 as site_v1;
 
@@ -55,6 +56,19 @@ passthrough_proxy! {
 }
 
 passthrough_proxy! {
+    /// The pass-through proxy of `FormSubmissionServiceHandlers`.
+    proto::gen_app::services::FormSubmissionServiceHandlers for FormSubmissionProxy {
+        client: content_v1::form_submission_service_client::FormSubmissionServiceClient<
+            tonic::transport::Channel,
+        >,
+        behaviors: public,
+        methods: [
+            pass submit(content_v1::SubmitFormSubmissionRequest) -> content_v1::FormSubmission,
+        ]
+    }
+}
+
+passthrough_proxy! {
     /// The pass-through proxy of `InteractionServiceHandlers`.
     proto::gen_app::services::InteractionServiceHandlers for InteractionProxy {
         client: interaction_v1::interaction_service_client::InteractionServiceClient<
@@ -70,6 +84,21 @@ passthrough_proxy! {
                 -> interaction_v1::GetInteractionStatusResponse,
             pass list_watched_posts(pagination::PagingRequest) -> content_v1::ListPostResponse,
             pass get_counts(interaction_v1::GetCountsRequest) -> interaction_v1::GetCountsResponse,
+            pass record_view(interaction_v1::RecordViewRequest)
+                -> interaction_v1::RecordViewResponse,
+        ]
+    }
+}
+
+passthrough_proxy! {
+    /// The pass-through proxy of `MediaAssetServiceHandlers`.
+    proto::gen_app::services::MediaAssetServiceHandlers for MediaAssetProxy {
+        client: media_v1::media_asset_service_client::MediaAssetServiceClient<
+            tonic::transport::Channel,
+        >,
+        behaviors: public,
+        methods: [
+            pass get(media_v1::GetMediaAssetRequest) -> media_v1::MediaAsset,
         ]
     }
 }
@@ -106,6 +135,8 @@ passthrough_proxy! {
             hand update(content_v1::UpdatePageRequest) -> content_v1::Page => forbidden_mutation,
             hand delete(content_v1::DeletePageRequest) -> pbjson_types::Empty => forbidden_mutation,
             pass get_translation(content_v1::GetPageRequest) -> content_v1::PageTranslation,
+            stub get_by_slug(proto::proto::app::service::v1::GetPageBySlugRequest)
+                -> content_v1::Page,
         ]
     }
 }
@@ -116,14 +147,36 @@ passthrough_proxy! {
         client: content_v1::post_service_client::PostServiceClient<tonic::transport::Channel>,
         behaviors: public,
         methods: [
+            hand get_post_content_model(content_v1::GetModelByPostRequest)
+                -> content_v1::ContentModel => post_content_model,
+            hand resolve_content_references(content_v1::ResolveContentReferencesRequest)
+                -> content_v1::ResolveContentReferencesResponse => resolve_content_references,
             hand list(pagination::PagingRequest) -> content_v1::ListPostResponse => post_list,
             hand search_posts(content_v1::SearchPostsRequest)
                 -> content_v1::SearchPostsResponse => post_search,
+            pass search_posts_suggest(content_v1::SearchPostsSuggestRequest)
+                -> content_v1::SearchPostsSuggestResponse,
             hand get(content_v1::GetPostRequest) -> content_v1::Post => post_get,
             hand create(content_v1::CreatePostRequest) -> content_v1::Post => forbidden_mutation,
             hand update(content_v1::UpdatePostRequest) -> content_v1::Post => forbidden_mutation,
             hand delete(content_v1::DeletePostRequest) -> pbjson_types::Empty => forbidden_mutation,
             pass get_translation(content_v1::GetPostRequest) -> content_v1::PostTranslation,
+            stub get_by_slug(proto::proto::app::service::v1::GetPostBySlugRequest)
+                -> content_v1::Post,
+        ]
+    }
+}
+
+passthrough_proxy! {
+    /// The pass-through proxy of `RedirectServiceHandlers`.
+    proto::gen_app::services::RedirectServiceHandlers for RedirectProxy {
+        client: content_v1::redirect_service_client::RedirectServiceClient<
+            tonic::transport::Channel,
+        >,
+        behaviors: public,
+        methods: [
+            stub list_enabled(content_v1::ListRedirectsRequest)
+                -> content_v1::ListRedirectsResponse,
         ]
     }
 }

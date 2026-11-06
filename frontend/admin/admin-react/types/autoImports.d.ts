@@ -7,6 +7,7 @@
 export {}
 declare global {
   const Activity: typeof import('react').Activity
+  const AiGenerateButton: typeof import('../src/components/common/AiGenerateButton/index').default
   const ApiPageSelect: typeof import('../src/components/common/Selects/index').ApiPageSelect
   const ApiSelect: typeof import('../src/components/common/Selects/index').ApiSelect
   const ApiTreeSelect: typeof import('../src/components/common/Selects/index').ApiTreeSelect
@@ -29,11 +30,13 @@ declare global {
   const BaseUpload: typeof import('../src/components/Upload/BaseUpload').default
   const CodeBlockModal: typeof import('../src/components/common/Editor/src/TiptapEditor/modals').CodeBlockModal
   const CodeEditor: typeof import('../src/components/common/Editor/src/CodeEditor').default
+  const ColumnSlidersIcon: typeof import('../src/components/common/columnSettingIcon').ColumnSlidersIcon
   const CopyBtn: typeof import('../src/components/Copy/CopyBtn').default
   const CopyInput: typeof import('../src/components/Copy/CopyInput').default
   const Count: typeof import('../src/components/Count/index').default
   const CreateBusiness: typeof import('../src/components/common/Business/index').CreateBusiness
   const CustomCodeBlockLowlight: typeof import('../src/components/common/Editor/src/TiptapEditor/index').CustomCodeBlockLowlight
+  const CustomFieldsEditor: typeof import('../src/components/content/CustomFieldsEditor').default
   const CustomIframe: typeof import('../src/components/common/Editor/src/TiptapEditor/nodes').CustomIframe
   const CustomVideo: typeof import('../src/components/common/Editor/src/TiptapEditor/nodes').CustomVideo
   const DeleteBtn: typeof import('../src/components/Buttons/index').DeleteBtn
@@ -53,17 +56,19 @@ declare global {
   const JsonEditor: typeof import('../src/components/common/Editor/src/JsonEditor').default
   const Link: typeof import('react-router-dom').Link
   const LinkModal: typeof import('../src/components/common/Editor/src/TiptapEditor/index').LinkModal
+  const ListTable: typeof import('../src/components/common/ListTable/index').default
   const Loading: typeof import('../src/components/common/Loading/index').default
   const LoadingComponent: typeof import('../src/components/common/Form/components/LoadingComponent').default
   const MAX_TAG_COUNT: typeof import('../src/components/common/Selects/index').MAX_TAG_COUNT
+  const MIN_COLUMN_WIDTH: typeof import('../src/components/common/ListTable/ResizableHeaderCell').MIN_COLUMN_WIDTH
   const MarkdownEditor: typeof import('../src/components/common/Editor/src/MarkdownEditor').default
   const NavLink: typeof import('react-router-dom').NavLink
   const Navigate: typeof import('react-router-dom').Navigate
   const Outlet: typeof import('react-router-dom').Outlet
-  const PageContainer: typeof import('../src/components/common/PageContainer/index').default
   const PartnerSelect: typeof import('../src/components/common/Business/Selects/PartnerSelect').default
   const PasswordStrength: typeof import('../src/components/PasswordStrength/index').default
   const PlainTextEditor: typeof import('../src/components/common/Editor/src/PlainTextEditor').default
+  const ResizableHeaderCell: typeof import('../src/components/common/ListTable/ResizableHeaderCell').default
   const ResizableTitle: typeof import('../src/components/Table/components/ResizableTitle').default
   const Route: typeof import('react-router-dom').Route
   const Routes: typeof import('react-router-dom').Routes
@@ -71,18 +76,22 @@ declare global {
   const SearchFooter: typeof import('../src/components/common/GlobalSearch/components/SearchFooter').default
   const SearchModal: typeof import('../src/components/common/GlobalSearch/components/SearchModal').default
   const SearchResult: typeof import('../src/components/common/GlobalSearch/components/SearchResult').default
+  const SettingBoltIcon: typeof import('../src/components/common/settingBoltIcon').SettingBoltIcon
   const SloganIcon: typeof import('../src/components/bussiness/AuthLayout/icons/SloganIcon').default
   const StatusBar: typeof import('../src/components/common/Editor/src/TiptapEditor/index').StatusBar
   const StrengthBar: typeof import('../src/components/PasswordStrength/components/StrengthBar').default
   const SubmitBottom: typeof import('../src/components/Bottom/SubmitBottom').default
   const Suspense: typeof import('react').Suspense
+  const TableActions: typeof import('../src/components/common/TableActions/index').default
   const TableExportButton: typeof import('../src/components/common/TableExportButton/index').default
   const TableFilter: typeof import('../src/components/Table/components/TableFilter').default
+  const TableSkeleton: typeof import('../src/components/common/ListTable/TableSkeleton').default
   const Theme: typeof import('../src/components/common/Theme/index').default
   const ThemeLoading: typeof import('../src/components/common/Loading/index').ThemeLoading
   const TiptapEditor: typeof import('../src/components/common/Editor/src/TiptapEditor').default
   const Toolbar: typeof import('../src/components/common/Editor/src/TiptapEditor/index').Toolbar
   const UpdateBtn: typeof import('../src/components/Buttons/index').UpdateBtn
+  const VersionHistoryDrawer: typeof import('../src/components/version/VersionHistoryDrawer').default
   const VideoModal: typeof import('../src/components/common/Editor/src/TiptapEditor/modals').VideoModal
   const VirtualWrapper: typeof import('../src/components/Table/components/VirtualWrapper').default
   const addComponent: typeof import('../src/components/common/Form/utils/componentMap').addComponent
@@ -95,6 +104,7 @@ declare global {
   const dayjsRang2StringRang: typeof import('../src/components/common/Dates/utils/helper').dayjsRang2StringRang
   const defaultImageUpload: typeof import('../src/components/common/Editor/src/TiptapEditor/defaultImageUpload').defaultImageUpload
   const deleteComponent: typeof import('../src/components/common/Form/utils/componentMap').deleteComponent
+  const diffLines: typeof import('../src/components/version/lineDiff').diffLines
   const disconnectSSEServer: typeof import('../src/hooks/useTokenRefresh').disconnectSSEServer
   const extractImageFiles: typeof import('../src/components/common/Editor/src/TiptapEditor/defaultImageUpload').extractImageFiles
   const fetchAllDictEntries: typeof import('../src/hooks/useDictCache').fetchAllDictEntries
@@ -113,6 +123,7 @@ declare global {
   const getTableHeight: typeof import('../src/components/Table/utils/helper').getTableHeight
   const handleRowHeight: typeof import('../src/components/Table/utils/helper').handleRowHeight
   const handleValuePropName: typeof import('../src/components/common/Form/utils/helper').handleValuePropName
+  const headCheck: typeof import('../src/components/common/ListTable/__head_check__').default
   const initCompProps: typeof import('../src/components/common/Form/utils/helper').initCompProps
   const initMonacoWorkers: typeof import('../src/components/common/Editor/src/monaco-loader').initMonacoWorkers
   const isDarkMode: typeof import('../src/components/common/Editor/src/utils').isDarkMode
@@ -123,6 +134,7 @@ declare global {
   const reconnectSSEServer: typeof import('../src/hooks/useTokenRefresh').reconnectSSEServer
   const reducer: typeof import('../src/components/Table/utils/reducer').reducer
   const resetDictCache: typeof import('../src/hooks/useDictCache').resetDictCache
+  const searchOptionRender: typeof import('../src/components/common/searchSubmitter').searchOptionRender
   const startRefreshTimer: typeof import('../src/hooks/useTokenRefresh').startRefreshTimer
   const startTransition: typeof import('react').startTransition
   const stopRefreshTimer: typeof import('../src/hooks/useTokenRefresh').stopRefreshTimer
@@ -136,10 +148,12 @@ declare global {
   const useAutoTableHeight: typeof import('../src/hooks/useTableScrollHeight').useAutoTableHeight
   const useCallback: typeof import('react').useCallback
   const useClipboard: typeof import('../src/hooks/useClipboard').useClipboard
+  const useCollaboration: typeof import('../src/hooks/useCollaboration').useCollaboration
   const useCommonStore: typeof import('../src/hooks/useCommonStore').useCommonStore
   const useContext: typeof import('react').useContext
   const useDebugValue: typeof import('react').useDebugValue
   const useDeferredValue: typeof import('react').useDeferredValue
+  const useDrawerCloseGuard: typeof import('../src/components/common/use-drawer-close-guard').useDrawerCloseGuard
   const useEcharts: typeof import('../src/hooks/useEcharts').useEcharts
   const useEffect: typeof import('react').useEffect
   const useEffectEvent: typeof import('react').useEffectEvent
@@ -154,6 +168,7 @@ declare global {
   const useLayoutEffect: typeof import('react').useLayoutEffect
   const useLinkClickHandler: typeof import('react-router-dom').useLinkClickHandler
   const useLocation: typeof import('react-router-dom').useLocation
+  const useLockStore: typeof import('../src/stores/lock').useLockStore
   const useLogout: typeof import('../src/hooks/useLogout').useLogout
   const useMemo: typeof import('react').useMemo
   const useNavigate: typeof import('react-router-dom').useNavigate
@@ -188,6 +203,6 @@ declare global {
 // for type re-export
 declare global {
   // @ts-ignore
-  export type { TableExportButtonProps, ImportModalProps, FC, ECOption, AuthLayoutProps, EditorProps, CodeEditorProps, JsonEditorProps, MarkdownEditorProps, PlainTextEditorProps, TiptapEditorProps, CodeBlockModalProps, VideoModalProps, IframeModalProps, ThemeLoadingProps, TokenPayload, AuthState, UserState, TabItem } from './autoImports.d'
+  export type { ResizableCellProps, TableActionConfirm, TableAction, FC, ECOption, AuthLayoutProps, EditorProps, CodeEditorProps, JsonEditorProps, MarkdownEditorProps, PlainTextEditorProps, CollaborationOptions, TiptapEditorProps, CodeBlockModalProps, VideoModalProps, IframeModalProps, ImportModalProps, TableSkeletonProps, ThemeLoadingProps, TableExportServerExport, TableExportButtonProps, VersionHistoryDrawerProps, DiffLineType, DiffLine, TokenPayload, AuthState, UserState, TabItem } from './autoImports.d'
   import('./autoImports.d')
 }

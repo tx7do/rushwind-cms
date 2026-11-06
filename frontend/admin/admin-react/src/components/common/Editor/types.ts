@@ -1,3 +1,5 @@
+import type { ReactNode } from 'react';
+
 export const EditorType = {
   CODE: 'EDITOR_TYPE_CODE',
   JSON: 'EDITOR_TYPE_JSON_BLOCK',
@@ -11,6 +13,16 @@ export type EditorType = (typeof EditorType)[keyof typeof EditorType];
 
 export interface EditorProps {
   value?: string;
+  /** 实时协同（仅富文本编辑器支持；传入即启用） */
+  collaboration?: {
+    room: string;
+    wsUrl: string;
+    token: string;
+    userName: string;
+    userColor: string;
+  } | null;
+  /** 在线协作者变化（协同启用时回调） */
+  onCollaboratorsChange?: (users: { name: string; color: string }[]) => void;
   editorType?: EditorType | string;
   height?: number | string;
   disabled?: boolean;
@@ -42,4 +54,6 @@ export interface EditorProps {
   };
   onChange?: (value: string) => void;
   onReady?: () => void;
+  /** 工具栏右侧扩展槽（仅富文本编辑器渲染；用于承载 AI 生成等页级动作，避免悬浮在工具栏上方） */
+  toolbarExtra?: ReactNode;
 }

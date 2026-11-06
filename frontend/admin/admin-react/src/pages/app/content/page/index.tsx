@@ -1,10 +1,24 @@
 import { useRef, useState } from 'react';
 import type { ProColumns, ActionType } from '@ant-design/pro-components';
 import TableExportButton from '@/components/common/TableExportButton';
-import { ProTable } from '@ant-design/pro-components';
-import { Button, Popconfirm, Tag, App } from 'antd';
-import { EditOutlined, DeleteOutlined, PlusOutlined } from '@ant-design/icons';
+import PagesTransferButtons from './PagesTransferButtons';
+import ListTable from '@/components/common/ListTable';
+import TableActions from '@/components/common/TableActions';
+import { Button, Input, Tag, App } from 'antd';
+import {
+  CheckOutlined,
+  CloseOutlined,
+  DeleteOutlined,
+  EditOutlined,
+  PlusOutlined,
+  SendOutlined,
+} from '@ant-design/icons';
 import { useQueryClient } from '@tanstack/react-query';
+import {
+  useApprovePageReview,
+  useRejectPageReview,
+  useSubmitPageReview,
+} from '@/api/hooks/page';
 import { useTranslation } from 'react-i18next';
 import { useNavigate } from 'react-router-dom';
 import dayjs from 'dayjs';
@@ -35,10 +49,15 @@ const PageList = () => {
   const tableScrollY = useProTableScrollY(containerRef);
   const queryClient = useQueryClient();
   const navigate = useNavigate();
-  const { message } = App.useApp();
+  const { message, modal } = App.useApp();
 
   // 树形展开受控：数据异步加载后全展开
   const [expandedKeys, setExpandedKeys] = useState<readonly any[]>([]);
+
+  // 发布审批：提交审核 / 通过 / 驳回（权限卡点=接口管理把 review 端点绑角色）
+  const submitReviewMutation = useSubmitPageReview();
+  const approveReviewMutation = useApprovePageReview();
+  const rejectReviewMutation = useRejectPageReview();
 
   const deleteMutation = useDeletePage({
     onSuccess: () => {
@@ -142,76 +161,141 @@ const PageList = () => {
     {
       title: t('action'),
       valueType: 'option',
-      width: 100,
+      width: 290,
       fixed: 'right',
-      render: (_, record) => [
-        <a
-          key="edit"
-          onClick={() =>
-            navigate(`/content/pages/edit/${record.id}?lang=${i18n.language}`)
-          }
-        >
-          <EditOutlined />
-        </a>,
-        <Popconfirm
-          key="delete"
-          title={t('deleteConfirmTitle')}
-          description={t('deleteConfirmDesc', { moduleName: t('moduleName') })}
-          onConfirm={() => {
-            record.id && deleteMutation.mutate({ id: record.id });
-          }}
-          okText={t('common:button.ok')}
-          cancelText={t('common:button.cancel')}
-        >
-          <a style={{ color: 'var(--ant-color-error)' }}>
-            <DeleteOutlined />
-          </a>
-        </Popconfirm>,
-      ],
+      render: (_, record) => (
+        <TableActions
+          record={record}
+          actions={[
+            {
+              key: 'edit',
+              label: t('common:button.edit'),
+              icon: <EditOutlined />,
+              onClick: () => navigate(`/content/pages/edit/${record.id}?lang=${i18n.language}`),
+            },
+            // 发布审批动作：草稿可提交审核；审核中可通过/驳回（状态机校验在 core 双保险）
+            {
+              key: 'submit-review',
+              label: t('review.submit'),
+              icon: <SendOutlined />,
+              tooltip: t('review.submitTitle'),
+              hidden: !(record.status === 'PAGE_STATUS_DRAFT' && !record.inProgress),
+              onClick: async () => {
+                try {
+                  await submitReviewMutation.mutateAsync({ pageId: record.id as number });
+                  message.success(t('review.submitted'));
+                  actionRef.current?.reload();
+                } catch (error) {
+                  console.error('Submit page review failed:', error);
+                }
+              },
+            },
+            {
+              key: 'approve-review',
+              label: t('review.approve'),
+              icon: <CheckOutlined />,
+              success: true,
+              tooltip: t('review.approveTitle'),
+              hidden: !record.inProgress,
+              onClick: async () => {
+                try {
+                  await approveReviewMutation.mutateAsync({ pageId: record.id as number });
+                  message.success(t('review.approved'));
+                  actionRef.current?.reload();
+                } catch (error) {
+                  console.error('Approve page review failed:', error);
+                }
+              },
+            },
+            {
+              key: 'reject-review',
+              label: t('review.reject'),
+              icon: <CloseOutlined />,
+              tooltip: t('review.rejectTitle'),
+              hidden: !record.inProgress,
+              onClick: () => {
+                let reason = '';
+                modal.confirm({
+                  title: t('review.rejectTitle'),
+                  content: (
+                    <Input.TextArea
+                      placeholder={t('review.reasonPlaceholder')}
+                      onChange={(e) => {
+                        reason = e.target.value;
+                      }}
+                    />
+                  ),
+                  okText: t('common:button.ok'),
+                  cancelText: t('common:button.cancel'),
+                  onOk: async () => {
+                    try {
+                      await rejectReviewMutation.mutateAsync({
+                        pageId: record.id as number,
+                        reason,
+                      });
+                      message.success(t('review.rejected'));
+                      actionRef.current?.reload();
+                    } catch (error) {
+                      console.error('Reject page review failed:', error);
+                    }
+                  },
+                });
+              },
+            },
+            {
+              key: 'delete',
+              label: t('common:button.delete'),
+              icon: <DeleteOutlined />,
+              danger: true,
+              confirm: {
+                title: t('deleteConfirmTitle'),
+                description: t('deleteConfirmDesc', { moduleName: t('moduleName') }),
+              },
+              onClick: () => record.id && deleteMutation.mutate({ id: record.id }),
+            },
+          ]}
+        />
+      ),
     },
   ];
 
   return (
     <div ref={containerRef} className="page-container-content" style={{ padding: '0 8px', height: '100%' }}>
-      <ProTable<any>
+      <ListTable<any>
         actionRef={actionRef}
         columns={columns}
         headerTitle={t('pageList')}
         request={async (params) => {
-          try {
-            const query = new PaginationQuery({
-              paging: {
-                page: params.current || 1,
-                pageSize: params.pageSize || TABLE.DEFAULT_PAGE_SIZE,
-              },
-              formValues: Object.fromEntries(
-                Object.entries(params).filter(
-                  ([key]) => !['current', 'pageSize'].includes(key),
-                ),
+          const query = new PaginationQuery({
+            paging: {
+              page: params.current || 1,
+              pageSize: params.pageSize || TABLE.DEFAULT_PAGE_SIZE,
+            },
+            formValues: Object.fromEntries(
+              Object.entries(params).filter(
+                ([key]) => !['current', 'pageSize'].includes(key),
               ),
-            });
+            ),
+          });
 
-            const response = await fetchListPages(query);
+          const response = await fetchListPages(query);
 
-            // 树形展开受控：收集所有含 children 的父页面 id
-            const collectParentIds = (items: any[]): any[] =>
-              items.flatMap((item) =>
-                item.children?.length
-                  ? [item.id, ...collectParentIds(item.children)]
-                  : [],
-              );
-            setExpandedKeys(collectParentIds(response.items || []));
+          // 树形展开受控：收集所有含 children 的父页面 id
+          const collectParentIds = (items: any[]): any[] =>
+            items.flatMap((item) =>
+              item.children?.length
+                ? [item.id, ...collectParentIds(item.children)]
+                : [],
+            );
+          setExpandedKeys(collectParentIds(response.items || []));
 
-            return {
-              data: response.items || [],
-              total: response.total || 0,
-              success: true,
-            };
-          } catch (error: any) {
-            message.error(error.message || t('fetchFailed'));
-            return { data: [], total: 0, success: false };
-          }
-        }}
+          return {
+            data: response.items || [],
+            total: response.total || 0,
+            success: true,
+          };
+        
+}}
         rowKey="id"
         search={{
           labelWidth: 'auto',
@@ -228,6 +312,10 @@ const PageList = () => {
             fetcher={fetchListPages}
             columns={columns}
             filename="pages"
+          />,
+          <PagesTransferButtons
+            key="transfer"
+            onChanged={() => actionRef.current?.reload()}
           />,
           <Button
             key="create"

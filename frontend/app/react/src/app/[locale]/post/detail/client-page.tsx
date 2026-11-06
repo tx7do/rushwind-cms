@@ -16,6 +16,8 @@ import SectionContainer from '@/components/layout/SectionContainer';
 
 import {
     fetchPost,
+    fetchPostBySlug,
+    fetchPostPreview,
     getPostTitle,
     getPostContent,
     getPostThumbnail,
@@ -24,24 +26,28 @@ import {
     useInteractionStatus,
     useGetCounts,
     extractCount,
+    recordView,
     useLike,
     useUnlike,
     useWatch,
     useUnwatch,
 } from '@/api/hooks/interaction';
 import {contentservicev1_Post} from "@/api/generated/app/service/v1";
+import CustomFieldsSection from './CustomFieldsSection';
 import XIcon from '@/plugins/xicon';
 import {useI18nRouter} from "@/i18n/helpers";
 import Image from '@/components/ui/image';
 
-export default function PostDetailPage() {
+export default function PostDetailPage({ initialPost }: { initialPost?: contentservicev1_Post | null }) {
     const t = useTranslations('page');
     const router = useI18nRouter();
     const searchParams = useSearchParams();
 
-    const [post, setPost] = useState<contentservicev1_Post | null>(null);
+    // SSR 下传 initialPost 时跳过客户端首拉（无骨架闪烁，SEO 由服务端组件输出）
+    const skipClientFetch = Boolean(initialPost);
+    const [post, setPost] = useState<contentservicev1_Post | null>(initialPost ?? null);
     const [postLoading, setPostLoading] = useState(false);
-    const [localLoading, setLocalLoading] = useState(true);
+    const [localLoading, setLocalLoading] = useState(!initialPost);
     const isLoading = localLoading || (postLoading && !post);
     // likeCount/watchCount：点赞/收藏计数缓存。初始读 GetCounts，写操作后用 RPC 返回的最新值更新。
     const [likeCount, setLikeCount] = useState<number | undefined>(undefined);
@@ -50,10 +56,19 @@ export default function PostDetailPage() {
 
     const contentRef = useRef<HTMLDivElement>(null);
 
-    const postId = useMemo(() => {
+    // 路由身份仅取自 searchParams：?id= 直接用；?slug= 时由拉取到的 post 回填
+    // （静态导出后详情页无服务端取数，slug → id 的解析发生在客户端拉取完成时）。
+    const routePostId = useMemo(() => {
         const id = searchParams.get('id');
         return id ? parseInt(id) : null;
     }, [searchParams]);
+    // 草稿预览：admin「预览」按钮带短时效令牌跳转，后端校验后放行非已发布内容
+    const previewToken = useMemo(() => searchParams.get('preview_token') || '', [searchParams]);
+    // SEO 别名路由：?slug={code}（纯数字别名在 getPostBySlug 内按 id 处理）
+    const slug = useMemo(() => searchParams.get('slug') || '', [searchParams]);
+    // 互动计数/状态/浏览上报都挂在这个 id 上：slug 路由在 post 到手后由 null 变为真实 id，
+    // 相关查询随之以真实 id 重跑。
+    const postId = routePostId ?? post?.id ?? null;
 
     // 点赞/收藏状态：由 interaction 子系统提供。
     // useInteractionStatus 取当前 viewer 对此 post 的 {liked, watched} 初始态；
@@ -66,7 +81,7 @@ export default function PostDetailPage() {
     const countsResp = useGetCounts(
         'TARGET_TYPE_POST',
         postId ? [postId] : [],
-        ['COUNTER_METRIC_LIKE', 'COUNTER_METRIC_WATCH'],
+        ['COUNTER_METRIC_LIKE', 'COUNTER_METRIC_WATCH', 'COUNTER_METRIC_VIEW'],
     );
     const likeMutation = useLike();
     const unlikeMutation = useUnlike();
@@ -91,17 +106,25 @@ export default function PostDetailPage() {
         };
     }, [post?.categoryIds, postId]);
 
-    // Load post data
+    // Load post data（静态导出：详情页无服务端取数，slug/id 均在客户端拉取）
     useEffect(() => {
         async function loadPost() {
-            if (!postId) return;
+            if (!routePostId && !slug) return;
             setLocalLoading(true);
             setPostLoading(true);
             try {
-                const fetchedPost = (await fetchPost(postId!)) as contentservicev1_Post;
-                setPost(fetchedPost);
-                if (fetchedPost) {
-                    document.title = `${getPostTitle(fetchedPost)} - RushWind Content Hub`;
+                let fetched: contentservicev1_Post | null = null;
+                if (previewToken && routePostId) {
+                    // 预览链接始终带 id（admin 签发），preview_token 优先
+                    fetched = (await fetchPostPreview(routePostId, previewToken)) as contentservicev1_Post;
+                } else if (slug) {
+                    fetched = (await fetchPostBySlug(slug)) as contentservicev1_Post;
+                } else if (routePostId) {
+                    fetched = (await fetchPost(routePostId)) as contentservicev1_Post;
+                }
+                if (fetched) {
+                    setPost(fetched);
+                    document.title = `${getPostTitle(fetched)} - RushWind Content Hub`;
                 }
             } catch (error) {
                 console.error('Load post failed:', error);
@@ -110,18 +133,29 @@ export default function PostDetailPage() {
                 setPostLoading(false);
             }
         }
+        if (skipClientFetch) return;
         loadPost();
-        // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [postId]);
+    }, [routePostId, slug, previewToken, skipClientFetch]);
 
-    // 从 GetCounts 响应同步点赞/收藏计数到缓存。
+    const [viewCount, setViewCount] = useState<number | undefined>(undefined);
+
+    // 从 GetCounts 响应同步点赞/收藏/浏览计数到缓存。
     // 计数由 interaction_counter 表提供（post 表的散落计数列已移除）。
     useEffect(() => {
         if (countsResp.data && postId) {
             setLikeCount(extractCount(countsResp.data, postId, 'COUNTER_METRIC_LIKE'));
             setWatchCount(extractCount(countsResp.data, postId, 'COUNTER_METRIC_WATCH'));
+            setViewCount(extractCount(countsResp.data, postId, 'COUNTER_METRIC_VIEW'));
         }
     }, [countsResp.data, postId]);
+
+    // 浏览量上报（PV +1）：每次进入详情记一次；ref 守卫避免 StrictMode 双挂载重复计数
+    const viewReportedRef = useRef<number | null>(null);
+    useEffect(() => {
+        if (!postId || viewReportedRef.current === postId) return;
+        viewReportedRef.current = postId;
+        recordView('TARGET_TYPE_POST', postId);
+    }, [postId]);
 
     // Handlers
     const handleBack = () => {
@@ -239,6 +273,7 @@ export default function PostDetailPage() {
                                 createdAt={post.createdAt}
                                 likes={likeCount}
                                 watchCount={watchCount}
+                                views={viewCount}
                             />
                         </header>
 
@@ -246,6 +281,9 @@ export default function PostDetailPage() {
                         <div className="mb-8" ref={contentRef}>
                             <ContentViewer content={displayContent} type="markdown"/>
                         </div>
+
+                        {/* 自定义字段（内容建模前台读侧；无模型/无值时静默不渲染） */}
+                        <CustomFieldsSection postId={postId} customFields={post.customFields}/>
 
                         {/* Floating Actions */}
                         <PostFloatingActions

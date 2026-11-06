@@ -1,7 +1,10 @@
 <script setup lang="ts">
 import {XIcon} from '@/plugins/xicon'
-import {fetchPost, getPostTitle, getPostContent, getPostThumbnail} from '@/api/composables/post'
-import {useGetCounts, extractCount, useWatch, useUnwatch, useLike, useUnlike} from '@/api/composables/interaction'
+import {fetchPost, fetchPostPreview, getPostTitle, getPostContent, getPostThumbnail,
+  getPostTranslation,
+} from '@/api/composables/post'
+import CustomFieldsSection from '@/components/post/CustomFieldsSection.vue'
+import {useGetCounts, extractCount, recordView, useWatch, useUnwatch, useLike, useUnlike} from '@/api/composables/interaction'
 
 const {t} = useI18n()
 const localePath = useLocalePath()
@@ -16,6 +19,8 @@ const isTocExpanded = ref(true)
 const contentRef = ref<HTMLElement | null>(null)
 
 const postId = computed(() => Number(route.params.id))
+// 草稿预览：admin「预览」按钮带短时效令牌跳转，后端校验后放行非已发布内容
+const previewToken = computed(() => String(route.query.preview_token || ''))
 
 // useGetCounts 取此 post 的点赞计数（来自 interaction_counter 表，post 表的 likes 列已移除）。
 // 响应中未出现的 (target, metric) 组合按 0 兜底。
@@ -23,18 +28,32 @@ const postIdArray = computed(() => (postId.value ? [postId.value] : []))
 const countsResp = useGetCounts(
   'TARGET_TYPE_POST',
   postIdArray,
-  ['COUNTER_METRIC_LIKE', 'COUNTER_METRIC_WATCH'],
+  ['COUNTER_METRIC_LIKE', 'COUNTER_METRIC_WATCH', 'COUNTER_METRIC_VIEW'],
 )
 const likeCount = ref<number | undefined>(undefined)
 const watchCount = ref<number | undefined>(undefined)
+const viewCount = ref<number | undefined>(undefined)
 watch(
   [() => countsResp.data?.value, () => postId.value],
   ([data, pid]) => {
     if (data && pid) {
       likeCount.value = extractCount(data, pid, 'COUNTER_METRIC_LIKE')
       watchCount.value = extractCount(data, pid, 'COUNTER_METRIC_WATCH')
+      viewCount.value = extractCount(data, pid, 'COUNTER_METRIC_VIEW')
     }
   },
+)
+
+// 浏览量上报（PV +1）：每次进入详情记一次
+const viewReportedId = ref<number | null>(null)
+watch(
+  postId,
+  (pid) => {
+    if (!pid || viewReportedId.value === pid) return
+    viewReportedId.value = pid
+    recordView('TARGET_TYPE_POST', pid)
+  },
+  { immediate: true },
 )
 const likeMutation = useLike()
 const unlikeMutation = useUnlike()
@@ -45,9 +64,20 @@ const displayTitle = computed(() => post.value ? getPostTitle(post.value) : '')
 const displayContent = computed(() => post.value ? getPostContent(post.value) : '')
 const displayThumbnail = computed(() => post.value ? getPostThumbnail(post.value) : '')
 
-// 动态标题
-useHead({
-  title: () => displayTitle.value || t('page.post_detail.untitled'),
+// 动态标题 + SEO 字段（admin 编辑侧 seoTitle/metaDescription/keywords/og*）
+useHead(() => {
+  const tr = post.value ? getPostTranslation(post.value) : null
+  const seo = tr?.seo
+  const title = displayTitle.value || t('page.post_detail.untitled')
+  const meta: Array<{ name: string; content: string }> = []
+  if (seo?.metaDescription) meta.push({ name: 'description', content: seo.metaDescription })
+  if (seo?.metaKeywords) meta.push({ name: 'keywords', content: seo.metaKeywords })
+  if (seo?.ogTitle) meta.push({ property: 'og:title', content: seo.ogTitle })
+  if (seo?.ogDescription) meta.push({ property: 'og:description', content: seo.ogDescription })
+  return {
+    title: () => seo?.seoTitle || title,
+    meta,
+  }
 })
 
 const relatedPostsQuery = computed(() => {
@@ -63,9 +93,11 @@ async function loadPost() {
   if (!postId.value) return
   postLoading.value = true
   try {
-    const fetched = await fetchPost(postId.value)
-    // 仅展示已发布文章，草稿/私有等状态按未找到处理
-    if (!fetched || fetched.status !== 'POST_STATUS_PUBLISHED') {
+    const fetched = previewToken.value
+      ? await fetchPostPreview(postId.value, previewToken.value)
+      : await fetchPost(postId.value)
+    // 仅展示已发布文章，草稿/私有等状态按未找到处理（携带预览令牌时放行草稿）
+    if (!fetched || (fetched.status !== 'POST_STATUS_PUBLISHED' && !previewToken.value)) {
       post.value = null
       return
     }
@@ -251,12 +283,15 @@ onMounted(() => {
                   :created-at="post.createdAt"
                   :likes="likeCount"
                   :watch-count="watchCount"
+                  :views="viewCount"
               />
             </header>
 
             <!-- Post Content -->
             <div ref="contentRef" class="mb-8">
               <ContentViewer :content="displayContent" type="markdown"/>
+              <!-- 自定义字段（内容建模前台读侧；无模型/无值时静默不渲染） -->
+              <CustomFieldsSection :post-id="postId" :custom-fields="post?.customFields"/>
             </div>
 
             <!-- Floating Actions -->

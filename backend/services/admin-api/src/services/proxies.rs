@@ -10,22 +10,191 @@
 #![allow(missing_docs)]
 
 use crate::passthrough_proxy;
+use proto::proto::access_key::service::v1 as access_key_v1;
+use proto::proto::ai::service::v1 as ai_v1;
 use proto::proto::audit::service::v1 as audit_v1;
 use proto::proto::authentication::service::v1 as authentication_v1;
 use proto::proto::comment::service::v1 as comment_v1;
+use proto::proto::config::service::v1 as config_v1;
 use proto::proto::content::service::v1 as content_v1;
 use proto::proto::dict::service::v1 as dict_v1;
+use proto::proto::flow::service::v1 as flow_v1;
 use proto::proto::identity::service::v1 as identity_v1;
 use proto::proto::interaction::service::v1 as interaction_v1;
 use proto::proto::internal_message::service::v1 as internal_message_v1;
 use proto::proto::media::service::v1 as media_v1;
+use proto::proto::monitor_alert::service::v1 as monitor_alert_v1;
+use proto::proto::notify::service::v1 as notify_v1;
+use proto::proto::online_session::service::v1 as online_session_v1;
 use proto::proto::pagination;
 use proto::proto::permission::service::v1 as permission_v1;
+use proto::proto::redis_cache::service::v1 as redis_cache_v1;
+use proto::proto::server_monitor::service::v1 as server_monitor_v1;
 use proto::proto::site::service::v1 as site_v1;
+use proto::proto::social::service::v1 as social_v1;
 use proto::proto::stats::service::v1 as stats_v1;
 use proto::proto::storage::service::v1 as storage_v1;
 use proto::proto::task::service::v1 as task_v1;
 use proto::proto::translator::service::v1 as translator_v1;
+use proto::proto::webhook::service::v1 as webhook_v1;
+
+passthrough_proxy! {
+    /// The pass-through proxy of `AccessKeyServiceHandlers`.
+    proto::gen_admin::services::AccessKeyServiceHandlers for AccessKeyProxy {
+        client: access_key_v1::access_key_service_client::AccessKeyServiceClient<
+            tonic::transport::Channel,
+        >,
+        behaviors: behaviors,
+        methods: [
+            pass list(pagination::PagingRequest) -> access_key_v1::ListAccessKeyResponse,
+            pass get(access_key_v1::GetAccessKeyRequest) -> access_key_v1::AccessKey,
+            pass create(access_key_v1::CreateAccessKeyRequest)
+                -> access_key_v1::CreateAccessKeyResponse,
+            pass update(access_key_v1::UpdateAccessKeyRequest) -> pbjson_types::Empty,
+            pass delete(access_key_v1::DeleteAccessKeyRequest) -> pbjson_types::Empty,
+            pass reset_secret(access_key_v1::ResetAccessKeySecretRequest)
+                -> access_key_v1::CreateAccessKeyResponse,
+            pass issue_token(access_key_v1::IssueTokenRequest) -> access_key_v1::IssueTokenResponse,
+        ]
+    }
+}
+
+passthrough_proxy! {
+    /// The pass-through proxy of `AiAgentServiceHandlers`.
+    proto::gen_admin::services::AiAgentServiceHandlers for AiAgentProxy {
+        client: ai_v1::ai_agent_service_client::AiAgentServiceClient<tonic::transport::Channel>,
+        behaviors: behaviors,
+        methods: [
+            pass list(pagination::PagingRequest) -> ai_v1::ListAiAgentAppsResponse,
+            pass get(ai_v1::GetAiAgentAppRequest) -> ai_v1::AiAgentApp,
+            pass create(ai_v1::CreateAiAgentAppRequest) -> ai_v1::AiAgentApp,
+            pass update(ai_v1::UpdateAiAgentAppRequest) -> pbjson_types::Empty,
+            pass delete(ai_v1::DeleteAiAgentAppRequest) -> pbjson_types::Empty,
+            pass approve_run(ai_v1::ApproveAgentRunRequest) -> ai_v1::AiAgentRun,
+            pass run(ai_v1::RunAiAgentAppRequest) -> ai_v1::AiAgentRun,
+            pass list_runs(pagination::PagingRequest) -> ai_v1::ListAiAgentRunsResponse,
+            pass get_run(ai_v1::GetAiAgentRunRequest) -> ai_v1::AiAgentRun,
+        ]
+    }
+}
+
+passthrough_proxy! {
+    /// The pass-through proxy of `AiChatServiceHandlers`.
+    proto::gen_admin::services::AiChatServiceHandlers for AiChatProxy {
+        client: ai_v1::ai_chat_service_client::AiChatServiceClient<tonic::transport::Channel>,
+        behaviors: behaviors,
+        methods: [
+            stub chat(ai_v1::ChatRequest) -> ai_v1::ChatResponse,
+        ]
+    }
+}
+
+passthrough_proxy! {
+    /// The pass-through proxy of `AiContentServiceHandlers`.
+    proto::gen_admin::services::AiContentServiceHandlers for AiContentProxy {
+        client: ai_v1::ai_content_service_client::AiContentServiceClient<tonic::transport::Channel>,
+        behaviors: behaviors,
+        methods: [
+            pass generate_content(ai_v1::GenerateContentRequest) -> ai_v1::GenerateContentResponse,
+            pass semantic_search(ai_v1::SemanticSearchRequest) -> ai_v1::SemanticSearchResponse,
+            pass rebuild_search_index(pbjson_types::Empty) -> ai_v1::RebuildSearchIndexResponse,
+            pass get_safety_insights(ai_v1::SafetyInsightsRequest) -> ai_v1::SafetyInsightsResponse,
+        ]
+    }
+}
+
+passthrough_proxy! {
+    /// The pass-through proxy of `AiConversationServiceHandlers`.
+    proto::gen_admin::services::AiConversationServiceHandlers for AiConversationProxy {
+        client: ai_v1::ai_conversation_service_client::AiConversationServiceClient<
+            tonic::transport::Channel,
+        >,
+        behaviors: behaviors,
+        methods: [
+            pass list(pagination::PagingRequest) -> ai_v1::ListAiConversationResponse,
+            pass get(ai_v1::GetAiConversationRequest) -> ai_v1::AiConversation,
+            pass update(ai_v1::UpdateAiConversationRequest) -> pbjson_types::Empty,
+            pass delete(ai_v1::DeleteAiConversationRequest) -> pbjson_types::Empty,
+        ]
+    }
+}
+
+passthrough_proxy! {
+    /// The pass-through proxy of `AiKnowledgeBaseServiceHandlers`.
+    proto::gen_admin::services::AiKnowledgeBaseServiceHandlers for AiKnowledgeBaseProxy {
+        client: ai_v1::ai_knowledge_base_service_client::AiKnowledgeBaseServiceClient<
+            tonic::transport::Channel,
+        >,
+        behaviors: behaviors,
+        methods: [
+            pass list(pagination::PagingRequest) -> ai_v1::ListAiKnowledgeBaseResponse,
+            pass get(ai_v1::GetAiKnowledgeBaseRequest) -> ai_v1::AiKnowledgeBase,
+            pass create(ai_v1::CreateAiKnowledgeBaseRequest) -> pbjson_types::Empty,
+            pass update(ai_v1::UpdateAiKnowledgeBaseRequest) -> pbjson_types::Empty,
+            pass delete(ai_v1::DeleteAiKnowledgeBaseRequest) -> pbjson_types::Empty,
+            pass upload_doc(ai_v1::UploadAiDocRequest) -> ai_v1::UploadAiDocResponse,
+            pass upload_doc_file(ai_v1::UploadAiDocFileRequest) -> ai_v1::UploadAiDocResponse,
+            pass list_docs(ai_v1::ListAiDocsRequest) -> ai_v1::ListAiDocsResponse,
+            pass delete_doc(ai_v1::DeleteAiDocRequest) -> pbjson_types::Empty,
+            pass search(ai_v1::SearchAiKnowledgeRequest) -> ai_v1::SearchAiKnowledgeResponse,
+            pass reindex_docs(ai_v1::ReindexDocsRequest) -> pbjson_types::Empty,
+        ]
+    }
+}
+
+passthrough_proxy! {
+    /// The pass-through proxy of `AiMessageServiceHandlers`.
+    proto::gen_admin::services::AiMessageServiceHandlers for AiMessageProxy {
+        client: ai_v1::ai_message_service_client::AiMessageServiceClient<tonic::transport::Channel>,
+        behaviors: behaviors,
+        methods: [
+            pass list(pagination::PagingRequest) -> ai_v1::ListAiMessageResponse,
+            pass delete(ai_v1::DeleteAiMessageRequest) -> pbjson_types::Empty,
+        ]
+    }
+}
+
+passthrough_proxy! {
+    /// The pass-through proxy of `AiProviderServiceHandlers`.
+    proto::gen_admin::services::AiProviderServiceHandlers for AiProviderProxy {
+        client: ai_v1::ai_provider_service_client::AiProviderServiceClient<
+            tonic::transport::Channel,
+        >,
+        behaviors: behaviors,
+        methods: [
+            pass list(pagination::PagingRequest) -> ai_v1::ListAiProviderResponse,
+            pass get(ai_v1::GetAiProviderRequest) -> ai_v1::AiProvider,
+            pass create(ai_v1::CreateAiProviderRequest) -> pbjson_types::Empty,
+            pass update(ai_v1::UpdateAiProviderRequest) -> pbjson_types::Empty,
+            pass delete(ai_v1::DeleteAiProviderRequest) -> pbjson_types::Empty,
+        ]
+    }
+}
+
+passthrough_proxy! {
+    /// The pass-through proxy of `AiQueryServiceHandlers`.
+    proto::gen_admin::services::AiQueryServiceHandlers for AiQueryProxy {
+        client: ai_v1::ai_query_service_client::AiQueryServiceClient<tonic::transport::Channel>,
+        behaviors: behaviors,
+        methods: [
+            pass ask(ai_v1::AskAiQueryRequest) -> ai_v1::AskAiQueryResponse,
+        ]
+    }
+}
+
+passthrough_proxy! {
+    /// The pass-through proxy of `AiUsageLogServiceHandlers`.
+    proto::gen_admin::services::AiUsageLogServiceHandlers for AiUsageLogProxy {
+        client: ai_v1::ai_usage_log_service_client::AiUsageLogServiceClient<
+            tonic::transport::Channel,
+        >,
+        behaviors: behaviors,
+        methods: [
+            pass list(pagination::PagingRequest) -> ai_v1::ListAiUsageLogResponse,
+            pass get_usage_summary(pbjson_types::Empty) -> ai_v1::UsageSummaryResponse,
+        ]
+    }
+}
 
 passthrough_proxy! {
     /// The pass-through proxy of `ApiAuditLogServiceHandlers`.
@@ -60,6 +229,20 @@ passthrough_proxy! {
 }
 
 passthrough_proxy! {
+    /// The pass-through proxy of `BackupServiceHandlers`.
+    proto::gen_admin::services::BackupServiceHandlers for BackupProxy {
+        client: task_v1::backup_archive_service_client::BackupArchiveServiceClient<
+            tonic::transport::Channel,
+        >,
+        behaviors: behaviors,
+        methods: [
+            pass list_backups(task_v1::ListBackupsRequest) -> task_v1::ListBackupsResponse,
+            pass download_backup(task_v1::DownloadBackupRequest) -> task_v1::DownloadBackupResponse,
+        ]
+    }
+}
+
+passthrough_proxy! {
     /// The pass-through proxy of `CategoryServiceHandlers`.
     proto::gen_admin::services::CategoryServiceHandlers for CategoryProxy {
         client: content_v1::category_service_client::CategoryServiceClient<
@@ -87,6 +270,21 @@ passthrough_proxy! {
             pass create(comment_v1::CreateCommentRequest) -> comment_v1::Comment,
             pass update(comment_v1::UpdateCommentRequest) -> comment_v1::Comment,
             pass delete(comment_v1::DeleteCommentRequest) -> pbjson_types::Empty,
+        ]
+    }
+}
+
+passthrough_proxy! {
+    /// The pass-through proxy of `ConfigServiceHandlers`.
+    proto::gen_admin::services::ConfigServiceHandlers for ConfigProxy {
+        client: config_v1::config_service_client::ConfigServiceClient<tonic::transport::Channel>,
+        behaviors: behaviors,
+        methods: [
+            pass list(pagination::PagingRequest) -> config_v1::ListConfigResponse,
+            pass get(config_v1::GetConfigRequest) -> config_v1::Config,
+            pass create(config_v1::CreateConfigRequest) -> pbjson_types::Empty,
+            pass update(config_v1::UpdateConfigRequest) -> pbjson_types::Empty,
+            pass delete(config_v1::DeleteConfigRequest) -> pbjson_types::Empty,
         ]
     }
 }
@@ -158,6 +356,40 @@ passthrough_proxy! {
 }
 
 passthrough_proxy! {
+    /// The pass-through proxy of `EditLockServiceHandlers`.
+    proto::gen_admin::services::EditLockServiceHandlers for EditLockProxy {
+        client: content_v1::edit_lock_service_client::EditLockServiceClient<
+            tonic::transport::Channel,
+        >,
+        behaviors: behaviors,
+        methods: [
+            pass acquire(content_v1::AcquireEditLockRequest) -> content_v1::EditLock,
+            pass release(content_v1::ReleaseEditLockRequest) -> pbjson_types::Empty,
+        ]
+    }
+}
+
+passthrough_proxy! {
+    /// The pass-through proxy of `ExperimentServiceHandlers`.
+    proto::gen_admin::services::ExperimentServiceHandlers for ExperimentProxy {
+        client: content_v1::experiment_service_client::ExperimentServiceClient<
+            tonic::transport::Channel,
+        >,
+        behaviors: behaviors,
+        methods: [
+            pass list(pagination::PagingRequest) -> content_v1::ListExperimentsResponse,
+            pass get(content_v1::GetExperimentRequest) -> content_v1::Experiment,
+            pass create(content_v1::CreateExperimentRequest) -> content_v1::Experiment,
+            pass update(content_v1::UpdateExperimentRequest) -> content_v1::Experiment,
+            pass delete(content_v1::DeleteExperimentRequest) -> pbjson_types::Empty,
+            pass set_status(content_v1::SetExperimentStatusRequest) -> content_v1::Experiment,
+            pass get_variant_stats(content_v1::GetExperimentVariantStatsRequest)
+                -> content_v1::ExperimentVariantStatsResponse,
+        ]
+    }
+}
+
+passthrough_proxy! {
     /// The pass-through proxy of `FileServiceHandlers`.
     proto::gen_admin::services::FileServiceHandlers for FileProxy {
         client: storage_v1::file_service_client::FileServiceClient<tonic::transport::Channel>,
@@ -168,6 +400,36 @@ passthrough_proxy! {
             hand create(storage_v1::CreateFileRequest) -> pbjson_types::Empty => file_create,
             pass update(storage_v1::UpdateFileRequest) -> pbjson_types::Empty,
             pass delete(storage_v1::DeleteFileRequest) -> pbjson_types::Empty,
+        ]
+    }
+}
+
+passthrough_proxy! {
+    /// The pass-through proxy of `FlowRuleServiceHandlers`.
+    proto::gen_admin::services::FlowRuleServiceHandlers for FlowRuleProxy {
+        client: flow_v1::flow_rule_service_client::FlowRuleServiceClient<tonic::transport::Channel>,
+        behaviors: behaviors,
+        methods: [
+            pass list(pagination::PagingRequest) -> flow_v1::ListFlowRuleResponse,
+            pass get(flow_v1::GetFlowRuleRequest) -> flow_v1::FlowRule,
+            pass create(flow_v1::CreateFlowRuleRequest) -> flow_v1::FlowRule,
+            pass update(flow_v1::UpdateFlowRuleRequest) -> flow_v1::FlowRule,
+            pass delete(flow_v1::DeleteFlowRuleRequest) -> pbjson_types::Empty,
+        ]
+    }
+}
+
+passthrough_proxy! {
+    /// The pass-through proxy of `FormSubmissionServiceHandlers`.
+    proto::gen_admin::services::FormSubmissionServiceHandlers for FormSubmissionProxy {
+        client: content_v1::form_submission_service_client::FormSubmissionServiceClient<
+            tonic::transport::Channel,
+        >,
+        behaviors: behaviors,
+        methods: [
+            pass list(pagination::PagingRequest) -> content_v1::ListFormSubmissionsResponse,
+            pass get(content_v1::GetFormSubmissionRequest) -> content_v1::FormSubmission,
+            pass delete(content_v1::DeleteFormSubmissionRequest) -> pbjson_types::Empty,
         ]
     }
 }
@@ -302,6 +564,28 @@ passthrough_proxy! {
 }
 
 passthrough_proxy! {
+    /// The pass-through proxy of `MFAServiceHandlers`.
+    proto::gen_admin::services::MFAServiceHandlers for MFAProxy {
+        client: authentication_v1::mfa_service_client::MfaServiceClient<tonic::transport::Channel>,
+        behaviors: behaviors,
+        methods: [
+            renamed get_m_f_a_status(authentication_v1::GetMfaStatusRequest)
+                -> authentication_v1::GetMfaStatusResponse => get_mfa_status,
+            pass start_enroll_method(authentication_v1::StartEnrollMethodRequest)
+                -> authentication_v1::StartEnrollMethodResponse,
+            pass confirm_enroll_method(authentication_v1::ConfirmEnrollMethodRequest)
+                -> authentication_v1::ConfirmEnrollMethodResponse,
+            renamed disable_m_f_a(authentication_v1::DisableMfaRequest)
+                -> pbjson_types::Empty => disable_mfa,
+            hand verify_m_f_a_challenge(authentication_v1::VerifyMfaChallengeRequest)
+                -> authentication_v1::LoginResponse => mfa_verify_challenge,
+            renamed reset_user_m_f_a(authentication_v1::ResetUserMfaRequest)
+                -> pbjson_types::Empty => reset_user_mfa,
+        ]
+    }
+}
+
+passthrough_proxy! {
     /// The pass-through proxy of `MediaAssetServiceHandlers`.
     proto::gen_admin::services::MediaAssetServiceHandlers for MediaAssetProxy {
         client: media_v1::media_asset_service_client::MediaAssetServiceClient<
@@ -313,6 +597,12 @@ passthrough_proxy! {
             pass get(media_v1::GetMediaAssetRequest) -> media_v1::MediaAsset,
             pass create(media_v1::CreateMediaAssetRequest) -> media_v1::MediaAsset,
             pass update(media_v1::UpdateMediaAssetRequest) -> media_v1::MediaAsset,
+            pass find_by_hash(media_v1::FindMediaAssetByHashRequest)
+                -> media_v1::FindMediaAssetByHashResponse,
+            pass list_duplicated_media_assets(media_v1::ListDuplicatedMediaAssetsRequest)
+                -> media_v1::ListDuplicatedMediaAssetsResponse,
+            pass list_media_asset_references(media_v1::ListMediaAssetReferencesRequest)
+                -> media_v1::ListMediaAssetReferencesResponse,
             pass delete(media_v1::DeleteMediaAssetRequest) -> pbjson_types::Empty,
         ]
     }
@@ -329,6 +619,30 @@ passthrough_proxy! {
             pass create(permission_v1::CreateMenuRequest) -> pbjson_types::Empty,
             pass update(permission_v1::UpdateMenuRequest) -> pbjson_types::Empty,
             pass delete(permission_v1::DeleteMenuRequest) -> pbjson_types::Empty,
+        ]
+    }
+}
+
+passthrough_proxy! {
+    /// The pass-through proxy of `MonitorAlertServiceHandlers`.
+    proto::gen_admin::services::MonitorAlertServiceHandlers for MonitorAlertProxy {
+        client: monitor_alert_v1::monitor_alert_service_client::MonitorAlertServiceClient<
+            tonic::transport::Channel,
+        >,
+        behaviors: behaviors,
+        methods: [
+            pass list_monitor_alert_rule(pagination::PagingRequest)
+                -> monitor_alert_v1::ListMonitorAlertRuleResponse,
+            pass get_monitor_alert_rule(monitor_alert_v1::GetMonitorAlertRuleRequest)
+                -> monitor_alert_v1::MonitorAlertRule,
+            pass create_monitor_alert_rule(monitor_alert_v1::CreateMonitorAlertRuleRequest)
+                -> monitor_alert_v1::MonitorAlertRule,
+            pass update_monitor_alert_rule(monitor_alert_v1::UpdateMonitorAlertRuleRequest)
+                -> pbjson_types::Empty,
+            pass delete_monitor_alert_rule(monitor_alert_v1::DeleteMonitorAlertRuleRequest)
+                -> pbjson_types::Empty,
+            pass evaluate_monitor_alerts(monitor_alert_v1::EvaluateMonitorAlertsRequest)
+                -> monitor_alert_v1::EvaluateMonitorAlertsResponse,
         ]
     }
 }
@@ -363,6 +677,122 @@ passthrough_proxy! {
             pass create(site_v1::CreateNavigationRequest) -> site_v1::Navigation,
             pass update(site_v1::UpdateNavigationRequest) -> site_v1::Navigation,
             pass delete(site_v1::DeleteNavigationRequest) -> pbjson_types::Empty,
+        ]
+    }
+}
+
+passthrough_proxy! {
+    /// The pass-through proxy of `NotificationChannelServiceHandlers`.
+    proto::gen_admin::services::NotificationChannelServiceHandlers for NotificationChannelProxy {
+        client: notify_v1::notification_channel_service_client::NotificationChannelServiceClient<
+            tonic::transport::Channel,
+        >,
+        behaviors: behaviors,
+        methods: [
+            pass list(pagination::PagingRequest) -> notify_v1::ListNotificationChannelResponse,
+            pass get(notify_v1::GetNotificationChannelRequest) -> notify_v1::NotificationChannel,
+            pass create(notify_v1::CreateNotificationChannelRequest)
+                -> notify_v1::NotificationChannel,
+            pass update(notify_v1::UpdateNotificationChannelRequest)
+                -> notify_v1::NotificationChannel,
+            pass delete(notify_v1::DeleteNotificationChannelRequest) -> pbjson_types::Empty,
+            pass send_test_email(notify_v1::SendTestEmailRequest)
+                -> notify_v1::SendTestEmailResponse,
+            pass list_channel_schemas(pbjson_types::Empty) -> notify_v1::ListChannelSchemasResponse,
+        ]
+    }
+}
+
+passthrough_proxy! {
+    /// The pass-through proxy of `NotificationPreferenceServiceHandlers`.
+    proto::gen_admin::services::NotificationPreferenceServiceHandlers
+        for NotificationPreferenceProxy {
+        client: notify_v1::notification_preference_service_client::
+            NotificationPreferenceServiceClient<tonic::transport::Channel>,
+        behaviors: behaviors,
+        methods: [
+            pass get_my_notification_preference(pbjson_types::Empty)
+                -> notify_v1::NotificationPreference,
+            pass update_my_notification_preference(notify_v1::UpdateNotificationPreferenceRequest)
+                -> notify_v1::NotificationPreference,
+            pass list_my_notification_categories(pbjson_types::Empty)
+                -> notify_v1::ListMyNotificationCategoriesResponse,
+        ]
+    }
+}
+
+passthrough_proxy! {
+    /// The pass-through proxy of `NotificationRuleServiceHandlers`.
+    proto::gen_admin::services::NotificationRuleServiceHandlers for NotificationRuleProxy {
+        client: notify_v1::notification_rule_service_client::NotificationRuleServiceClient<
+            tonic::transport::Channel,
+        >,
+        behaviors: behaviors,
+        methods: [
+            pass list(pagination::PagingRequest) -> notify_v1::ListNotificationRuleResponse,
+            pass get(notify_v1::GetNotificationRuleRequest) -> notify_v1::NotificationRule,
+            pass create(notify_v1::CreateNotificationRuleRequest) -> notify_v1::NotificationRule,
+            pass update(notify_v1::UpdateNotificationRuleRequest) -> notify_v1::NotificationRule,
+            pass delete(notify_v1::DeleteNotificationRuleRequest) -> pbjson_types::Empty,
+            pass test_dispatch(notify_v1::TestDispatchNotificationRequest)
+                -> notify_v1::TestDispatchNotificationResponse,
+        ]
+    }
+}
+
+passthrough_proxy! {
+    /// The pass-through proxy of `NotificationServiceHandlers`.
+    proto::gen_admin::services::NotificationServiceHandlers for NotificationProxy {
+        client: notify_v1::notification_service_client::NotificationServiceClient<
+            tonic::transport::Channel,
+        >,
+        behaviors: behaviors,
+        methods: [
+            pass list_delivery(pagination::PagingRequest)
+                -> notify_v1::ListNotificationDeliveryResponse,
+            pass get_delivery(notify_v1::GetNotificationDeliveryRequest)
+                -> notify_v1::NotificationDelivery,
+        ]
+    }
+}
+
+passthrough_proxy! {
+    /// The pass-through proxy of `NotificationTemplateServiceHandlers`.
+    proto::gen_admin::services::NotificationTemplateServiceHandlers for NotificationTemplateProxy {
+        client: notify_v1::notification_template_service_client::NotificationTemplateServiceClient<
+            tonic::transport::Channel,
+        >,
+        behaviors: behaviors,
+        methods: [
+            pass list(pagination::PagingRequest) -> notify_v1::ListNotificationTemplateResponse,
+            pass get(notify_v1::GetNotificationTemplateRequest) -> notify_v1::NotificationTemplate,
+            pass create(notify_v1::CreateNotificationTemplateRequest)
+                -> notify_v1::NotificationTemplate,
+            pass update(notify_v1::UpdateNotificationTemplateRequest)
+                -> notify_v1::NotificationTemplate,
+            pass delete(notify_v1::DeleteNotificationTemplateRequest) -> pbjson_types::Empty,
+            pass render(notify_v1::RenderNotificationTemplateRequest)
+                -> notify_v1::RenderNotificationTemplateResponse,
+        ]
+    }
+}
+
+passthrough_proxy! {
+    /// The pass-through proxy of `OnlineSessionServiceHandlers`.
+    proto::gen_admin::services::OnlineSessionServiceHandlers for OnlineSessionProxy {
+        client: online_session_v1::online_session_service_client::OnlineSessionServiceClient<
+            tonic::transport::Channel,
+        >,
+        behaviors: behaviors,
+        methods: [
+            renamed list_online_session(online_session_v1::ListOnlineSessionRequest)
+                -> online_session_v1::ListOnlineSessionResponse => list,
+            renamed force_logout_session(online_session_v1::ForceLogoutSessionRequest)
+                -> online_session_v1::ForceLogoutSessionResponse => force_logout,
+            renamed list_my_online_session(online_session_v1::ListMyOnlineSessionRequest)
+                -> online_session_v1::ListOnlineSessionResponse => list_my,
+            renamed revoke_my_online_session(online_session_v1::RevokeMyOnlineSessionRequest)
+                -> online_session_v1::RevokeMyOnlineSessionResponse => revoke_my,
         ]
     }
 }
@@ -409,6 +839,13 @@ passthrough_proxy! {
             pass create(content_v1::CreatePageRequest) -> content_v1::Page,
             pass update(content_v1::UpdatePageRequest) -> content_v1::Page,
             pass delete(content_v1::DeletePageRequest) -> pbjson_types::Empty,
+            pass list_versions(content_v1::ListPageVersionsRequest)
+                -> content_v1::ListPageVersionsResponse,
+            pass get_version(content_v1::GetPageVersionRequest) -> content_v1::PageVersion,
+            pass restore_version(content_v1::RestorePageVersionRequest) -> content_v1::Page,
+            pass submit_review(content_v1::SubmitPageReviewRequest) -> content_v1::Page,
+            pass approve_review(content_v1::ReviewPageRequest) -> content_v1::Page,
+            pass reject_review(content_v1::RejectPageReviewRequest) -> content_v1::Page,
         ]
     }
 }
@@ -506,6 +943,57 @@ passthrough_proxy! {
             pass delete(content_v1::DeletePostRequest) -> pbjson_types::Empty,
             pass translation_exists(content_v1::PostTranslationExistsRequest)
                 -> content_v1::PostTranslationExistsResponse,
+            pass list_versions(content_v1::ListPostVersionsRequest)
+                -> content_v1::ListPostVersionsResponse,
+            pass get_version(content_v1::GetPostVersionRequest) -> content_v1::PostVersion,
+            pass restore_version(content_v1::RestorePostVersionRequest) -> content_v1::Post,
+            pass submit_review(content_v1::SubmitPostReviewRequest) -> content_v1::Post,
+            pass approve_review(content_v1::ReviewPostRequest) -> content_v1::Post,
+            pass reject_review(content_v1::RejectPostReviewRequest) -> content_v1::Post,
+        ]
+    }
+}
+
+passthrough_proxy! {
+    /// The pass-through proxy of `RedirectServiceHandlers`.
+    proto::gen_admin::services::RedirectServiceHandlers for RedirectProxy {
+        client: content_v1::redirect_service_client::RedirectServiceClient<
+            tonic::transport::Channel,
+        >,
+        behaviors: behaviors,
+        methods: [
+            pass list(pagination::PagingRequest) -> content_v1::ListRedirectsResponse,
+            pass get(content_v1::GetRedirectRequest) -> content_v1::Redirect,
+            pass create(content_v1::CreateRedirectRequest) -> content_v1::Redirect,
+            pass update(content_v1::UpdateRedirectRequest) -> content_v1::Redirect,
+            pass delete(content_v1::DeleteRedirectRequest) -> pbjson_types::Empty,
+        ]
+    }
+}
+
+passthrough_proxy! {
+    /// The pass-through proxy of `RedisCacheMonitorServiceHandlers`.
+    proto::gen_admin::services::RedisCacheMonitorServiceHandlers for RedisCacheMonitorProxy {
+        client: redis_cache_v1::redis_cache_monitor_service_client::RedisCacheMonitorServiceClient<
+            tonic::transport::Channel,
+        >,
+        behaviors: behaviors,
+        methods: [
+            pass get(redis_cache_v1::GetRedisCacheMonitorRequest)
+                -> redis_cache_v1::RedisCacheMonitorInfo,
+        ]
+    }
+}
+
+passthrough_proxy! {
+    /// The pass-through proxy of `ReviewLogServiceHandlers`.
+    proto::gen_admin::services::ReviewLogServiceHandlers for ReviewLogProxy {
+        client: content_v1::review_log_service_client::ReviewLogServiceClient<
+            tonic::transport::Channel,
+        >,
+        behaviors: behaviors,
+        methods: [
+            pass list(content_v1::ListReviewLogsRequest) -> content_v1::ListReviewLogsResponse,
         ]
     }
 }
@@ -521,6 +1009,35 @@ passthrough_proxy! {
             pass create(permission_v1::CreateRoleRequest) -> pbjson_types::Empty,
             pass update(permission_v1::UpdateRoleRequest) -> pbjson_types::Empty,
             pass delete(permission_v1::DeleteRoleRequest) -> pbjson_types::Empty,
+        ]
+    }
+}
+
+passthrough_proxy! {
+    /// The pass-through proxy of `SearchSynonymServiceHandlers`.
+    proto::gen_admin::services::SearchSynonymServiceHandlers for SearchSynonymProxy {
+        client: content_v1::search_synonym_service_client::SearchSynonymServiceClient<
+            tonic::transport::Channel,
+        >,
+        behaviors: behaviors,
+        methods: [
+            pass list(pbjson_types::Empty) -> content_v1::ListSearchSynonymsResponse,
+            pass create(content_v1::CreateSearchSynonymRequest) -> content_v1::SearchSynonym,
+            pass delete(content_v1::DeleteSearchSynonymRequest) -> pbjson_types::Empty,
+        ]
+    }
+}
+
+passthrough_proxy! {
+    /// The pass-through proxy of `ServerMonitorServiceHandlers`.
+    proto::gen_admin::services::ServerMonitorServiceHandlers for ServerMonitorProxy {
+        client: server_monitor_v1::server_monitor_service_client::ServerMonitorServiceClient<
+            tonic::transport::Channel,
+        >,
+        behaviors: behaviors,
+        methods: [
+            pass get(server_monitor_v1::GetServerMonitorRequest)
+                -> server_monitor_v1::ServerMonitorInfo,
         ]
     }
 }
@@ -558,6 +1075,50 @@ passthrough_proxy! {
 }
 
 passthrough_proxy! {
+    /// The pass-through proxy of `SocialServiceHandlers`.
+    proto::gen_admin::services::SocialServiceHandlers for SocialProxy {
+        client: social_v1::social_service_client::SocialServiceClient<tonic::transport::Channel>,
+        behaviors: behaviors,
+        methods: [
+            pass list_social_accounts(pagination::PagingRequest)
+                -> social_v1::ListSocialAccountsResponse,
+            pass get_social_account(social_v1::GetSocialAccountRequest) -> social_v1::SocialAccount,
+            pass create_social_account(social_v1::CreateSocialAccountRequest)
+                -> social_v1::SocialAccount,
+            pass update_social_account(social_v1::UpdateSocialAccountRequest)
+                -> social_v1::SocialAccount,
+            pass delete_social_account(social_v1::DeleteSocialAccountRequest)
+                -> pbjson_types::Empty,
+            pass list_social_distributions(pagination::PagingRequest)
+                -> social_v1::ListSocialDistributionsResponse,
+            pass get_social_distribution(social_v1::GetSocialDistributionRequest)
+                -> social_v1::SocialDistribution,
+            pass create_social_distribution(social_v1::CreateSocialDistributionRequest)
+                -> social_v1::SocialDistribution,
+            pass update_social_distribution(social_v1::UpdateSocialDistributionRequest)
+                -> social_v1::SocialDistribution,
+            pass delete_social_distribution(social_v1::DeleteSocialDistributionRequest)
+                -> pbjson_types::Empty,
+            pass publish_social_distribution(social_v1::PublishSocialDistributionRequest)
+                -> social_v1::SocialDistribution,
+            pass refresh_social_distribution_stats(social_v1::RefreshSocialDistributionStatsRequest)
+                -> social_v1::SocialDistribution,
+            pass list_social_distribution_stats_history(
+                social_v1::ListSocialDistributionStatsHistoryRequest
+            ) -> social_v1::ListSocialDistributionStatsHistoryResponse,
+            pass get_social_distribution_summary(pbjson_types::Empty)
+                -> social_v1::SocialDistributionSummary,
+            pass move_social_distribution(social_v1::MoveSocialDistributionRequest)
+                -> social_v1::SocialDistribution,
+            pass list_social_inbox(social_v1::ListSocialInboxRequest)
+                -> social_v1::ListSocialInboxResponse,
+            pass mark_social_inbox_read(social_v1::MarkSocialInboxReadRequest)
+                -> pbjson_types::Empty,
+        ]
+    }
+}
+
+passthrough_proxy! {
     /// The pass-through proxy of `StatsServiceHandlers`.
     proto::gen_admin::services::StatsServiceHandlers for StatsProxy {
         client: stats_v1::stats_service_client::StatsServiceClient<tonic::transport::Channel>,
@@ -571,6 +1132,14 @@ passthrough_proxy! {
                 -> stats_v1::GetInteractionStatsResponse,
             pass get_login_activity(stats_v1::GetLoginActivityRequest)
                 -> stats_v1::GetLoginActivityResponse,
+            pass get_ai_usage_trend(stats_v1::TrendRequest) -> stats_v1::GetAiUsageTrendResponse,
+            pass get_api_call_trend(stats_v1::TrendRequest) -> stats_v1::GetApiCallTrendResponse,
+            pass get_post_status_distribution(stats_v1::GetPostStatusDistributionRequest)
+                -> stats_v1::GetPostStatusDistributionResponse,
+            pass get_comment_status_distribution(stats_v1::GetCommentStatusDistributionRequest)
+                -> stats_v1::GetCommentStatusDistributionResponse,
+            pass get_media_asset_type_distribution(stats_v1::GetMediaAssetTypeDistributionRequest)
+                -> stats_v1::GetMediaAssetTypeDistributionResponse,
         ]
     }
 }
@@ -608,6 +1177,34 @@ passthrough_proxy! {
             pass control_task(task_v1::ControlTaskRequest) -> pbjson_types::Empty,
             pass list_task_executions(task_v1::ListTaskExecutionsRequest)
                 -> task_v1::ListTaskExecutionsResponse,
+            pass inspect_system_tasks(task_v1::InspectSystemTasksRequest)
+                -> task_v1::InspectSystemTasksResponse,
+        ]
+    }
+}
+
+passthrough_proxy! {
+    /// The pass-through proxy of `TenantQuotaServiceHandlers`.
+    proto::gen_admin::services::TenantQuotaServiceHandlers for TenantQuotaProxy {
+        client: identity_v1::tenant_quota_service_client::TenantQuotaServiceClient<
+            tonic::transport::Channel,
+        >,
+        behaviors: behaviors,
+        methods: [
+            pass list(pagination::PagingRequest) -> identity_v1::ListTenantQuotaResponse,
+            pass get(identity_v1::GetTenantQuotaRequest) -> identity_v1::TenantQuota,
+            pass create(identity_v1::CreateTenantQuotaRequest) -> pbjson_types::Empty,
+            pass update(identity_v1::UpdateTenantQuotaRequest) -> pbjson_types::Empty,
+            pass delete(identity_v1::DeleteTenantQuotaRequest) -> pbjson_types::Empty,
+            pass get_usage(identity_v1::GetTenantUsageRequest) -> identity_v1::TenantUsage,
+            pass get_my_tenant_usage(identity_v1::GetMyTenantUsageRequest)
+                -> identity_v1::TenantUsage,
+            pass list_quota_plans(identity_v1::ListQuotaPlansRequest)
+                -> identity_v1::ListQuotaPlansResponse,
+            pass create_quota_plan(identity_v1::CreateQuotaPlanRequest) -> identity_v1::QuotaPlan,
+            pass delete_quota_plan(identity_v1::DeleteQuotaPlanRequest) -> pbjson_types::Empty,
+            pass apply_quota_plan(identity_v1::ApplyQuotaPlanRequest)
+                -> identity_v1::ApplyQuotaPlanResponse,
         ]
     }
 }
@@ -678,6 +1275,24 @@ passthrough_proxy! {
             pass user_exists(identity_v1::UserExistsRequest) -> identity_v1::UserExistsResponse,
             hand edit_user_password(identity_v1::EditUserPasswordRequest)
                 -> pbjson_types::Empty => edit_user_password,
+        ]
+    }
+}
+
+passthrough_proxy! {
+    /// The pass-through proxy of `WebhookServiceHandlers`.
+    proto::gen_admin::services::WebhookServiceHandlers for WebhookProxy {
+        client: webhook_v1::webhook_service_client::WebhookServiceClient<tonic::transport::Channel>,
+        behaviors: behaviors,
+        methods: [
+            pass list(pagination::PagingRequest) -> webhook_v1::ListWebhookResponse,
+            pass get(webhook_v1::GetWebhookRequest) -> webhook_v1::Webhook,
+            pass create(webhook_v1::CreateWebhookRequest) -> webhook_v1::Webhook,
+            pass update(webhook_v1::UpdateWebhookRequest) -> webhook_v1::Webhook,
+            pass delete(webhook_v1::DeleteWebhookRequest) -> pbjson_types::Empty,
+            pass test_ping(webhook_v1::TestWebhookPingRequest) -> webhook_v1::WebhookDelivery,
+            pass list_deliveries(webhook_v1::ListWebhookDeliveriesRequest)
+                -> webhook_v1::ListWebhookDeliveriesResponse,
         ]
     }
 }

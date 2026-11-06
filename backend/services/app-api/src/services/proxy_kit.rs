@@ -67,6 +67,22 @@ macro_rules! passthrough_proxy {
         }
     };
 
+    // renamed — the same-service forward whose BFF method name drifted
+    // from the domain RPC name (contract-vintage renames): identical
+    // operator stamping, the domain RPC name rides as $target.
+    (@body renamed $method:ident($req:ty) -> $resp:ty => $target:ident,
+        client: $client:ty, behaviors: $behaviors:ident,
+        state: $state:expr, ctx: $ctx:expr, msg: $msg:expr) => {
+        {
+            let mut core = <$client>::new($state.core_channel.clone());
+            Ok(core
+                .$target($crate::services::with_operator($ctx, $msg))
+                .await
+                .map_err($crate::services::map_status)?
+                .into_inner())
+        }
+    };
+
     // drop — the forward whose domain response body the face discards.
     (@body drop $method:ident($req:ty) -> $resp:ty,
         client: $client:ty, behaviors: $behaviors:ident,

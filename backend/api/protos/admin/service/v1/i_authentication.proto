@@ -22,6 +22,18 @@ service AuthenticationService {
     };
   }
 
+  // 获取 OIDC 授权跳转地址（core 生成 state 暂存 Redis，防 CSRF；免鉴权）
+  rpc GetOidcAuthorizeUrl (authentication.service.v1.GetOidcAuthorizeUrlRequest) returns (authentication.service.v1.GetOidcAuthorizeUrlResponse) {
+    option (google.api.http) = {
+      post: "/admin/v1/oidc/authorize-url"
+      body: "*"
+    };
+
+    option(gnostic.openapi.v3.operation) = {
+      security: {}
+    };
+  }
+
   // 登出
   rpc Logout (google.protobuf.Empty) returns (google.protobuf.Empty) {
     option (google.api.http) = {
@@ -50,6 +62,30 @@ service AuthenticationService {
   }
 
   // 验证验证码
+  // 忘记密码（免鉴权）：发重置验证码到绑定邮箱
+  rpc ForgotPassword (authentication.service.v1.ForgotPasswordRequest) returns (google.protobuf.Empty) {
+    option (google.api.http) = {
+      post: "/admin/v1/forgot-password"
+      body: "*"
+    };
+  }
+
+  // 凭邮箱验证码重置密码（免鉴权）
+  rpc ResetPasswordByCode (authentication.service.v1.ResetPasswordByCodeRequest) returns (google.protobuf.Empty) {
+    option (google.api.http) = {
+      post: "/admin/v1/reset-password-by-code"
+      body: "*"
+    };
+  }
+
+  // 租户白标查询（免鉴权；登录页按租户编号渲染 Logo/名称）
+  rpc GetTenantBranding (authentication.service.v1.GetTenantBrandingRequest) returns (authentication.service.v1.GetTenantBrandingResponse) {
+    option (google.api.http) = {
+      post: "/admin/v1/tenant-branding"
+      body: "*"
+    };
+  }
+
   rpc VerifyCaptcha (authentication.service.v1.VerifyCaptchaRequest) returns (authentication.service.v1.VerifyCaptchaResponse) {
     option (google.api.http) = {
       post: "/admin/v1/captcha/verify"

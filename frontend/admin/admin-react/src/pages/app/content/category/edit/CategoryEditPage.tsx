@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from 'react';
 import { Button, Col, Form, Input, InputNumber, Row, Select, Switch, App } from 'antd';
+import AiGenerateButton from '@/components/common/AiGenerateButton';
 import {
   ArrowLeftOutlined,
   CheckOutlined,
@@ -20,6 +21,7 @@ import {
   fetchListContentModels,
   fetchListFieldDefinitions,
 } from '@/api/hooks/content-model';
+import CustomFieldsEditor from '@/components/content/CustomFieldsEditor';
 import { fetchListLanguages } from '@/api/hooks/language';
 import { useTranslate } from '@/api/hooks/tag';
 import { categoryStatusOptions } from '../constants';
@@ -362,21 +364,6 @@ const CategoryEditPage = () => {
     }
   };
 
-  const renderCustomField = (field: any) => {
-    switch (field.type) {
-      case 'FIELD_TYPE_RICHTEXT':
-        return (
-          <Input.TextArea
-            rows={4}
-            placeholder={field.label || field.name}
-          />
-        );
-      // RELATION 关联选择器待 content/model 子模块移植后补齐，暂以文本输入兜底
-      default:
-        return <Input placeholder={field.label || field.name} />;
-    }
-  };
-
   return (
     <ContentContainer heightMode="fixed" padding="16px" bottomMargin={0}>
       <Form
@@ -472,26 +459,37 @@ const CategoryEditPage = () => {
             </Col>
           </Row>
 
-          <Form.Item name="description" label={t('descriptionPlaceholder')}>
+          <Form.Item
+            name="description"
+            label={
+              <div style={{ display: 'flex', width: '100%', alignItems: 'center', justifyContent: 'space-between' }}>
+                <span>{t('descriptionPlaceholder')}</span>
+                <AiGenerateButton
+                  scene="DESCRIPTION"
+                  defaultTopic={form.getFieldValue('name')}
+                  onGenerate={(content) => form.setFieldValue('description', content)}
+                />
+              </div>
+            }
+          >
             <Input.TextArea rows={4} placeholder={t('descriptionPlaceholder')} />
           </Form.Item>
 
           {/* 动态字段表单：由绑定的内容模型字段定义驱动 */}
           <Form.Item
             noStyle
-            shouldUpdate={(prev, cur) => prev.contentModelId !== cur.contentModelId}
+            shouldUpdate={(prev, cur) =>
+              prev.contentModelId !== cur.contentModelId ||
+              prev.customFields !== cur.customFields
+            }
           >
-            {() => {
-              return fieldDefinitions.map((field) => (
-                <Form.Item
-                  key={field.id}
-                  name={['customFields', field.name ?? '']}
-                  label={field.label || field.name}
-                >
-                  {renderCustomField(field)}
-                </Form.Item>
-              ));
-            }}
+            {() => (
+              <CustomFieldsEditor
+                fields={fieldDefinitions}
+                value={form.getFieldValue('customFields')}
+                onChange={(next) => form.setFieldValue('customFields', next)}
+              />
+            )}
           </Form.Item>
         </div>
       </Form>

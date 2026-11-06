@@ -38,10 +38,10 @@ case "$FRONTEND" in
 
     replace src/locales/zh-CN/_core/auth.json \
       -e 's/风行CMS后台管理系统/锐风CMS后台管理系统/' \
-      -e 's/Copyright © {year} GoWind/Copyright © {year} RushWind/'
+      -e 's/Copyright © {{year}} GoWind/Copyright © {{year}} RushWind/'
 
     replace src/locales/en-US/_core/auth.json \
-      -e 's/Copyright © {year} GoWind/Copyright © {year} RushWind/'
+      -e 's/Copyright © {{year}} GoWind/Copyright © {{year}} RushWind/'
 
     replace index.html \
       -e 's/content="GoWind CMS React AntD Vite"/content="RushWind CMS React AntD Vite"/' \
@@ -49,11 +49,16 @@ case "$FRONTEND" in
 
     replace .env \
       -e 's/VITE_APP_TITLE="GoWind CMS Admin"/VITE_APP_TITLE="RushWind CMS Admin"/' \
+      -e 's/VITE_APP_TITLE="GoWind Content Hub"/VITE_APP_TITLE="RushWind Content Hub"/' \
       -e 's/VITE_APP_NAMESPACE="gowind-cms"/VITE_APP_NAMESPACE="rushwind-cms"/'
 
     replace .env.production \
       -e 's|api.demo.admin.gowind.cloud|api.demo.admin.rushwind.cloud|' \
       -e 's|sse.demo.admin.gowind.cloud|sse.demo.admin.rushwind.cloud|'
+
+    # 通知渠道表单的示例签名占位（用户可见，2026-11 批次新增页面）。
+    replace src/pages/app/notification/channel/index.tsx \
+      -e 's/placeholder="GoWind"/placeholder="RushWind"/'
     ;;
   *)
     echo "ERROR: no brand rules for frontend '$FRONTEND'" >&2

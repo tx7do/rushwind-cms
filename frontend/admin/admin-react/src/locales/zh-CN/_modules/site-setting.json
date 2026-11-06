@@ -44,7 +44,6 @@
   "updateFailed": "更新失败",
   "deleteSuccess": "删除成功",
   "deleteFailed": "删除失败",
-  "fetchFailed": "加载失败",
   "typeMap": {
     "SETTING_TYPE_TEXT": "单行文本",
     "SETTING_TYPE_TEXTAREA": "多行文本",

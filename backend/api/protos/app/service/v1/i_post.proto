@@ -8,9 +8,33 @@ import "google/protobuf/empty.proto";
 
 import "pagination/v1/pagination.proto";
 import "content/service/v1/post.proto";
+import "content/service/v1/content_model.proto";
 
 // 帖子服务
 service PostService {
+
+  // 按文章取其分类链绑定的内容模型（C 端渲染 custom_fields 用；免鉴权）
+  rpc GetPostContentModel (content.service.v1.GetModelByPostRequest) returns (content.service.v1.ContentModel) {
+    option (google.api.http) = {
+      get: "/app/v1/posts/{post_id}/content-model"
+    };
+
+    option(gnostic.openapi.v3.operation) = {
+      security: {}
+    };
+  }
+
+  // 批量解析 RELATION 字段引用（"post:12"/"page:7"）为目标内容摘要
+  // （C 端渲染关联卡片用；免鉴权；仅解析 PUBLISHED 目标）
+  rpc ResolveContentReferences (content.service.v1.ResolveContentReferencesRequest) returns (content.service.v1.ResolveContentReferencesResponse) {
+    option (google.api.http) = {
+      get: "/app/v1/content-references/resolve"
+    };
+
+    option(gnostic.openapi.v3.operation) = {
+      security: {}
+    };
+  }
   // 获取帖子列表
   rpc List (pagination.PagingRequest) returns (content.service.v1.ListPostResponse) {
     option (google.api.http) = {
@@ -25,6 +49,17 @@ service PostService {
   rpc SearchPosts (content.service.v1.SearchPostsRequest) returns (content.service.v1.SearchPostsResponse) {
     option (google.api.http) = {
       get: "/app/v1/posts/search"
+    };
+  }
+
+  // 搜索建议词（标题前缀联想；免鉴权）
+  rpc SearchPostsSuggest (content.service.v1.SearchPostsSuggestRequest) returns (content.service.v1.SearchPostsSuggestResponse) {
+    option (google.api.http) = {
+      get: "/app/v1/posts/search/suggest"
+    };
+
+    option(gnostic.openapi.v3.operation) = {
+      security: {}
     };
   }
 
@@ -64,4 +99,22 @@ service PostService {
       get: "/app/v1/posts/{id}/translation"
     };
   }
+
+  // 按 slug 获取帖子（公开，SEO 路由 /post/{slug} 的数据源）
+  rpc GetBySlug (GetPostBySlugRequest) returns (content.service.v1.Post) {
+    option (google.api.http) = {
+      get: "/app/v1/posts/by-slug/{slug}"
+    };
+  }
+}
+
+// 请求 - 按 slug 获取帖子
+message GetPostBySlugRequest {
+  string slug = 1 [
+    (gnostic.openapi.v3.property) = {description: "帖子 slug（任一语言翻译的 slug）"}
+  ];
+
+  string locale = 2 [
+    (gnostic.openapi.v3.property) = {description: "语言代码"}
+  ];
 }

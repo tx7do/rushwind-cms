@@ -92,12 +92,12 @@ class MessageLookup extends MessageLookupByLibrary {
     ),
     "contactEmail": MessageLookupByLibrary.simpleMessage("Email"),
     "contactEmailDesc": MessageLookupByLibrary.simpleMessage(
-      "You can reach us via email at support@gowind.dev for any questions, suggestions or feedback. We typically respond within 1-2 business days.",
+      "You can reach us via email at support@rushwind.dev for any questions, suggestions or feedback. We typically respond within 1-2 business days.",
     ),
     "contactUs": MessageLookupByLibrary.simpleMessage("Contact Us"),
     "contactWebsite": MessageLookupByLibrary.simpleMessage("Website"),
     "contactWebsiteDesc": MessageLookupByLibrary.simpleMessage(
-      "Visit our official website gowind.dev for the latest updates, documentation, and community resources.",
+      "Visit our official website rushwind.dev for the latest updates, documentation, and community resources.",
     ),
     "dark": MessageLookupByLibrary.simpleMessage("Dark"),
     "darkMode": MessageLookupByLibrary.simpleMessage("Dark Mode"),

@@ -20,6 +20,15 @@ export const contentRoutes: AppRouteObject[] = [
     },
     children: [
       {
+        name: 'calendar',
+        path: 'calendar', // 相对路径，最终为 /content/calendar
+        element: createLazyRoute(() => import('@/pages/app/content/calendar')),
+        meta: {
+          title: 'routes:calendar',
+          icon: 'lucide:calendar-days',
+        },
+      },
+      {
         name: 'content-categories',
         path: 'categories',
         element: createLazyRoute(() => import('@/pages/app/content/category')),
@@ -47,6 +56,17 @@ export const contentRoutes: AppRouteObject[] = [
         meta: {
           title: 'routes:content-edit-category',
           hideInMenu: true,
+          authority: ['sys:platform_admin', 'sys:tenant_manager'],
+        },
+      },
+      {
+        name: 'content-components',
+        path: 'components',
+        element: createLazyRoute(() => import('@/pages/app/content/component')),
+        meta: {
+          title: 'routes:content-components',
+          icon: 'lucide:component',
+          order: 9,
           authority: ['sys:platform_admin', 'sys:tenant_manager'],
         },
       },
@@ -157,6 +177,28 @@ export const contentRoutes: AppRouteObject[] = [
           title: 'routes:content-edit-tag',
           hideInMenu: true,
           hideInTab: false,
+          authority: ['sys:platform_admin', 'sys:tenant_manager'],
+        },
+      },
+      {
+        name: 'content-form-submissions',
+        path: 'form-submissions',
+        element: createLazyRoute(() => import('@/pages/app/content/form-submissions')),
+        meta: {
+          title: 'routes:content-form-submissions',
+          icon: 'lucide:inbox',
+          order: 9,
+          authority: ['sys:platform_admin', 'sys:tenant_manager'],
+        },
+      },
+      {
+        name: 'content-experiments',
+        path: 'experiments',
+        element: createLazyRoute(() => import('@/pages/app/content/experiments')),
+        meta: {
+          title: 'routes:content-experiments',
+          icon: 'lucide:flask-conical',
+          order: 10,
           authority: ['sys:platform_admin', 'sys:tenant_manager'],
         },
       },

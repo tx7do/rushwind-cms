@@ -94,4 +94,20 @@ impl proto::gen_app::services::AuthenticationServiceHandlers for AuthenticationS
             .map_err(map_status)?
             .into_inner())
     }
+
+    // 2026-11 契约批次新增：OIDC 登录的前置步骤（登录页尚无 token），
+    // 纯转发——state 防 CSRF 由 core 生成校验。
+    async fn get_oidc_authorize_url(
+        &self,
+        _ctx: Ctx,
+        req: proto::proto::authentication::service::v1::GetOidcAuthorizeUrlRequest,
+    ) -> Result<proto::proto::authentication::service::v1::GetOidcAuthorizeUrlResponse, StatusError>
+    {
+        let mut core = self.state.core.clone();
+        Ok(core
+            .get_oidc_authorize_url(tonic::Request::new(req))
+            .await
+            .map_err(map_status)?
+            .into_inner())
+    }
 }

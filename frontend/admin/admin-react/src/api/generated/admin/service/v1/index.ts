@@ -125,204 +125,44 @@ export type AdminErrorReason =
   | 'USER_NOT_FOUND'
   // 506
   | 'VARIANT_ALSO_NEGOTIATES';
-// 查询路由列表 - 回应
-export type ListRouteResponse = {
-  items: permissionservicev1_MenuRouteItem[] | undefined;
-};
-
-// 路由项
-export type permissionservicev1_MenuRouteItem = {
-  //
-  // Behaviors: OPTIONAL
-  alias?: string;
-  children: permissionservicev1_MenuRouteItem[] | undefined;
-  //
-  // Behaviors: OPTIONAL
-  component?: string;
-  //
-  // Behaviors: OPTIONAL
-  meta?: permissionservicev1_MenuMeta;
-  //
-  // Behaviors: OPTIONAL
-  name?: string;
-  //
-  // Behaviors: OPTIONAL
-  path?: string;
-  //
-  // Behaviors: OPTIONAL
-  redirect?: string;
-};
-
-// 路由元信息
-export type permissionservicev1_MenuMeta = {
-  //
-  // Behaviors: OPTIONAL
-  activeIcon?: string;
-  //
-  // Behaviors: OPTIONAL
-  activePath?: string;
-  //
-  // Behaviors: OPTIONAL
-  affixTab?: boolean;
-  //
-  // Behaviors: OPTIONAL
-  affixTabOrder?: number;
-  //
-  // Behaviors: OPTIONAL
-  authority: string[] | undefined;
-  //
-  // Behaviors: OPTIONAL
-  badge?: string;
-  //
-  // Behaviors: OPTIONAL
-  badgeType?: string;
-  //
-  // Behaviors: OPTIONAL
-  badgeVariants?: string;
-  //
-  // Behaviors: OPTIONAL
-  hideChildrenInMenu?: boolean;
-  //
-  // Behaviors: OPTIONAL
-  hideInBreadcrumb?: boolean;
-  //
-  // Behaviors: OPTIONAL
-  hideInMenu?: boolean;
-  //
-  // Behaviors: OPTIONAL
-  hideInTab?: boolean;
-  //
-  // Behaviors: OPTIONAL
-  icon?: string;
-  //
-  // Behaviors: OPTIONAL
-  iframeSrc?: string;
-  //
-  // Behaviors: OPTIONAL
-  ignoreAccess?: boolean;
-  //
-  // Behaviors: OPTIONAL
-  keepAlive?: boolean;
-  //
-  // Behaviors: OPTIONAL
-  link?: string;
-  //
-  // Behaviors: OPTIONAL
-  loaded?: boolean;
-  //
-  // Behaviors: OPTIONAL
-  maxNumOfOpenTab?: number;
-  //
-  // Behaviors: OPTIONAL
-  menuVisibleWithForbidden?: boolean;
-  //
-  // Behaviors: OPTIONAL
-  openInNewWindow?: boolean;
-  //
-  // Behaviors: OPTIONAL
-  order?: number;
-  //
-  // Behaviors: OPTIONAL
-  title?: string;
-};
-
-// 查询权限码列表 - 回应
-export type ListPermissionCodeResponse = {
-  codes: string[] | undefined;
-};
-
-export type InitialContextResponse = {
-  menus: permissionservicev1_MenuRouteItem[] | undefined;
-  permissions: string[] | undefined;
-};
-
-// 后台前端初始化数据与配置服务
-export interface AdminPortalService {
-  // 查询前端路由表
-  GetNavigation(
-    request: wellKnownEmpty,
-  ): Promise<ListRouteResponse>;
-  // 查询权限码列表
-  GetMyPermissionCode(
-    request: wellKnownEmpty,
-  ): Promise<ListPermissionCodeResponse>;
-  // 一次性获取进入后台所需的所有上下文
-  GetInitialContext(
-    request: wellKnownEmpty,
-  ): Promise<InitialContextResponse>;
-}
-
-export function createAdminPortalServiceClient(
-  transport: ClientTransport,
-): AdminPortalService {
-  return {
-    GetNavigation(_request) {
-      const path = `admin/v1/routes`;
-      const body = null;
-      return transport.unary(path, 'GET', body, {
-        service: 'AdminPortalService',
-        method: 'GetNavigation',
-      }) as Promise<ListRouteResponse>;
-    },
-    GetMyPermissionCode(_request) {
-      const path = `admin/v1/perm-codes`;
-      const body = null;
-      return transport.unary(path, 'GET', body, {
-        service: 'AdminPortalService',
-        method: 'GetMyPermissionCode',
-      }) as Promise<ListPermissionCodeResponse>;
-    },
-    GetInitialContext(_request) {
-      const path = `admin/v1/initial-context`;
-      const body = null;
-      return transport.unary(path, 'GET', body, {
-        service: 'AdminPortalService',
-        method: 'GetInitialContext',
-      }) as Promise<InitialContextResponse>;
-    },
-  };
-}
-// An empty JSON object
-type wellKnownEmpty = Record<never, never>;
-
-// API资源管理服务
-export interface ApiService {
-  // 查询API资源列表
+// OpenAPI 访问凭证（AK/SK）管理 — BFF
+export interface AccessKeyService {
+  // 分页查询访问凭证列表
   List(
     request: pagination_PagingRequest,
-  ): Promise<permissionservicev1_ListApiResponse>;
-  // 查询API资源详情
+  ): Promise<access_keyservicev1_ListAccessKeyResponse>;
+  // 查询访问凭证详情
   Get(
-    request: permissionservicev1_GetApiRequest,
-  ): Promise<permissionservicev1_Api>;
-  // 创建API资源
+    request: access_keyservicev1_GetAccessKeyRequest,
+  ): Promise<access_keyservicev1_AccessKey>;
+  // 创建访问凭证（响应中的 secret 仅本次明文返回，服务端只存 SHA-256 摘要）
   Create(
-    request: permissionservicev1_CreateApiRequest,
-  ): Promise<wellKnownEmpty>;
-  // 更新API资源
+    request: access_keyservicev1_CreateAccessKeyRequest,
+  ): Promise<access_keyservicev1_CreateAccessKeyResponse>;
+  // 更新访问凭证（名称/状态/过期时间）
   Update(
-    request: permissionservicev1_UpdateApiRequest,
+    request: access_keyservicev1_UpdateAccessKeyRequest,
   ): Promise<wellKnownEmpty>;
-  // 删除API资源
+  // 删除访问凭证
   Delete(
-    request: permissionservicev1_DeleteApiRequest,
+    request: access_keyservicev1_DeleteAccessKeyRequest,
   ): Promise<wellKnownEmpty>;
-  // 同步API资源
-  SyncApis(
-    request: wellKnownEmpty,
-  ): Promise<wellKnownEmpty>;
-  // 查询路由数据
-  GetWalkRouteData(
-    request: wellKnownEmpty,
-  ): Promise<permissionservicev1_ListApiResponse>;
+  // 重置密钥：生成新 Secret（响应明文返回一次）
+  ResetSecret(
+    request: access_keyservicev1_ResetAccessKeySecretRequest,
+  ): Promise<access_keyservicev1_CreateAccessKeyResponse>;
+  // 令牌交换（机器对机器）：AK/SK 换短期 JWT。免鉴权端点——本身即是认证。
+  IssueToken(
+    request: access_keyservicev1_IssueTokenRequest,
+  ): Promise<access_keyservicev1_IssueTokenResponse>;
 }
 
-export function createApiServiceClient(
+export function createAccessKeyServiceClient(
   transport: ClientTransport,
-): ApiService {
+): AccessKeyService {
   return {
     List(request) {
-      const path = `admin/v1/apis`;
+      const path = `/admin/v1/access-keys`;
       const body = null;
       const queryParams: string[] = [];
       if (request.page) {
@@ -370,56 +210,9 @@ export function createApiServiceClient(
           `filterExpr.type=${encodeURIComponent(request.filterExpr.type.toString())}`,
         );
       }
-      if (request.filterExpr?.conditions?.field) {
-        queryParams.push(
-          `filterExpr.conditions.field=${encodeURIComponent(request.filterExpr.conditions.field.toString())}`,
-        );
-      }
-      if (request.filterExpr?.conditions?.op) {
-        queryParams.push(
-          `filterExpr.conditions.op=${encodeURIComponent(request.filterExpr.conditions.op.toString())}`,
-        );
-      }
-      if (request.filterExpr?.conditions?.value) {
-        queryParams.push(
-          `filterExpr.conditions.value=${encodeURIComponent(request.filterExpr.conditions.value.toString())}`,
-        );
-      }
-      if (request.filterExpr?.conditions?.jsonValue) {
-        queryParams.push(
-          `filterExpr.conditions.jsonValue=${encodeURIComponent(request.filterExpr.conditions.jsonValue.toString())}`,
-        );
-      }
-      if (request.filterExpr?.conditions?.values) {
-        request.filterExpr.conditions.values.forEach((x) => {
-          queryParams.push(
-            `filterExpr.conditions.values=${encodeURIComponent(x.toString())}`,
-          );
-        });
-      }
-      if (request.filterExpr?.conditions?.datePart) {
-        queryParams.push(
-          `filterExpr.conditions.datePart=${encodeURIComponent(request.filterExpr.conditions.datePart.toString())}`,
-        );
-      }
-      if (request.filterExpr?.conditions?.jsonPath) {
-        queryParams.push(
-          `filterExpr.conditions.jsonPath=${encodeURIComponent(request.filterExpr.conditions.jsonPath.toString())}`,
-        );
-      }
       if (request.orderBy) {
         queryParams.push(
           `orderBy=${encodeURIComponent(request.orderBy.toString())}`,
-        );
-      }
-      if (request.sorting?.field) {
-        queryParams.push(
-          `sorting.field=${encodeURIComponent(request.sorting.field.toString())}`,
-        );
-      }
-      if (request.sorting?.direction) {
-        queryParams.push(
-          `sorting.direction=${encodeURIComponent(request.sorting.direction.toString())}`,
         );
       }
       if (request.fieldMask) {
@@ -432,17 +225,22 @@ export function createApiServiceClient(
         uri += `?${queryParams.join('&')}`;
       }
       return transport.unary(uri, 'GET', body, {
-        service: 'ApiService',
+        service: 'AccessKeyService',
         method: 'List',
-      }) as Promise<permissionservicev1_ListApiResponse>;
+      }) as Promise<access_keyservicev1_ListAccessKeyResponse>;
     },
     Get(request) {
       if (request.id === undefined || request.id === null) {
         throw new Error('missing required field request.id');
       }
-      const path = `admin/v1/apis/${request.id}`;
+      const path = `/admin/v1/access-keys/${request.id}`;
       const body = null;
       const queryParams: string[] = [];
+      if (request.accessKey) {
+        queryParams.push(
+          `accessKey=${encodeURIComponent(request.accessKey.toString())}`,
+        );
+      }
       if (request.viewMask) {
         queryParams.push(
           `viewMask=${encodeURIComponent(request.viewMask.toString())}`,
@@ -453,26 +251,28 @@ export function createApiServiceClient(
         uri += `?${queryParams.join('&')}`;
       }
       return transport.unary(uri, 'GET', body, {
-        service: 'ApiService',
+        service: 'AccessKeyService',
         method: 'Get',
-      }) as Promise<permissionservicev1_Api>;
+      }) as Promise<access_keyservicev1_AccessKey>;
     },
     Create(request) {
-      const path = `admin/v1/apis`;
+      const path = `/admin/v1/access-keys`;
       const body = JSON.stringify(request);
       return transport.unary(path, 'POST', body, {
-        service: 'ApiService',
+        service: 'AccessKeyService',
         method: 'Create',
-      }) as Promise<wellKnownEmpty>;
+      }) as Promise<access_keyservicev1_CreateAccessKeyResponse>;
     },
     Update(request) {
       if (request.id === undefined || request.id === null) {
         throw new Error('missing required field request.id');
       }
-      const path = `admin/v1/apis/${request.id}`;
-      const body = JSON.stringify(request);
+      const path = `/admin/v1/access-keys/${request.id}`;
+      const bodyMap = { ...request } as Record<string, unknown>;
+      delete bodyMap["id"];
+      const body = JSON.stringify(bodyMap);
       return transport.unary(path, 'PUT', body, {
-        service: 'ApiService',
+        service: 'AccessKeyService',
         method: 'Update',
       }) as Promise<wellKnownEmpty>;
     },
@@ -480,28 +280,33 @@ export function createApiServiceClient(
       if (request.id === undefined || request.id === null) {
         throw new Error('missing required field request.id');
       }
-      const path = `admin/v1/apis/${request.id}`;
+      const path = `/admin/v1/access-keys/${request.id}`;
       const body = null;
       return transport.unary(path, 'DELETE', body, {
-        service: 'ApiService',
+        service: 'AccessKeyService',
         method: 'Delete',
       }) as Promise<wellKnownEmpty>;
     },
-    SyncApis(request) {
-      const path = `admin/v1/apis/sync`;
+    ResetSecret(request) {
+      if (request.id === undefined || request.id === null) {
+        throw new Error('missing required field request.id');
+      }
+      const path = `/admin/v1/access-keys/${request.id}/secret`;
+      const bodyMap = { ...request } as Record<string, unknown>;
+      delete bodyMap["id"];
+      const body = JSON.stringify(bodyMap);
+      return transport.unary(path, 'PUT', body, {
+        service: 'AccessKeyService',
+        method: 'ResetSecret',
+      }) as Promise<access_keyservicev1_CreateAccessKeyResponse>;
+    },
+    IssueToken(request) {
+      const path = `/admin/v1/access-keys/token`;
       const body = JSON.stringify(request);
       return transport.unary(path, 'POST', body, {
-        service: 'ApiService',
-        method: 'SyncApis',
-      }) as Promise<wellKnownEmpty>;
-    },
-    GetWalkRouteData(_request) {
-      const path = `admin/v1/apis/walk-route`;
-      const body = null;
-      return transport.unary(path, 'GET', body, {
-        service: 'ApiService',
-        method: 'GetWalkRouteData',
-      }) as Promise<permissionservicev1_ListApiResponse>;
+        service: 'AccessKeyService',
+        method: 'IssueToken',
+      }) as Promise<access_keyservicev1_IssueTokenResponse>;
     },
   };
 }
@@ -668,38 +473,31 @@ export type pagination_Sorting_Direction =
 //     }
 type wellKnownFieldMask = string;
 
-// 查询列表 - 回应
-export type permissionservicev1_ListApiResponse = {
-  items: permissionservicev1_Api[] | undefined;
+// 查询访问凭证列表 - 回应
+export type access_keyservicev1_ListAccessKeyResponse = {
+  items: access_keyservicev1_AccessKey[] | undefined;
   total: number | undefined;
 };
 
-// API资源
-export type permissionservicev1_Api = {
+// OpenAPI 访问凭证（AK/SK）
+export type access_keyservicev1_AccessKey = {
+  accessKey?: string;
   createdAt?: wellKnownTimestamp;
   createdBy?: number;
   deletedAt?: wellKnownTimestamp;
   deletedBy?: number;
-  description?: string;
+  expiresAt?: wellKnownTimestamp;
   id?: number;
-  method?: string;
-  module?: string;
-  moduleDescription?: string;
-  operation?: string;
-  path?: string;
-  scope?: permissionservicev1_Api_Scope;
-  status?: permissionservicev1_Api_Status;
+  lastUsedAt?: wellKnownTimestamp;
+  name?: string;
+  status?: access_keyservicev1_AccessKey_Status;
+  tenantId?: number;
   updatedAt?: wellKnownTimestamp;
   updatedBy?: number;
 };
 
-// API作用域
-export type permissionservicev1_Api_Scope =
-  | 'ADMIN'
-  | 'API_SCOPE_INVALID'
-  | 'APP';
-// 权限状态
-export type permissionservicev1_Api_Status =
+// 凭证状态
+export type access_keyservicev1_AccessKey_Status =
   | 'OFF'
   | 'ON';
 // Encoded using RFC 3339, where generated output will always be Z-normalized
@@ -707,48 +505,266 @@ export type permissionservicev1_Api_Status =
 // Offsets other than "Z" are also accepted.
 type wellKnownTimestamp = string;
 
-// 查询 - 请求
-export type permissionservicev1_GetApiRequest = {
+// 查询访问凭证详情 - 请求
+export type access_keyservicev1_GetAccessKeyRequest = {
+  accessKey?: string;
   id?: number;
   viewMask?: wellKnownFieldMask;
 };
 
-// 创建 - 请求
-export type permissionservicev1_CreateApiRequest = {
-  data: permissionservicev1_Api | undefined;
+// 创建访问凭证 - 请求
+export type access_keyservicev1_CreateAccessKeyRequest = {
+  data: access_keyservicev1_AccessKey | undefined;
 };
 
-// 更新 - 请求
-export type permissionservicev1_UpdateApiRequest = {
+// 创建访问凭证 - 回应（secret 仅本次明文返回，服务端只存 SHA-256 摘要）
+export type access_keyservicev1_CreateAccessKeyResponse = {
+  data: access_keyservicev1_AccessKey | undefined;
+  secret: string | undefined;
+};
+
+// 更新访问凭证 - 请求
+export type access_keyservicev1_UpdateAccessKeyRequest = {
   allowMissing?: boolean;
-  data: permissionservicev1_Api | undefined;
+  data: access_keyservicev1_AccessKey | undefined;
   id: number | undefined;
   updateMask: undefined | wellKnownFieldMask;
 };
 
-// 删除 - 请求
-export type permissionservicev1_DeleteApiRequest = {
-  id?: number;
+// An empty JSON object
+type wellKnownEmpty = Record<never, never>;
+
+// 删除访问凭证 - 请求
+export type access_keyservicev1_DeleteAccessKeyRequest = {
+  id: number | undefined;
 };
 
-// API审计日志管理服务
-export interface ApiAuditLogService {
-  // 查询API审计日志列表
-  List(
-    request: pagination_PagingRequest,
-  ): Promise<auditservicev1_ListApiAuditLogResponse>;
-  // 查询API审计日志详情
-  Get(
-    request: auditservicev1_GetApiAuditLogRequest,
-  ): Promise<auditservicev1_ApiAuditLog>;
+// 重置密钥 - 请求
+export type access_keyservicev1_ResetAccessKeySecretRequest = {
+  id: number | undefined;
+};
+
+// 令牌交换 - 请求（机器对机器：AK/SK 换取短期 JWT）
+export type access_keyservicev1_IssueTokenRequest = {
+  accessKey: string | undefined;
+  // 与上游不同：CMS 的 core 无法感知 HTTP 层，调用方 IP 由 admin BFF 从
+  // HTTP 请求解析后注入（ClientRealIP），用于交换端点的防爆破限流计数。
+  clientIp?: string;
+  secret: string | undefined;
+};
+
+// 令牌交换 - 回应
+export type access_keyservicev1_IssueTokenResponse = {
+  accessToken: string | undefined;
+  expiresIn: number | undefined;
+  tokenType: string | undefined;
+};
+
+// 查询路由列表 - 回应
+export type ListRouteResponse = {
+  items: permissionservicev1_MenuRouteItem[] | undefined;
+};
+
+// 路由项
+export type permissionservicev1_MenuRouteItem = {
+  //
+  // Behaviors: OPTIONAL
+  alias?: string;
+  children: permissionservicev1_MenuRouteItem[] | undefined;
+  //
+  // Behaviors: OPTIONAL
+  component?: string;
+  //
+  // Behaviors: OPTIONAL
+  meta?: permissionservicev1_MenuMeta;
+  //
+  // Behaviors: OPTIONAL
+  name?: string;
+  //
+  // Behaviors: OPTIONAL
+  path?: string;
+  //
+  // Behaviors: OPTIONAL
+  redirect?: string;
+};
+
+// 路由元信息
+export type permissionservicev1_MenuMeta = {
+  //
+  // Behaviors: OPTIONAL
+  activeIcon?: string;
+  //
+  // Behaviors: OPTIONAL
+  activePath?: string;
+  //
+  // Behaviors: OPTIONAL
+  affixTab?: boolean;
+  //
+  // Behaviors: OPTIONAL
+  affixTabOrder?: number;
+  //
+  // Behaviors: OPTIONAL
+  authority: string[] | undefined;
+  //
+  // Behaviors: OPTIONAL
+  badge?: string;
+  //
+  // Behaviors: OPTIONAL
+  badgeType?: string;
+  //
+  // Behaviors: OPTIONAL
+  badgeVariants?: string;
+  //
+  // Behaviors: OPTIONAL
+  hideChildrenInMenu?: boolean;
+  //
+  // Behaviors: OPTIONAL
+  hideInBreadcrumb?: boolean;
+  //
+  // Behaviors: OPTIONAL
+  hideInMenu?: boolean;
+  //
+  // Behaviors: OPTIONAL
+  hideInTab?: boolean;
+  //
+  // Behaviors: OPTIONAL
+  icon?: string;
+  //
+  // Behaviors: OPTIONAL
+  iframeSrc?: string;
+  //
+  // Behaviors: OPTIONAL
+  ignoreAccess?: boolean;
+  //
+  // Behaviors: OPTIONAL
+  keepAlive?: boolean;
+  //
+  // Behaviors: OPTIONAL
+  link?: string;
+  //
+  // Behaviors: OPTIONAL
+  loaded?: boolean;
+  //
+  // Behaviors: OPTIONAL
+  maxNumOfOpenTab?: number;
+  //
+  // Behaviors: OPTIONAL
+  menuVisibleWithForbidden?: boolean;
+  //
+  // Behaviors: OPTIONAL
+  openInNewWindow?: boolean;
+  //
+  // Behaviors: OPTIONAL
+  order?: number;
+  //
+  // Behaviors: OPTIONAL
+  title?: string;
+};
+
+// 查询权限码列表 - 回应
+export type ListPermissionCodeResponse = {
+  codes: string[] | undefined;
+  // 字段权限隐藏字段集（"资源.字段" 串数组；平台用户为空）
+  hiddenFields: string[] | undefined;
+};
+
+export type InitialContextResponse = {
+  menus: permissionservicev1_MenuRouteItem[] | undefined;
+  permissions: string[] | undefined;
+};
+
+// 后台前端初始化数据与配置服务
+export interface AdminPortalService {
+  // 查询前端路由表
+  GetNavigation(
+    request: wellKnownEmpty,
+  ): Promise<ListRouteResponse>;
+  // 查询权限码列表
+  GetMyPermissionCode(
+    request: wellKnownEmpty,
+  ): Promise<ListPermissionCodeResponse>;
+  // 一次性获取进入后台所需的所有上下文
+  GetInitialContext(
+    request: wellKnownEmpty,
+  ): Promise<InitialContextResponse>;
 }
 
-export function createApiAuditLogServiceClient(
+export function createAdminPortalServiceClient(
   transport: ClientTransport,
-): ApiAuditLogService {
+): AdminPortalService {
+  return {
+    GetNavigation(_request) {
+      const path = `/admin/v1/routes`;
+      const body = null;
+      return transport.unary(path, 'GET', body, {
+        service: 'AdminPortalService',
+        method: 'GetNavigation',
+      }) as Promise<ListRouteResponse>;
+    },
+    GetMyPermissionCode(_request) {
+      const path = `/admin/v1/perm-codes`;
+      const body = null;
+      return transport.unary(path, 'GET', body, {
+        service: 'AdminPortalService',
+        method: 'GetMyPermissionCode',
+      }) as Promise<ListPermissionCodeResponse>;
+    },
+    GetInitialContext(_request) {
+      const path = `/admin/v1/initial-context`;
+      const body = null;
+      return transport.unary(path, 'GET', body, {
+        service: 'AdminPortalService',
+        method: 'GetInitialContext',
+      }) as Promise<InitialContextResponse>;
+    },
+  };
+}
+// AI Agent 编排管理服务（可视化画布）
+export interface AiAgentService {
+  // 分页查询 Agent 应用列表
+  List(
+    request: pagination_PagingRequest,
+  ): Promise<aiservicev1_ListAiAgentAppsResponse>;
+  // 查询 Agent 应用详情
+  Get(
+    request: aiservicev1_GetAiAgentAppRequest,
+  ): Promise<aiservicev1_AiAgentApp>;
+  // 创建 Agent 应用
+  Create(
+    request: aiservicev1_CreateAiAgentAppRequest,
+  ): Promise<aiservicev1_AiAgentApp>;
+  // 更新 Agent 应用
+  Update(
+    request: aiservicev1_UpdateAiAgentAppRequest,
+  ): Promise<wellKnownEmpty>;
+  // 删除 Agent 应用
+  Delete(
+    request: aiservicev1_DeleteAiAgentAppRequest,
+  ): Promise<wellKnownEmpty>;
+  // 试运行（同步执行图，返回含 trace 的运行记录）
+  // 审批裁决运行（WAITING_APPROVAL → 继续/驳回）
+  ApproveRun(
+    request: aiservicev1_ApproveAgentRunRequest,
+  ): Promise<aiservicev1_AiAgentRun>;
+  Run(
+    request: aiservicev1_RunAiAgentAppRequest,
+  ): Promise<aiservicev1_AiAgentRun>;
+  // 查询运行台账（appId eq 过滤走 PagingRequest；独立集合路径，避免与 /{id} 参数路由抢配）
+  ListRuns(
+    request: pagination_PagingRequest,
+  ): Promise<aiservicev1_ListAiAgentRunsResponse>;
+  // 查询运行详情（含 trace JSON）
+  GetRun(
+    request: aiservicev1_GetAiAgentRunRequest,
+  ): Promise<aiservicev1_AiAgentRun>;
+}
+
+export function createAiAgentServiceClient(
+  transport: ClientTransport,
+): AiAgentService {
   return {
     List(request) {
-      const path = `admin/v1/api-audit-logs`;
+      const path = `/admin/v1/ai/agents`;
       const body = null;
       const queryParams: string[] = [];
       if (request.page) {
@@ -796,41 +812,141 @@ export function createApiAuditLogServiceClient(
           `filterExpr.type=${encodeURIComponent(request.filterExpr.type.toString())}`,
         );
       }
-      if (request.filterExpr?.conditions?.field) {
+      if (request.orderBy) {
         queryParams.push(
-          `filterExpr.conditions.field=${encodeURIComponent(request.filterExpr.conditions.field.toString())}`,
+          `orderBy=${encodeURIComponent(request.orderBy.toString())}`,
         );
       }
-      if (request.filterExpr?.conditions?.op) {
+      if (request.fieldMask) {
         queryParams.push(
-          `filterExpr.conditions.op=${encodeURIComponent(request.filterExpr.conditions.op.toString())}`,
+          `fieldMask=${encodeURIComponent(request.fieldMask.toString())}`,
         );
       }
-      if (request.filterExpr?.conditions?.value) {
+      let uri = path;
+      if (queryParams.length > 0) {
+        uri += `?${queryParams.join('&')}`;
+      }
+      return transport.unary(uri, 'GET', body, {
+        service: 'AiAgentService',
+        method: 'List',
+      }) as Promise<aiservicev1_ListAiAgentAppsResponse>;
+    },
+    Get(request) {
+      if (request.id === undefined || request.id === null) {
+        throw new Error('missing required field request.id');
+      }
+      const path = `/admin/v1/ai/agents/${request.id}`;
+      const body = null;
+      return transport.unary(path, 'GET', body, {
+        service: 'AiAgentService',
+        method: 'Get',
+      }) as Promise<aiservicev1_AiAgentApp>;
+    },
+    Create(request) {
+      const path = `/admin/v1/ai/agents`;
+      const body = JSON.stringify(request);
+      return transport.unary(path, 'POST', body, {
+        service: 'AiAgentService',
+        method: 'Create',
+      }) as Promise<aiservicev1_AiAgentApp>;
+    },
+    Update(request) {
+      if (request.id === undefined || request.id === null) {
+        throw new Error('missing required field request.id');
+      }
+      const path = `/admin/v1/ai/agents/${request.id}`;
+      const bodyMap = { ...request } as Record<string, unknown>;
+      delete bodyMap["id"];
+      const body = JSON.stringify(bodyMap);
+      return transport.unary(path, 'PUT', body, {
+        service: 'AiAgentService',
+        method: 'Update',
+      }) as Promise<wellKnownEmpty>;
+    },
+    Delete(request) {
+      if (request.id === undefined || request.id === null) {
+        throw new Error('missing required field request.id');
+      }
+      const path = `/admin/v1/ai/agents/${request.id}`;
+      const body = null;
+      return transport.unary(path, 'DELETE', body, {
+        service: 'AiAgentService',
+        method: 'Delete',
+      }) as Promise<wellKnownEmpty>;
+    },
+    ApproveRun(request) {
+      if (request.runId === undefined || request.runId === null) {
+        throw new Error('missing required field request.run_id');
+      }
+      const path = `/admin/v1/ai/agent-runs/${request.runId}/approve`;
+      const bodyMap = { ...request } as Record<string, unknown>;
+      delete bodyMap["runId"];
+      const body = JSON.stringify(bodyMap);
+      return transport.unary(path, 'POST', body, {
+        service: 'AiAgentService',
+        method: 'ApproveRun',
+      }) as Promise<aiservicev1_AiAgentRun>;
+    },
+    Run(request) {
+      if (request.id === undefined || request.id === null) {
+        throw new Error('missing required field request.id');
+      }
+      const path = `/admin/v1/ai/agents/${request.id}/run`;
+      const bodyMap = { ...request } as Record<string, unknown>;
+      delete bodyMap["id"];
+      const body = JSON.stringify(bodyMap);
+      return transport.unary(path, 'POST', body, {
+        service: 'AiAgentService',
+        method: 'Run',
+      }) as Promise<aiservicev1_AiAgentRun>;
+    },
+    ListRuns(request) {
+      const path = `/admin/v1/ai/agent-runs`;
+      const body = null;
+      const queryParams: string[] = [];
+      if (request.page) {
         queryParams.push(
-          `filterExpr.conditions.value=${encodeURIComponent(request.filterExpr.conditions.value.toString())}`,
+          `page=${encodeURIComponent(request.page.toString())}`,
         );
       }
-      if (request.filterExpr?.conditions?.jsonValue) {
+      if (request.pageSize) {
         queryParams.push(
-          `filterExpr.conditions.jsonValue=${encodeURIComponent(request.filterExpr.conditions.jsonValue.toString())}`,
+          `pageSize=${encodeURIComponent(request.pageSize.toString())}`,
         );
       }
-      if (request.filterExpr?.conditions?.values) {
-        request.filterExpr.conditions.values.forEach((x) => {
-          queryParams.push(
-            `filterExpr.conditions.values=${encodeURIComponent(x.toString())}`,
-          );
-        });
-      }
-      if (request.filterExpr?.conditions?.datePart) {
+      if (request.offset) {
         queryParams.push(
-          `filterExpr.conditions.datePart=${encodeURIComponent(request.filterExpr.conditions.datePart.toString())}`,
+          `offset=${encodeURIComponent(request.offset.toString())}`,
         );
       }
-      if (request.filterExpr?.conditions?.jsonPath) {
+      if (request.limit) {
         queryParams.push(
-          `filterExpr.conditions.jsonPath=${encodeURIComponent(request.filterExpr.conditions.jsonPath.toString())}`,
+          `limit=${encodeURIComponent(request.limit.toString())}`,
+        );
+      }
+      if (request.token) {
+        queryParams.push(
+          `token=${encodeURIComponent(request.token.toString())}`,
+        );
+      }
+      if (request.noPaging) {
+        queryParams.push(
+          `noPaging=${encodeURIComponent(request.noPaging.toString())}`,
+        );
+      }
+      if (request.query) {
+        queryParams.push(
+          `query=${encodeURIComponent(request.query.toString())}`,
+        );
+      }
+      if (request.filter) {
+        queryParams.push(
+          `filter=${encodeURIComponent(request.filter.toString())}`,
+        );
+      }
+      if (request.filterExpr?.type) {
+        queryParams.push(
+          `filterExpr.type=${encodeURIComponent(request.filterExpr.type.toString())}`,
         );
       }
       if (request.orderBy) {
@@ -838,14 +954,1727 @@ export function createApiAuditLogServiceClient(
           `orderBy=${encodeURIComponent(request.orderBy.toString())}`,
         );
       }
-      if (request.sorting?.field) {
+      if (request.fieldMask) {
         queryParams.push(
-          `sorting.field=${encodeURIComponent(request.sorting.field.toString())}`,
+          `fieldMask=${encodeURIComponent(request.fieldMask.toString())}`,
         );
       }
-      if (request.sorting?.direction) {
+      let uri = path;
+      if (queryParams.length > 0) {
+        uri += `?${queryParams.join('&')}`;
+      }
+      return transport.unary(uri, 'GET', body, {
+        service: 'AiAgentService',
+        method: 'ListRuns',
+      }) as Promise<aiservicev1_ListAiAgentRunsResponse>;
+    },
+    GetRun(request) {
+      if (request.id === undefined || request.id === null) {
+        throw new Error('missing required field request.id');
+      }
+      const path = `/admin/v1/ai/agent-runs/${request.id}`;
+      const body = null;
+      return transport.unary(path, 'GET', body, {
+        service: 'AiAgentService',
+        method: 'GetRun',
+      }) as Promise<aiservicev1_AiAgentRun>;
+    },
+  };
+}
+// 查询列表 - 回应
+export type aiservicev1_ListAiAgentAppsResponse = {
+  items: aiservicev1_AiAgentApp[] | undefined;
+  total: number | undefined;
+};
+
+// Agent 编排应用
+export type aiservicev1_AiAgentApp = {
+  createdAt?: wellKnownTimestamp;
+  createdBy?: number;
+  description?: string;
+  enabled?: boolean;
+  // 图 DSL（JSON：nodes/edges；节点五种、模板与条件表达式语义见设计文档 §2）
+  graph?: string;
+  id?: number;
+  name?: string;
+  // 创建/更新入参带出（与 AiConversation 同口径）：租户隔离 mixin 无创建钩子，租户必须显式写
+  tenantId?: number;
+  updatedAt?: wellKnownTimestamp;
+  updatedBy?: number;
+};
+
+// 查询详情 - 请求
+export type aiservicev1_GetAiAgentAppRequest = {
+  id: number | undefined;
+};
+
+// 创建 - 请求
+export type aiservicev1_CreateAiAgentAppRequest = {
+  data: aiservicev1_AiAgentApp | undefined;
+};
+
+// 更新 - 请求
+export type aiservicev1_UpdateAiAgentAppRequest = {
+  data: aiservicev1_AiAgentApp | undefined;
+  id: number | undefined;
+  updateMask: undefined | wellKnownFieldMask;
+};
+
+// 删除 - 请求
+export type aiservicev1_DeleteAiAgentAppRequest = {
+  id: number | undefined;
+};
+
+// 审批裁决运行 - 请求
+export type aiservicev1_ApproveAgentRunRequest = {
+  approved: boolean | undefined;
+  // 审批意见（驳回时写入运行 error；批准时注入挂起节点 note 变量）
+  note: string | undefined;
+  runId: number | undefined;
+};
+
+// Agent 运行记录
+export type aiservicev1_AiAgentRun = {
+  appId?: number;
+  completionTokens?: number;
+  createdAt?: wellKnownTimestamp;
+  durationMs?: number;
+  error?: string;
+  id?: number;
+  // 运行入参（JSON 对象：start 节点 inputVars 的 name → 值）
+  input?: string;
+  output?: string;
+  // 等待审批的节点 ID（status=WAITING_APPROVAL 时有值）
+  pendingNodeId?: string;
+  promptTokens?: number;
+  // 挂起恢复快照 JSON：{vars, nextNodeId}（ApproveRun 批准后据此继续执行）
+  resumeState?: string;
+  status?: aiservicev1_AiAgentRun_Status;
+  totalTokens?: number;
+  // 逐节点执行轨迹（JSON 数组：{nodeId,type,status,ms,summary,usage}）
+  trace?: string;
+};
+
+// 运行状态
+export type aiservicev1_AiAgentRun_Status =
+  | 'FAILED'
+  | 'RUNNING'
+  | 'STATUS_UNSPECIFIED'
+  | 'SUCCEEDED'
+  | 'WAITING_APPROVAL';
+// 试运行 - 请求
+export type aiservicev1_RunAiAgentAppRequest = {
+  id: number | undefined;
+  // 运行入参：start 节点声明的输入变量名 → 值（JSON 对象字符串）
+  input: { [key: string]: string } | undefined;
+};
+
+// 运行台账列表 - 回应
+export type aiservicev1_ListAiAgentRunsResponse = {
+  items: aiservicev1_AiAgentRun[] | undefined;
+  total: number | undefined;
+};
+
+// 运行详情 - 请求
+export type aiservicev1_GetAiAgentRunRequest = {
+  id: number | undefined;
+};
+
+// AI 对话服务（表单助手）
+//
+// 流式语义：本 RPC 是普通 POST（body 为扁平请求体，不包 data）。
+// BFF 消费 core 的 ChatStreamFrame 流：chunk/tool 帧经 SSE 网关
+// （`ai_chat_chunk` / `ai_chat_tool` 事件）推给发起用户，done 帧作为
+// 同步响应返回。前端先累积 chunk 做流式渲染，POST 响应到达后以响应
+// 中的完整消息为准。
+export interface AiChatService {
+  // 发起一轮对话
+  Chat(
+    request: aiservicev1_ChatRequest,
+  ): Promise<aiservicev1_ChatResponse>;
+}
+
+export function createAiChatServiceClient(
+  transport: ClientTransport,
+): AiChatService {
+  return {
+    Chat(request) {
+      const path = `/admin/v1/ai/chat/completions`;
+      const body = JSON.stringify(request);
+      return transport.unary(path, 'POST', body, {
+        service: 'AiChatService',
+        method: 'Chat',
+      }) as Promise<aiservicev1_ChatResponse>;
+    },
+  };
+}
+// 发起对话 - 请求
+export type aiservicev1_ChatRequest = {
+  content?: string;
+  conversationId?: number;
+  knowledgeBaseId?: number;
+  operatorTenantId?: number;
+  operatorUserId?: number;
+  providerId?: number;
+};
+
+// 发起对话 - 回应
+export type aiservicev1_ChatResponse = {
+  // 会话（新建时返回新建的会话）
+  conversation: aiservicev1_AiConversation | undefined;
+  // 模型回复消息（含 token 用量与模型名）
+  message: aiservicev1_AiMessage | undefined;
+};
+
+// AI 对话会话
+export type aiservicev1_AiConversation = {
+  createdAt?: wellKnownTimestamp;
+  createdBy?: number;
+  deletedAt?: wellKnownTimestamp;
+  deletedBy?: number;
+  id?: number;
+  lastMessageAt?: wellKnownTimestamp;
+  providerId?: number;
+  tenantId?: number;
+  title?: string;
+  updatedAt?: wellKnownTimestamp;
+  updatedBy?: number;
+  userId?: number;
+};
+
+// AI 对话消息
+export type aiservicev1_AiMessage = {
+  completionTokens?: number;
+  content?: string;
+  conversationId?: number;
+  createdAt?: wellKnownTimestamp;
+  createdBy?: number;
+  deletedAt?: wellKnownTimestamp;
+  deletedBy?: number;
+  durationMs?: number;
+  errorMessage?: string;
+  id?: number;
+  modelName?: string;
+  promptTokens?: number;
+  role?: aiservicev1_AiRole;
+  tenantId?: number;
+  updatedAt?: wellKnownTimestamp;
+  updatedBy?: number;
+  userId?: number;
+};
+
+// 消息角色
+export type aiservicev1_AiRole =
+  | 'AI_ROLE_UNSPECIFIED'
+  | 'ASSISTANT'
+  | 'SYSTEM'
+  | 'USER';
+// AI 内容生成服务（表单助手）
+export interface AiContentService {
+  // 生成内容
+  GenerateContent(
+    request: aiservicev1_GenerateContentRequest,
+  ): Promise<aiservicev1_GenerateContentResponse>;
+  // 语义搜索（菜单等可导航条目）
+  SemanticSearch(
+    request: aiservicev1_SemanticSearchRequest,
+  ): Promise<aiservicev1_SemanticSearchResponse>;
+  // 重建搜索索引
+  RebuildSearchIndex(
+    request: wellKnownEmpty,
+  ): Promise<aiservicev1_RebuildSearchIndexResponse>;
+  // AI 安全与异常洞察（平台用户专属）
+  GetSafetyInsights(
+    request: aiservicev1_SafetyInsightsRequest,
+  ): Promise<aiservicev1_SafetyInsightsResponse>;
+}
+
+export function createAiContentServiceClient(
+  transport: ClientTransport,
+): AiContentService {
+  return {
+    GenerateContent(request) {
+      const path = `/admin/v1/ai/content/generate`;
+      const body = JSON.stringify(request);
+      return transport.unary(path, 'POST', body, {
+        service: 'AiContentService',
+        method: 'GenerateContent',
+      }) as Promise<aiservicev1_GenerateContentResponse>;
+    },
+    SemanticSearch(request) {
+      const path = `/admin/v1/ai/content/search`;
+      const body = JSON.stringify(request);
+      return transport.unary(path, 'POST', body, {
+        service: 'AiContentService',
+        method: 'SemanticSearch',
+      }) as Promise<aiservicev1_SemanticSearchResponse>;
+    },
+    RebuildSearchIndex(_request) {
+      const path = `/admin/v1/ai/content/rebuild-index`;
+      const body = null;
+      return transport.unary(path, 'POST', body, {
+        service: 'AiContentService',
+        method: 'RebuildSearchIndex',
+      }) as Promise<aiservicev1_RebuildSearchIndexResponse>;
+    },
+    GetSafetyInsights(request) {
+      const path = `/admin/v1/ai/insights`;
+      const body = JSON.stringify(request);
+      return transport.unary(path, 'POST', body, {
+        service: 'AiContentService',
+        method: 'GetSafetyInsights',
+      }) as Promise<aiservicev1_SafetyInsightsResponse>;
+    },
+  };
+}
+// 内容生成 - 请求
+export type aiservicev1_GenerateContentRequest = {
+  // 补充上下文（如已有内容的续写、字段标签等，可选）
+  context?: string;
+  // 输出语言（BCP-47，默认 zh-CN）
+  lang?: string;
+  // 期望长度（字符数提示，默认 200）
+  maxLength?: number;
+  // 场景标识
+  scene: aiservicev1_ContentScene | undefined;
+  // 主题/关键词（用户输入的生成指令）
+  topic: string | undefined;
+};
+
+// 场景标识（服务端按此选择预设提示词模板）
+export type aiservicev1_ContentScene =
+  // 公告/通知正文
+  | 'ANNOUNCEMENT'
+  | 'CONTENT_SCENE_UNSPECIFIED'
+  // 通用描述（角色/菜单/字典项/文件等实体描述）
+  | 'DESCRIPTION'
+  // 自由生成（用户自带完整提示词）
+  | 'GENERAL'
+  // 文章正文
+  | 'POST_BODY'
+  // 文章摘要
+  | 'POST_SUMMARY'
+  // 文章标题
+  | 'POST_TITLE'
+  // 回复/反馈文案
+  | 'REPLY'
+  // 社交平台发布文案（短文案，可带话题标签）
+  | 'SOCIAL_POST';
+// 内容生成 - 回应
+export type aiservicev1_GenerateContentResponse = {
+  content: string | undefined;
+  totalTokens: number | undefined;
+};
+
+// 语义搜索 - 请求
+export type aiservicev1_SemanticSearchRequest = {
+  limit?: number;
+  query: string | undefined;
+};
+
+// 语义搜索 - 回应
+export type aiservicev1_SemanticSearchResponse = {
+  items: aiservicev1_SemanticSearchItem[] | undefined;
+};
+
+// 搜索结果项
+export type aiservicev1_SemanticSearchItem = {
+  itemType: string | undefined;
+  route: string | undefined;
+  score: number | undefined;
+  title: string | undefined;
+};
+
+// 重建搜索索引 - 回应
+export type aiservicev1_RebuildSearchIndexResponse = {
+  indexedCount: number | undefined;
+};
+
+// AI 安全洞察 - 请求
+export type aiservicev1_SafetyInsightsRequest = {
+  // 界面语言（BCP-47），决定 LLM 总评的输出语言；
+  // 告警只回传结构化事实，文案由前端 i18n 模板渲染
+  lang?: string;
+};
+
+// AI 安全洞察 - 回应
+export type aiservicev1_SafetyInsightsResponse = {
+  alerts: aiservicev1_AiInsightAlert[] | undefined;
+  summary: string | undefined;
+};
+
+// 异常告警条目：规则预筛的确定性结构化事实，不含人类文案——
+// 文案由前端按 type 选 i18n 模板并以 facts 插值渲染
+export type aiservicev1_AiInsightAlert = {
+  facts: { [key: string]: string } | undefined;
+  items: aiservicev1_AiSensitiveOpItem[] | undefined;
+  severity: string | undefined;
+  type: string | undefined;
+};
+
+// 敏感操作明细项
+export type aiservicev1_AiSensitiveOpItem = {
+  action: string | undefined;
+  createdAt: string | undefined;
+  resourceType: string | undefined;
+  username: string | undefined;
+};
+
+// AI 对话会话管理服务
+export interface AiConversationService {
+  // 分页查询会话列表
+  List(
+    request: pagination_PagingRequest,
+  ): Promise<aiservicev1_ListAiConversationResponse>;
+  // 查询会话详情
+  Get(
+    request: aiservicev1_GetAiConversationRequest,
+  ): Promise<aiservicev1_AiConversation>;
+  // 更新会话（改标题）
+  Update(
+    request: aiservicev1_UpdateAiConversationRequest,
+  ): Promise<wellKnownEmpty>;
+  // 删除会话
+  Delete(
+    request: aiservicev1_DeleteAiConversationRequest,
+  ): Promise<wellKnownEmpty>;
+}
+
+export function createAiConversationServiceClient(
+  transport: ClientTransport,
+): AiConversationService {
+  return {
+    List(request) {
+      const path = `/admin/v1/ai/conversations`;
+      const body = null;
+      const queryParams: string[] = [];
+      if (request.page) {
         queryParams.push(
-          `sorting.direction=${encodeURIComponent(request.sorting.direction.toString())}`,
+          `page=${encodeURIComponent(request.page.toString())}`,
+        );
+      }
+      if (request.pageSize) {
+        queryParams.push(
+          `pageSize=${encodeURIComponent(request.pageSize.toString())}`,
+        );
+      }
+      if (request.offset) {
+        queryParams.push(
+          `offset=${encodeURIComponent(request.offset.toString())}`,
+        );
+      }
+      if (request.limit) {
+        queryParams.push(
+          `limit=${encodeURIComponent(request.limit.toString())}`,
+        );
+      }
+      if (request.token) {
+        queryParams.push(
+          `token=${encodeURIComponent(request.token.toString())}`,
+        );
+      }
+      if (request.noPaging) {
+        queryParams.push(
+          `noPaging=${encodeURIComponent(request.noPaging.toString())}`,
+        );
+      }
+      if (request.query) {
+        queryParams.push(
+          `query=${encodeURIComponent(request.query.toString())}`,
+        );
+      }
+      if (request.filter) {
+        queryParams.push(
+          `filter=${encodeURIComponent(request.filter.toString())}`,
+        );
+      }
+      if (request.filterExpr?.type) {
+        queryParams.push(
+          `filterExpr.type=${encodeURIComponent(request.filterExpr.type.toString())}`,
+        );
+      }
+      if (request.orderBy) {
+        queryParams.push(
+          `orderBy=${encodeURIComponent(request.orderBy.toString())}`,
+        );
+      }
+      if (request.fieldMask) {
+        queryParams.push(
+          `fieldMask=${encodeURIComponent(request.fieldMask.toString())}`,
+        );
+      }
+      let uri = path;
+      if (queryParams.length > 0) {
+        uri += `?${queryParams.join('&')}`;
+      }
+      return transport.unary(uri, 'GET', body, {
+        service: 'AiConversationService',
+        method: 'List',
+      }) as Promise<aiservicev1_ListAiConversationResponse>;
+    },
+    Get(request) {
+      if (request.id === undefined || request.id === null) {
+        throw new Error('missing required field request.id');
+      }
+      const path = `/admin/v1/ai/conversations/${request.id}`;
+      const body = null;
+      const queryParams: string[] = [];
+      if (request.viewMask) {
+        queryParams.push(
+          `viewMask=${encodeURIComponent(request.viewMask.toString())}`,
+        );
+      }
+      let uri = path;
+      if (queryParams.length > 0) {
+        uri += `?${queryParams.join('&')}`;
+      }
+      return transport.unary(uri, 'GET', body, {
+        service: 'AiConversationService',
+        method: 'Get',
+      }) as Promise<aiservicev1_AiConversation>;
+    },
+    Update(request) {
+      if (request.id === undefined || request.id === null) {
+        throw new Error('missing required field request.id');
+      }
+      const path = `/admin/v1/ai/conversations/${request.id}`;
+      const bodyMap = { ...request } as Record<string, unknown>;
+      delete bodyMap["id"];
+      const body = JSON.stringify(bodyMap);
+      return transport.unary(path, 'PUT', body, {
+        service: 'AiConversationService',
+        method: 'Update',
+      }) as Promise<wellKnownEmpty>;
+    },
+    Delete(request) {
+      if (request.id === undefined || request.id === null) {
+        throw new Error('missing required field request.id');
+      }
+      const path = `/admin/v1/ai/conversations/${request.id}`;
+      const body = null;
+      return transport.unary(path, 'DELETE', body, {
+        service: 'AiConversationService',
+        method: 'Delete',
+      }) as Promise<wellKnownEmpty>;
+    },
+  };
+}
+// 查询会话列表 - 回应
+export type aiservicev1_ListAiConversationResponse = {
+  items: aiservicev1_AiConversation[] | undefined;
+  total: number | undefined;
+};
+
+// 查询会话详情 - 请求
+export type aiservicev1_GetAiConversationRequest = {
+  id?: number;
+  viewMask?: wellKnownFieldMask;
+};
+
+// 更新会话 - 请求
+export type aiservicev1_UpdateAiConversationRequest = {
+  allowMissing?: boolean;
+  data: aiservicev1_AiConversation | undefined;
+  id: number | undefined;
+  updateMask: undefined | wellKnownFieldMask;
+};
+
+// 删除会话 - 请求
+export type aiservicev1_DeleteAiConversationRequest = {
+  id?: number;
+};
+
+// AI 知识库管理服务（RAG）
+export interface AiKnowledgeBaseService {
+  // 分页查询知识库列表
+  List(
+    request: pagination_PagingRequest,
+  ): Promise<aiservicev1_ListAiKnowledgeBaseResponse>;
+  // 查询知识库详情
+  Get(
+    request: aiservicev1_GetAiKnowledgeBaseRequest,
+  ): Promise<aiservicev1_AiKnowledgeBase>;
+  // 创建知识库
+  Create(
+    request: aiservicev1_CreateAiKnowledgeBaseRequest,
+  ): Promise<wellKnownEmpty>;
+  // 更新知识库
+  Update(
+    request: aiservicev1_UpdateAiKnowledgeBaseRequest,
+  ): Promise<wellKnownEmpty>;
+  // 删除知识库
+  Delete(
+    request: aiservicev1_DeleteAiKnowledgeBaseRequest,
+  ): Promise<wellKnownEmpty>;
+  // 上传文档（纯文本：切片 → 向量化 → 落库）
+  UploadDoc(
+    request: aiservicev1_UploadAiDocRequest,
+  ): Promise<aiservicev1_UploadAiDocResponse>;
+  // 上传文档文件（txt/md/docx/pdf：抽取文本后入库）
+  UploadDocFile(
+    request: aiservicev1_UploadAiDocFileRequest,
+  ): Promise<aiservicev1_UploadAiDocResponse>;
+  // 查询知识库下的文档
+  ListDocs(
+    request: aiservicev1_ListAiDocsRequest,
+  ): Promise<aiservicev1_ListAiDocsResponse>;
+  // 删除文档
+  DeleteDoc(
+    request: aiservicev1_DeleteAiDocRequest,
+  ): Promise<wellKnownEmpty>;
+  // 检索测试
+  Search(
+    request: aiservicev1_SearchAiKnowledgeRequest,
+  ): Promise<aiservicev1_SearchAiKnowledgeResponse>;
+  // 重索引（异步任务）
+  ReindexDocs(
+    request: aiservicev1_ReindexDocsRequest,
+  ): Promise<wellKnownEmpty>;
+}
+
+export function createAiKnowledgeBaseServiceClient(
+  transport: ClientTransport,
+): AiKnowledgeBaseService {
+  return {
+    List(request) {
+      const path = `/admin/v1/ai/knowledge-bases`;
+      const body = null;
+      const queryParams: string[] = [];
+      if (request.page) {
+        queryParams.push(
+          `page=${encodeURIComponent(request.page.toString())}`,
+        );
+      }
+      if (request.pageSize) {
+        queryParams.push(
+          `pageSize=${encodeURIComponent(request.pageSize.toString())}`,
+        );
+      }
+      if (request.offset) {
+        queryParams.push(
+          `offset=${encodeURIComponent(request.offset.toString())}`,
+        );
+      }
+      if (request.limit) {
+        queryParams.push(
+          `limit=${encodeURIComponent(request.limit.toString())}`,
+        );
+      }
+      if (request.token) {
+        queryParams.push(
+          `token=${encodeURIComponent(request.token.toString())}`,
+        );
+      }
+      if (request.noPaging) {
+        queryParams.push(
+          `noPaging=${encodeURIComponent(request.noPaging.toString())}`,
+        );
+      }
+      if (request.query) {
+        queryParams.push(
+          `query=${encodeURIComponent(request.query.toString())}`,
+        );
+      }
+      if (request.filter) {
+        queryParams.push(
+          `filter=${encodeURIComponent(request.filter.toString())}`,
+        );
+      }
+      if (request.filterExpr?.type) {
+        queryParams.push(
+          `filterExpr.type=${encodeURIComponent(request.filterExpr.type.toString())}`,
+        );
+      }
+      if (request.orderBy) {
+        queryParams.push(
+          `orderBy=${encodeURIComponent(request.orderBy.toString())}`,
+        );
+      }
+      if (request.fieldMask) {
+        queryParams.push(
+          `fieldMask=${encodeURIComponent(request.fieldMask.toString())}`,
+        );
+      }
+      let uri = path;
+      if (queryParams.length > 0) {
+        uri += `?${queryParams.join('&')}`;
+      }
+      return transport.unary(uri, 'GET', body, {
+        service: 'AiKnowledgeBaseService',
+        method: 'List',
+      }) as Promise<aiservicev1_ListAiKnowledgeBaseResponse>;
+    },
+    Get(request) {
+      if (request.id === undefined || request.id === null) {
+        throw new Error('missing required field request.id');
+      }
+      const path = `/admin/v1/ai/knowledge-bases/${request.id}`;
+      const body = null;
+      const queryParams: string[] = [];
+      if (request.viewMask) {
+        queryParams.push(
+          `viewMask=${encodeURIComponent(request.viewMask.toString())}`,
+        );
+      }
+      let uri = path;
+      if (queryParams.length > 0) {
+        uri += `?${queryParams.join('&')}`;
+      }
+      return transport.unary(uri, 'GET', body, {
+        service: 'AiKnowledgeBaseService',
+        method: 'Get',
+      }) as Promise<aiservicev1_AiKnowledgeBase>;
+    },
+    Create(request) {
+      const path = `/admin/v1/ai/knowledge-bases`;
+      const body = JSON.stringify(request);
+      return transport.unary(path, 'POST', body, {
+        service: 'AiKnowledgeBaseService',
+        method: 'Create',
+      }) as Promise<wellKnownEmpty>;
+    },
+    Update(request) {
+      if (request.id === undefined || request.id === null) {
+        throw new Error('missing required field request.id');
+      }
+      const path = `/admin/v1/ai/knowledge-bases/${request.id}`;
+      const bodyMap = { ...request } as Record<string, unknown>;
+      delete bodyMap["id"];
+      const body = JSON.stringify(bodyMap);
+      return transport.unary(path, 'PUT', body, {
+        service: 'AiKnowledgeBaseService',
+        method: 'Update',
+      }) as Promise<wellKnownEmpty>;
+    },
+    Delete(request) {
+      if (request.id === undefined || request.id === null) {
+        throw new Error('missing required field request.id');
+      }
+      const path = `/admin/v1/ai/knowledge-bases/${request.id}`;
+      const body = null;
+      return transport.unary(path, 'DELETE', body, {
+        service: 'AiKnowledgeBaseService',
+        method: 'Delete',
+      }) as Promise<wellKnownEmpty>;
+    },
+    UploadDoc(request) {
+      if (request.baseId === undefined || request.baseId === null) {
+        throw new Error('missing required field request.base_id');
+      }
+      const path = `/admin/v1/ai/knowledge-bases/${request.baseId}/docs`;
+      const bodyMap = { ...request } as Record<string, unknown>;
+      delete bodyMap["baseId"];
+      const body = JSON.stringify(bodyMap);
+      return transport.unary(path, 'POST', body, {
+        service: 'AiKnowledgeBaseService',
+        method: 'UploadDoc',
+      }) as Promise<aiservicev1_UploadAiDocResponse>;
+    },
+    UploadDocFile(request) {
+      if (request.baseId === undefined || request.baseId === null) {
+        throw new Error('missing required field request.base_id');
+      }
+      const path = `/admin/v1/ai/knowledge-bases/${request.baseId}/docs/file`;
+      const bodyMap = { ...request } as Record<string, unknown>;
+      delete bodyMap["baseId"];
+      const body = JSON.stringify(bodyMap);
+      return transport.unary(path, 'POST', body, {
+        service: 'AiKnowledgeBaseService',
+        method: 'UploadDocFile',
+      }) as Promise<aiservicev1_UploadAiDocResponse>;
+    },
+    ListDocs(request) {
+      if (request.baseId === undefined || request.baseId === null) {
+        throw new Error('missing required field request.base_id');
+      }
+      const path = `/admin/v1/ai/knowledge-bases/${request.baseId}/docs`;
+      const body = null;
+      return transport.unary(path, 'GET', body, {
+        service: 'AiKnowledgeBaseService',
+        method: 'ListDocs',
+      }) as Promise<aiservicev1_ListAiDocsResponse>;
+    },
+    DeleteDoc(request) {
+      if (request.baseId === undefined || request.baseId === null) {
+        throw new Error('missing required field request.base_id');
+      }
+      if (request.id === undefined || request.id === null) {
+        throw new Error('missing required field request.id');
+      }
+      const path = `/admin/v1/ai/knowledge-bases/${request.baseId}/docs/${request.id}`;
+      const body = null;
+      return transport.unary(path, 'DELETE', body, {
+        service: 'AiKnowledgeBaseService',
+        method: 'DeleteDoc',
+      }) as Promise<wellKnownEmpty>;
+    },
+    Search(request) {
+      if (request.baseId === undefined || request.baseId === null) {
+        throw new Error('missing required field request.base_id');
+      }
+      const path = `/admin/v1/ai/knowledge-bases/${request.baseId}/search`;
+      const bodyMap = { ...request } as Record<string, unknown>;
+      delete bodyMap["baseId"];
+      const body = JSON.stringify(bodyMap);
+      return transport.unary(path, 'POST', body, {
+        service: 'AiKnowledgeBaseService',
+        method: 'Search',
+      }) as Promise<aiservicev1_SearchAiKnowledgeResponse>;
+    },
+    ReindexDocs(request) {
+      const path = `/admin/v1/ai/knowledge-bases/reindex`;
+      const body = JSON.stringify(request);
+      return transport.unary(path, 'POST', body, {
+        service: 'AiKnowledgeBaseService',
+        method: 'ReindexDocs',
+      }) as Promise<wellKnownEmpty>;
+    },
+  };
+}
+// 查询知识库列表 - 回应
+export type aiservicev1_ListAiKnowledgeBaseResponse = {
+  items: aiservicev1_AiKnowledgeBase[] | undefined;
+  total: number | undefined;
+};
+
+// AI 知识库
+export type aiservicev1_AiKnowledgeBase = {
+  createdAt?: wellKnownTimestamp;
+  createdBy?: number;
+  deletedAt?: wellKnownTimestamp;
+  deletedBy?: number;
+  description?: string;
+  docCount?: number;
+  embeddingModel?: string;
+  id?: number;
+  name?: string;
+  providerId?: number;
+  tenantId?: number;
+  updatedAt?: wellKnownTimestamp;
+  updatedBy?: number;
+  userId?: number;
+};
+
+// 查询知识库详情 - 请求
+export type aiservicev1_GetAiKnowledgeBaseRequest = {
+  id?: number;
+  viewMask?: wellKnownFieldMask;
+};
+
+// 创建知识库 - 请求
+export type aiservicev1_CreateAiKnowledgeBaseRequest = {
+  data: aiservicev1_AiKnowledgeBase | undefined;
+};
+
+// 更新知识库 - 请求
+export type aiservicev1_UpdateAiKnowledgeBaseRequest = {
+  allowMissing?: boolean;
+  data: aiservicev1_AiKnowledgeBase | undefined;
+  id: number | undefined;
+  updateMask: undefined | wellKnownFieldMask;
+};
+
+// 删除知识库 - 请求
+export type aiservicev1_DeleteAiKnowledgeBaseRequest = {
+  id?: number;
+};
+
+// 上传文档 - 请求（纯文本；内容直接随请求体传输）
+export type aiservicev1_UploadAiDocRequest = {
+  baseId: number | undefined;
+  content: string | undefined;
+  name: string | undefined;
+};
+
+// 上传文档 - 回应
+export type aiservicev1_UploadAiDocResponse = {
+  chunkCount: number | undefined;
+  doc: aiservicev1_AiDoc | undefined;
+};
+
+// AI 文档
+export type aiservicev1_AiDoc = {
+  baseId?: number;
+  chunkCount?: number;
+  createdAt?: wellKnownTimestamp;
+  errorMessage?: string;
+  id?: number;
+  name?: string;
+  status?: string;
+  tenantId?: number;
+  userId?: number;
+};
+
+// 上传文档文件 - 请求（文件字节经 protojson 即 base64 字符串传输）
+export type aiservicev1_UploadAiDocFileRequest = {
+  baseId: number | undefined;
+  contentBase64: string | undefined;
+  docName?: string;
+  fileName: string | undefined;
+};
+
+// 查询文档列表 - 请求
+export type aiservicev1_ListAiDocsRequest = {
+  baseId: number | undefined;
+};
+
+// 查询文档列表 - 回应
+export type aiservicev1_ListAiDocsResponse = {
+  items: aiservicev1_AiDoc[] | undefined;
+  total: number | undefined;
+};
+
+// 删除文档 - 请求
+export type aiservicev1_DeleteAiDocRequest = {
+  baseId: number | undefined;
+  id: number | undefined;
+};
+
+// 检索 - 请求
+export type aiservicev1_SearchAiKnowledgeRequest = {
+  baseId: number | undefined;
+  query: string | undefined;
+  topK?: number;
+};
+
+// 检索 - 回应
+export type aiservicev1_SearchAiKnowledgeResponse = {
+  hits: aiservicev1_KnowledgeHit[] | undefined;
+};
+
+// 检索命中片段
+export type aiservicev1_KnowledgeHit = {
+  chunkIndex: number | undefined;
+  content: string | undefined;
+  doc: aiservicev1_AiDoc | undefined;
+  score: number | undefined;
+};
+
+// 重索引 - 请求
+export type aiservicev1_ReindexDocsRequest = {
+  // 知识库ID；0 表示全部知识库
+  baseId?: number;
+};
+
+// AI 对话消息服务
+export interface AiMessageService {
+  // 分页查询消息列表（按 conversationId 过滤；ID 类字段精确匹配，不走模糊搜索）
+  List(
+    request: pagination_PagingRequest,
+  ): Promise<aiservicev1_ListAiMessageResponse>;
+  // 删除消息
+  Delete(
+    request: aiservicev1_DeleteAiMessageRequest,
+  ): Promise<wellKnownEmpty>;
+}
+
+export function createAiMessageServiceClient(
+  transport: ClientTransport,
+): AiMessageService {
+  return {
+    List(request) {
+      const path = `/admin/v1/ai/messages`;
+      const body = null;
+      const queryParams: string[] = [];
+      if (request.page) {
+        queryParams.push(
+          `page=${encodeURIComponent(request.page.toString())}`,
+        );
+      }
+      if (request.pageSize) {
+        queryParams.push(
+          `pageSize=${encodeURIComponent(request.pageSize.toString())}`,
+        );
+      }
+      if (request.offset) {
+        queryParams.push(
+          `offset=${encodeURIComponent(request.offset.toString())}`,
+        );
+      }
+      if (request.limit) {
+        queryParams.push(
+          `limit=${encodeURIComponent(request.limit.toString())}`,
+        );
+      }
+      if (request.token) {
+        queryParams.push(
+          `token=${encodeURIComponent(request.token.toString())}`,
+        );
+      }
+      if (request.noPaging) {
+        queryParams.push(
+          `noPaging=${encodeURIComponent(request.noPaging.toString())}`,
+        );
+      }
+      if (request.query) {
+        queryParams.push(
+          `query=${encodeURIComponent(request.query.toString())}`,
+        );
+      }
+      if (request.filter) {
+        queryParams.push(
+          `filter=${encodeURIComponent(request.filter.toString())}`,
+        );
+      }
+      if (request.filterExpr?.type) {
+        queryParams.push(
+          `filterExpr.type=${encodeURIComponent(request.filterExpr.type.toString())}`,
+        );
+      }
+      if (request.orderBy) {
+        queryParams.push(
+          `orderBy=${encodeURIComponent(request.orderBy.toString())}`,
+        );
+      }
+      if (request.fieldMask) {
+        queryParams.push(
+          `fieldMask=${encodeURIComponent(request.fieldMask.toString())}`,
+        );
+      }
+      let uri = path;
+      if (queryParams.length > 0) {
+        uri += `?${queryParams.join('&')}`;
+      }
+      return transport.unary(uri, 'GET', body, {
+        service: 'AiMessageService',
+        method: 'List',
+      }) as Promise<aiservicev1_ListAiMessageResponse>;
+    },
+    Delete(request) {
+      if (request.id === undefined || request.id === null) {
+        throw new Error('missing required field request.id');
+      }
+      const path = `/admin/v1/ai/messages/${request.id}`;
+      const body = null;
+      return transport.unary(path, 'DELETE', body, {
+        service: 'AiMessageService',
+        method: 'Delete',
+      }) as Promise<wellKnownEmpty>;
+    },
+  };
+}
+// 查询消息列表 - 回应
+export type aiservicev1_ListAiMessageResponse = {
+  items: aiservicev1_AiMessage[] | undefined;
+  total: number | undefined;
+};
+
+// 删除消息 - 请求
+export type aiservicev1_DeleteAiMessageRequest = {
+  id?: number;
+};
+
+// AI 模型提供商管理服务
+export interface AiProviderService {
+  // 分页查询 AI 提供商列表
+  List(
+    request: pagination_PagingRequest,
+  ): Promise<aiservicev1_ListAiProviderResponse>;
+  // 查询 AI 提供商详情
+  Get(
+    request: aiservicev1_GetAiProviderRequest,
+  ): Promise<aiservicev1_AiProvider>;
+  // 创建 AI 提供商
+  Create(
+    request: aiservicev1_CreateAiProviderRequest,
+  ): Promise<wellKnownEmpty>;
+  // 更新 AI 提供商
+  Update(
+    request: aiservicev1_UpdateAiProviderRequest,
+  ): Promise<wellKnownEmpty>;
+  // 删除 AI 提供商
+  Delete(
+    request: aiservicev1_DeleteAiProviderRequest,
+  ): Promise<wellKnownEmpty>;
+}
+
+export function createAiProviderServiceClient(
+  transport: ClientTransport,
+): AiProviderService {
+  return {
+    List(request) {
+      const path = `/admin/v1/ai/providers`;
+      const body = null;
+      const queryParams: string[] = [];
+      if (request.page) {
+        queryParams.push(
+          `page=${encodeURIComponent(request.page.toString())}`,
+        );
+      }
+      if (request.pageSize) {
+        queryParams.push(
+          `pageSize=${encodeURIComponent(request.pageSize.toString())}`,
+        );
+      }
+      if (request.offset) {
+        queryParams.push(
+          `offset=${encodeURIComponent(request.offset.toString())}`,
+        );
+      }
+      if (request.limit) {
+        queryParams.push(
+          `limit=${encodeURIComponent(request.limit.toString())}`,
+        );
+      }
+      if (request.token) {
+        queryParams.push(
+          `token=${encodeURIComponent(request.token.toString())}`,
+        );
+      }
+      if (request.noPaging) {
+        queryParams.push(
+          `noPaging=${encodeURIComponent(request.noPaging.toString())}`,
+        );
+      }
+      if (request.query) {
+        queryParams.push(
+          `query=${encodeURIComponent(request.query.toString())}`,
+        );
+      }
+      if (request.filter) {
+        queryParams.push(
+          `filter=${encodeURIComponent(request.filter.toString())}`,
+        );
+      }
+      if (request.filterExpr?.type) {
+        queryParams.push(
+          `filterExpr.type=${encodeURIComponent(request.filterExpr.type.toString())}`,
+        );
+      }
+      if (request.orderBy) {
+        queryParams.push(
+          `orderBy=${encodeURIComponent(request.orderBy.toString())}`,
+        );
+      }
+      if (request.fieldMask) {
+        queryParams.push(
+          `fieldMask=${encodeURIComponent(request.fieldMask.toString())}`,
+        );
+      }
+      let uri = path;
+      if (queryParams.length > 0) {
+        uri += `?${queryParams.join('&')}`;
+      }
+      return transport.unary(uri, 'GET', body, {
+        service: 'AiProviderService',
+        method: 'List',
+      }) as Promise<aiservicev1_ListAiProviderResponse>;
+    },
+    Get(request) {
+      if (request.id === undefined || request.id === null) {
+        throw new Error('missing required field request.id');
+      }
+      const path = `/admin/v1/ai/providers/${request.id}`;
+      const body = null;
+      const queryParams: string[] = [];
+      if (request.viewMask) {
+        queryParams.push(
+          `viewMask=${encodeURIComponent(request.viewMask.toString())}`,
+        );
+      }
+      let uri = path;
+      if (queryParams.length > 0) {
+        uri += `?${queryParams.join('&')}`;
+      }
+      return transport.unary(uri, 'GET', body, {
+        service: 'AiProviderService',
+        method: 'Get',
+      }) as Promise<aiservicev1_AiProvider>;
+    },
+    Create(request) {
+      const path = `/admin/v1/ai/providers`;
+      const body = JSON.stringify(request);
+      return transport.unary(path, 'POST', body, {
+        service: 'AiProviderService',
+        method: 'Create',
+      }) as Promise<wellKnownEmpty>;
+    },
+    Update(request) {
+      if (request.id === undefined || request.id === null) {
+        throw new Error('missing required field request.id');
+      }
+      const path = `/admin/v1/ai/providers/${request.id}`;
+      const bodyMap = { ...request } as Record<string, unknown>;
+      delete bodyMap["id"];
+      const body = JSON.stringify(bodyMap);
+      return transport.unary(path, 'PUT', body, {
+        service: 'AiProviderService',
+        method: 'Update',
+      }) as Promise<wellKnownEmpty>;
+    },
+    Delete(request) {
+      if (request.id === undefined || request.id === null) {
+        throw new Error('missing required field request.id');
+      }
+      const path = `/admin/v1/ai/providers/${request.id}`;
+      const body = null;
+      return transport.unary(path, 'DELETE', body, {
+        service: 'AiProviderService',
+        method: 'Delete',
+      }) as Promise<wellKnownEmpty>;
+    },
+  };
+}
+// 查询 AI 提供商列表 - 回应
+export type aiservicev1_ListAiProviderResponse = {
+  items: aiservicev1_AiProvider[] | undefined;
+  total: number | undefined;
+};
+
+// AI 模型提供商（一行 = 一个可调用的模型端点配置）
+export type aiservicev1_AiProvider = {
+  apiKey?: string;
+  apiKeyHint?: string;
+  baseUrl?: string;
+  createdAt?: wellKnownTimestamp;
+  createdBy?: number;
+  deletedAt?: wellKnownTimestamp;
+  deletedBy?: number;
+  id?: number;
+  isDefault?: boolean;
+  isEnabled?: boolean;
+  localHost?: string;
+  localPort?: number;
+  modelName?: string;
+  modelType?: aiservicev1_AiProvider_ModelType;
+  name?: string;
+  organization?: string;
+  remark?: string;
+  systemPrompt?: string;
+  timeoutSeconds?: number;
+  updatedAt?: wellKnownTimestamp;
+  updatedBy?: number;
+};
+
+// 模型部署形态
+export type aiservicev1_AiProvider_ModelType =
+  | 'CLOUD'
+  | 'LOCAL'
+  | 'MODEL_TYPE_UNSPECIFIED';
+// 查询 AI 提供商详情 - 请求
+export type aiservicev1_GetAiProviderRequest = {
+  id?: number;
+  viewMask?: wellKnownFieldMask;
+};
+
+// 创建 AI 提供商 - 请求
+export type aiservicev1_CreateAiProviderRequest = {
+  data: aiservicev1_AiProvider | undefined;
+};
+
+// 更新 AI 提供商 - 请求
+export type aiservicev1_UpdateAiProviderRequest = {
+  allowMissing?: boolean;
+  data: aiservicev1_AiProvider | undefined;
+  id: number | undefined;
+  updateMask: undefined | wellKnownFieldMask;
+};
+
+// 删除 AI 提供商 - 请求
+export type aiservicev1_DeleteAiProviderRequest = {
+  id?: number;
+};
+
+// 智能问数服务（NL → 只读 SQL → 结构化结果）
+// 平台管理员专属：第一版查的是全平台数据，且 SQL 会触达原生库表。
+export interface AiQueryService {
+  // 智能问数
+  Ask(
+    request: aiservicev1_AskAiQueryRequest,
+  ): Promise<aiservicev1_AskAiQueryResponse>;
+}
+
+export function createAiQueryServiceClient(
+  transport: ClientTransport,
+): AiQueryService {
+  return {
+    Ask(request) {
+      const path = `/admin/v1/ai/query/ask`;
+      const body = JSON.stringify(request);
+      return transport.unary(path, 'POST', body, {
+        service: 'AiQueryService',
+        method: 'Ask',
+      }) as Promise<aiservicev1_AskAiQueryResponse>;
+    },
+  };
+}
+// 智能问数 - 请求
+export type aiservicev1_AskAiQueryRequest = {
+  // 对话历史（最近若干轮，建议 ≤5；用于消解追问里的指代，如"那只看 admin 的"）
+  history: aiservicev1_AiQueryHistoryItem[] | undefined;
+  // 界面语言（BCP-47），决定结论 answer 的输出语言；默认 zh-CN
+  lang?: string;
+  question: string | undefined;
+  // 是否生成自然语言结论（二次模型调用；默认 true）
+  withAnswer?: boolean;
+};
+
+// 对话历史一轮（多轮追问用）：只回传问答摘要，供模型消解指代（如"那只看 admin 的"）
+export type aiservicev1_AiQueryHistoryItem = {
+  question: string | undefined;
+  resultSummary: string | undefined;
+  sql: string | undefined;
+};
+
+// 智能问数 - 回应
+export type aiservicev1_AskAiQueryResponse = {
+  // 自然语言结论（with_answer=false 或模型失败时为空）
+  answer?: string;
+  // 结果列名
+  columns: string[] | undefined;
+  // 执行失败原因（SQL 语法/列不存在等；有值时 rows 为空）
+  errorMessage?: string;
+  // 实际返回的行数
+  rowCount: number | undefined;
+  // 结果行（上限 100 行）
+  rows: aiservicev1_AiQueryRow[] | undefined;
+  // 生成的只读 SQL（原样返回，便于核对与复用）
+  sql: string | undefined;
+  // 本次消耗的总 token 数（计入 AI_TOKENS 用量）
+  totalTokens: number | undefined;
+};
+
+// 结果行（values 与 columns 下标对应；时间/数字均已格式化为字符串）
+export type aiservicev1_AiQueryRow = {
+  values: string[] | undefined;
+};
+
+// AI 用量流水服务（配额记账事实源）
+export interface AiUsageLogService {
+  // 分页查询用量流水
+  List(
+    request: pagination_PagingRequest,
+  ): Promise<aiservicev1_ListAiUsageLogResponse>;
+  // 当月用量汇总（tokens/调用量/配额上限）
+  GetUsageSummary(
+    request: wellKnownEmpty,
+  ): Promise<aiservicev1_UsageSummaryResponse>;
+}
+
+export function createAiUsageLogServiceClient(
+  transport: ClientTransport,
+): AiUsageLogService {
+  return {
+    List(request) {
+      const path = `/admin/v1/ai/usage-logs`;
+      const body = null;
+      const queryParams: string[] = [];
+      if (request.page) {
+        queryParams.push(
+          `page=${encodeURIComponent(request.page.toString())}`,
+        );
+      }
+      if (request.pageSize) {
+        queryParams.push(
+          `pageSize=${encodeURIComponent(request.pageSize.toString())}`,
+        );
+      }
+      if (request.offset) {
+        queryParams.push(
+          `offset=${encodeURIComponent(request.offset.toString())}`,
+        );
+      }
+      if (request.limit) {
+        queryParams.push(
+          `limit=${encodeURIComponent(request.limit.toString())}`,
+        );
+      }
+      if (request.token) {
+        queryParams.push(
+          `token=${encodeURIComponent(request.token.toString())}`,
+        );
+      }
+      if (request.noPaging) {
+        queryParams.push(
+          `noPaging=${encodeURIComponent(request.noPaging.toString())}`,
+        );
+      }
+      if (request.query) {
+        queryParams.push(
+          `query=${encodeURIComponent(request.query.toString())}`,
+        );
+      }
+      if (request.filter) {
+        queryParams.push(
+          `filter=${encodeURIComponent(request.filter.toString())}`,
+        );
+      }
+      if (request.filterExpr?.type) {
+        queryParams.push(
+          `filterExpr.type=${encodeURIComponent(request.filterExpr.type.toString())}`,
+        );
+      }
+      if (request.orderBy) {
+        queryParams.push(
+          `orderBy=${encodeURIComponent(request.orderBy.toString())}`,
+        );
+      }
+      if (request.fieldMask) {
+        queryParams.push(
+          `fieldMask=${encodeURIComponent(request.fieldMask.toString())}`,
+        );
+      }
+      let uri = path;
+      if (queryParams.length > 0) {
+        uri += `?${queryParams.join('&')}`;
+      }
+      return transport.unary(uri, 'GET', body, {
+        service: 'AiUsageLogService',
+        method: 'List',
+      }) as Promise<aiservicev1_ListAiUsageLogResponse>;
+    },
+    GetUsageSummary(_request) {
+      const path = `/admin/v1/ai/usage-summary`;
+      const body = null;
+      return transport.unary(path, 'GET', body, {
+        service: 'AiUsageLogService',
+        method: 'GetUsageSummary',
+      }) as Promise<aiservicev1_UsageSummaryResponse>;
+    },
+  };
+}
+// 查询用量流水列表 - 回应
+export type aiservicev1_ListAiUsageLogResponse = {
+  items: aiservicev1_AiUsageLog[] | undefined;
+  total: number | undefined;
+};
+
+// AI 调用用量流水（每次成功的模型调用一行；配额按 total_tokens 聚合）
+export type aiservicev1_AiUsageLog = {
+  completionTokens?: number;
+  conversationId?: number;
+  createdAt?: wellKnownTimestamp;
+  durationMs?: number;
+  id?: number;
+  modelName?: string;
+  promptTokens?: number;
+  providerId?: number;
+  tenantId?: number;
+  totalTokens?: number;
+  userId?: number;
+};
+
+// 当月用量汇总 - 回应
+export type aiservicev1_UsageSummaryResponse = {
+  breakdown: aiservicev1_UsageBreakdown[] | undefined;
+  monthCalls: number | undefined;
+  monthTokens: number | undefined;
+  quotaConfigured: boolean | undefined;
+  quotaLimit: number | undefined;
+};
+
+// 用量细分行（provider × 模型 维度聚合）
+export type aiservicev1_UsageBreakdown = {
+  calls: number | undefined;
+  completionTokens: number | undefined;
+  modelName: string | undefined;
+  promptTokens: number | undefined;
+  providerId: number | undefined;
+  providerName: string | undefined;
+  totalTokens: number | undefined;
+};
+
+// API资源管理服务
+export interface ApiService {
+  // 查询API资源列表
+  List(
+    request: pagination_PagingRequest,
+  ): Promise<permissionservicev1_ListApiResponse>;
+  // 查询API资源详情
+  Get(
+    request: permissionservicev1_GetApiRequest,
+  ): Promise<permissionservicev1_Api>;
+  // 创建API资源
+  Create(
+    request: permissionservicev1_CreateApiRequest,
+  ): Promise<wellKnownEmpty>;
+  // 更新API资源
+  Update(
+    request: permissionservicev1_UpdateApiRequest,
+  ): Promise<wellKnownEmpty>;
+  // 删除API资源
+  Delete(
+    request: permissionservicev1_DeleteApiRequest,
+  ): Promise<wellKnownEmpty>;
+  // 同步API资源
+  SyncApis(
+    request: wellKnownEmpty,
+  ): Promise<wellKnownEmpty>;
+  // 查询路由数据
+  GetWalkRouteData(
+    request: wellKnownEmpty,
+  ): Promise<permissionservicev1_ListApiResponse>;
+}
+
+export function createApiServiceClient(
+  transport: ClientTransport,
+): ApiService {
+  return {
+    List(request) {
+      const path = `/admin/v1/apis`;
+      const body = null;
+      const queryParams: string[] = [];
+      if (request.page) {
+        queryParams.push(
+          `page=${encodeURIComponent(request.page.toString())}`,
+        );
+      }
+      if (request.pageSize) {
+        queryParams.push(
+          `pageSize=${encodeURIComponent(request.pageSize.toString())}`,
+        );
+      }
+      if (request.offset) {
+        queryParams.push(
+          `offset=${encodeURIComponent(request.offset.toString())}`,
+        );
+      }
+      if (request.limit) {
+        queryParams.push(
+          `limit=${encodeURIComponent(request.limit.toString())}`,
+        );
+      }
+      if (request.token) {
+        queryParams.push(
+          `token=${encodeURIComponent(request.token.toString())}`,
+        );
+      }
+      if (request.noPaging) {
+        queryParams.push(
+          `noPaging=${encodeURIComponent(request.noPaging.toString())}`,
+        );
+      }
+      if (request.query) {
+        queryParams.push(
+          `query=${encodeURIComponent(request.query.toString())}`,
+        );
+      }
+      if (request.filter) {
+        queryParams.push(
+          `filter=${encodeURIComponent(request.filter.toString())}`,
+        );
+      }
+      if (request.filterExpr?.type) {
+        queryParams.push(
+          `filterExpr.type=${encodeURIComponent(request.filterExpr.type.toString())}`,
+        );
+      }
+      if (request.orderBy) {
+        queryParams.push(
+          `orderBy=${encodeURIComponent(request.orderBy.toString())}`,
+        );
+      }
+      if (request.fieldMask) {
+        queryParams.push(
+          `fieldMask=${encodeURIComponent(request.fieldMask.toString())}`,
+        );
+      }
+      let uri = path;
+      if (queryParams.length > 0) {
+        uri += `?${queryParams.join('&')}`;
+      }
+      return transport.unary(uri, 'GET', body, {
+        service: 'ApiService',
+        method: 'List',
+      }) as Promise<permissionservicev1_ListApiResponse>;
+    },
+    Get(request) {
+      if (request.id === undefined || request.id === null) {
+        throw new Error('missing required field request.id');
+      }
+      const path = `/admin/v1/apis/${request.id}`;
+      const body = null;
+      const queryParams: string[] = [];
+      if (request.viewMask) {
+        queryParams.push(
+          `viewMask=${encodeURIComponent(request.viewMask.toString())}`,
+        );
+      }
+      let uri = path;
+      if (queryParams.length > 0) {
+        uri += `?${queryParams.join('&')}`;
+      }
+      return transport.unary(uri, 'GET', body, {
+        service: 'ApiService',
+        method: 'Get',
+      }) as Promise<permissionservicev1_Api>;
+    },
+    Create(request) {
+      const path = `/admin/v1/apis`;
+      const body = JSON.stringify(request);
+      return transport.unary(path, 'POST', body, {
+        service: 'ApiService',
+        method: 'Create',
+      }) as Promise<wellKnownEmpty>;
+    },
+    Update(request) {
+      if (request.id === undefined || request.id === null) {
+        throw new Error('missing required field request.id');
+      }
+      const path = `/admin/v1/apis/${request.id}`;
+      const bodyMap = { ...request } as Record<string, unknown>;
+      delete bodyMap["id"];
+      const body = JSON.stringify(bodyMap);
+      return transport.unary(path, 'PUT', body, {
+        service: 'ApiService',
+        method: 'Update',
+      }) as Promise<wellKnownEmpty>;
+    },
+    Delete(request) {
+      if (request.id === undefined || request.id === null) {
+        throw new Error('missing required field request.id');
+      }
+      const path = `/admin/v1/apis/${request.id}`;
+      const body = null;
+      return transport.unary(path, 'DELETE', body, {
+        service: 'ApiService',
+        method: 'Delete',
+      }) as Promise<wellKnownEmpty>;
+    },
+    SyncApis(request) {
+      const path = `/admin/v1/apis/sync`;
+      const body = JSON.stringify(request);
+      return transport.unary(path, 'POST', body, {
+        service: 'ApiService',
+        method: 'SyncApis',
+      }) as Promise<wellKnownEmpty>;
+    },
+    GetWalkRouteData(_request) {
+      const path = `/admin/v1/apis/walk-route`;
+      const body = null;
+      return transport.unary(path, 'GET', body, {
+        service: 'ApiService',
+        method: 'GetWalkRouteData',
+      }) as Promise<permissionservicev1_ListApiResponse>;
+    },
+  };
+}
+// 查询列表 - 回应
+export type permissionservicev1_ListApiResponse = {
+  items: permissionservicev1_Api[] | undefined;
+  total: number | undefined;
+};
+
+// API资源
+export type permissionservicev1_Api = {
+  createdAt?: wellKnownTimestamp;
+  createdBy?: number;
+  deletedAt?: wellKnownTimestamp;
+  deletedBy?: number;
+  description?: string;
+  id?: number;
+  method?: string;
+  module?: string;
+  moduleDescription?: string;
+  operation?: string;
+  path?: string;
+  scope?: permissionservicev1_Api_Scope;
+  status?: permissionservicev1_Api_Status;
+  updatedAt?: wellKnownTimestamp;
+  updatedBy?: number;
+};
+
+// API作用域
+export type permissionservicev1_Api_Scope =
+  | 'ADMIN'
+  | 'API_SCOPE_INVALID'
+  | 'APP';
+// 权限状态
+export type permissionservicev1_Api_Status =
+  | 'OFF'
+  | 'ON';
+// 查询 - 请求
+export type permissionservicev1_GetApiRequest = {
+  id?: number;
+  viewMask?: wellKnownFieldMask;
+};
+
+// 创建 - 请求
+export type permissionservicev1_CreateApiRequest = {
+  data: permissionservicev1_Api | undefined;
+};
+
+// 更新 - 请求
+export type permissionservicev1_UpdateApiRequest = {
+  allowMissing?: boolean;
+  data: permissionservicev1_Api | undefined;
+  id: number | undefined;
+  updateMask: undefined | wellKnownFieldMask;
+};
+
+// 删除 - 请求
+export type permissionservicev1_DeleteApiRequest = {
+  id?: number;
+};
+
+// API审计日志管理服务
+export interface ApiAuditLogService {
+  // 查询API审计日志列表
+  List(
+    request: pagination_PagingRequest,
+  ): Promise<auditservicev1_ListApiAuditLogResponse>;
+  // 查询API审计日志详情
+  Get(
+    request: auditservicev1_GetApiAuditLogRequest,
+  ): Promise<auditservicev1_ApiAuditLog>;
+}
+
+export function createApiAuditLogServiceClient(
+  transport: ClientTransport,
+): ApiAuditLogService {
+  return {
+    List(request) {
+      const path = `/admin/v1/api-audit-logs`;
+      const body = null;
+      const queryParams: string[] = [];
+      if (request.page) {
+        queryParams.push(
+          `page=${encodeURIComponent(request.page.toString())}`,
+        );
+      }
+      if (request.pageSize) {
+        queryParams.push(
+          `pageSize=${encodeURIComponent(request.pageSize.toString())}`,
+        );
+      }
+      if (request.offset) {
+        queryParams.push(
+          `offset=${encodeURIComponent(request.offset.toString())}`,
+        );
+      }
+      if (request.limit) {
+        queryParams.push(
+          `limit=${encodeURIComponent(request.limit.toString())}`,
+        );
+      }
+      if (request.token) {
+        queryParams.push(
+          `token=${encodeURIComponent(request.token.toString())}`,
+        );
+      }
+      if (request.noPaging) {
+        queryParams.push(
+          `noPaging=${encodeURIComponent(request.noPaging.toString())}`,
+        );
+      }
+      if (request.query) {
+        queryParams.push(
+          `query=${encodeURIComponent(request.query.toString())}`,
+        );
+      }
+      if (request.filter) {
+        queryParams.push(
+          `filter=${encodeURIComponent(request.filter.toString())}`,
+        );
+      }
+      if (request.filterExpr?.type) {
+        queryParams.push(
+          `filterExpr.type=${encodeURIComponent(request.filterExpr.type.toString())}`,
+        );
+      }
+      if (request.orderBy) {
+        queryParams.push(
+          `orderBy=${encodeURIComponent(request.orderBy.toString())}`,
         );
       }
       if (request.fieldMask) {
@@ -866,7 +2695,7 @@ export function createApiAuditLogServiceClient(
       if (request.id === undefined || request.id === null) {
         throw new Error('missing required field request.id');
       }
-      const path = `admin/v1/api-audit-logs/${request.id}`;
+      const path = `/admin/v1/api-audit-logs/${request.id}`;
       const body = null;
       const queryParams: string[] = [];
       if (request.viewMask) {
@@ -983,6 +2812,10 @@ export interface AuthenticationService {
   Login(
     request: authenticationservicev1_LoginRequest,
   ): Promise<authenticationservicev1_LoginResponse>;
+  // 获取 OIDC 授权跳转地址（core 生成 state 暂存 Redis，防 CSRF；免鉴权）
+  GetOidcAuthorizeUrl(
+    request: authenticationservicev1_GetOidcAuthorizeUrlRequest,
+  ): Promise<authenticationservicev1_GetOidcAuthorizeUrlResponse>;
   // 登出
   Logout(
     request: wellKnownEmpty,
@@ -996,6 +2829,18 @@ export interface AuthenticationService {
     request: wellKnownEmpty,
   ): Promise<authenticationservicev1_GenerateCaptchaResponse>;
   // 验证验证码
+  // 忘记密码（免鉴权）：发重置验证码到绑定邮箱
+  ForgotPassword(
+    request: authenticationservicev1_ForgotPasswordRequest,
+  ): Promise<wellKnownEmpty>;
+  // 凭邮箱验证码重置密码（免鉴权）
+  ResetPasswordByCode(
+    request: authenticationservicev1_ResetPasswordByCodeRequest,
+  ): Promise<wellKnownEmpty>;
+  // 租户白标查询（免鉴权；登录页按租户编号渲染 Logo/名称）
+  GetTenantBranding(
+    request: authenticationservicev1_GetTenantBrandingRequest,
+  ): Promise<authenticationservicev1_GetTenantBrandingResponse>;
   VerifyCaptcha(
     request: authenticationservicev1_VerifyCaptchaRequest,
   ): Promise<authenticationservicev1_VerifyCaptchaResponse>;
@@ -1006,15 +2851,23 @@ export function createAuthenticationServiceClient(
 ): AuthenticationService {
   return {
     Login(request) {
-      const path = `admin/v1/login`;
+      const path = `/admin/v1/login`;
       const body = JSON.stringify(request);
       return transport.unary(path, 'POST', body, {
         service: 'AuthenticationService',
         method: 'Login',
       }) as Promise<authenticationservicev1_LoginResponse>;
     },
+    GetOidcAuthorizeUrl(request) {
+      const path = `/admin/v1/oidc/authorize-url`;
+      const body = JSON.stringify(request);
+      return transport.unary(path, 'POST', body, {
+        service: 'AuthenticationService',
+        method: 'GetOidcAuthorizeUrl',
+      }) as Promise<authenticationservicev1_GetOidcAuthorizeUrlResponse>;
+    },
     Logout(request) {
-      const path = `admin/v1/logout`;
+      const path = `/admin/v1/logout`;
       const body = JSON.stringify(request);
       return transport.unary(path, 'POST', body, {
         service: 'AuthenticationService',
@@ -1022,7 +2875,7 @@ export function createAuthenticationServiceClient(
       }) as Promise<wellKnownEmpty>;
     },
     RefreshToken(request) {
-      const path = `admin/v1/refresh-token`;
+      const path = `/admin/v1/refresh-token`;
       const body = JSON.stringify(request);
       return transport.unary(path, 'POST', body, {
         service: 'AuthenticationService',
@@ -1030,15 +2883,39 @@ export function createAuthenticationServiceClient(
       }) as Promise<authenticationservicev1_LoginResponse>;
     },
     GenerateCaptcha(_request) {
-      const path = `admin/v1/captcha`;
+      const path = `/admin/v1/captcha`;
       const body = null;
       return transport.unary(path, 'GET', body, {
         service: 'AuthenticationService',
         method: 'GenerateCaptcha',
       }) as Promise<authenticationservicev1_GenerateCaptchaResponse>;
     },
+    ForgotPassword(request) {
+      const path = `/admin/v1/forgot-password`;
+      const body = JSON.stringify(request);
+      return transport.unary(path, 'POST', body, {
+        service: 'AuthenticationService',
+        method: 'ForgotPassword',
+      }) as Promise<wellKnownEmpty>;
+    },
+    ResetPasswordByCode(request) {
+      const path = `/admin/v1/reset-password-by-code`;
+      const body = JSON.stringify(request);
+      return transport.unary(path, 'POST', body, {
+        service: 'AuthenticationService',
+        method: 'ResetPasswordByCode',
+      }) as Promise<wellKnownEmpty>;
+    },
+    GetTenantBranding(request) {
+      const path = `/admin/v1/tenant-branding`;
+      const body = JSON.stringify(request);
+      return transport.unary(path, 'POST', body, {
+        service: 'AuthenticationService',
+        method: 'GetTenantBranding',
+      }) as Promise<authenticationservicev1_GetTenantBrandingResponse>;
+    },
     VerifyCaptcha(request) {
-      const path = `admin/v1/captcha/verify`;
+      const path = `/admin/v1/captcha/verify`;
       const body = JSON.stringify(request);
       return transport.unary(path, 'POST', body, {
         service: 'AuthenticationService',
@@ -1049,6 +2926,8 @@ export function createAuthenticationServiceClient(
 }
 // 用户登录 - 请求
 export type authenticationservicev1_LoginRequest = {
+  // 登录客户端 IP（BFF 从 HTTP 请求注入，写会话元数据/审计用）
+  clientIp?: string;
   client_id?: string;
   client_secret?: string;
   client_type?: authenticationservicev1_ClientType;
@@ -1059,12 +2938,20 @@ export type authenticationservicev1_LoginRequest = {
   // Behaviors: REQUIRED
   grant_type: authenticationservicev1_GrantType | undefined;
   jti?: string;
+  // MFA 挑战凭据（两步验证第二步随 totp_code 一并回传；Login 返回 mfa_operation_id 时签发）
+  mfa_operation_id?: string;
   mobile?: string;
+  oidcIssuer?: string;
+  oidc_state?: string;
   password?: string;
   redirect_uri?: string;
   refresh_token?: string;
   scope?: string;
   tenant_code?: string;
+  // TOTP 动态验证码（6 位数字）
+  totp_code?: string;
+  // 登录客户端 User-Agent（BFF 注入）
+  userAgent?: string;
   user_id?: number;
   username?: string;
 };
@@ -1085,6 +2972,10 @@ export type authenticationservicev1_LoginResponse = {
   access_token: string | undefined;
   expires_in: number | undefined;
   id_token?: string;
+  // 本次签发的会话令牌对 ID（在线会话管理用）
+  jti?: string;
+  // MFA 挑战凭据：非空表示密码验证已通过、须完成两步验证（此时不含任何令牌字段）
+  mfa_operation_id?: string;
   refresh_expires_in?: number;
   refresh_token?: string;
   scope?: string;
@@ -1095,9 +2986,45 @@ export type authenticationservicev1_LoginResponse = {
 export type authenticationservicev1_TokenType =
   | 'bearer'
   | 'mac';
+// OIDC 授权跳转地址 - 请求
+export type authenticationservicev1_GetOidcAuthorizeUrlRequest = {
+  redirect_uri?: string;
+};
+
+// OIDC 授权跳转地址 - 响应
+export type authenticationservicev1_GetOidcAuthorizeUrlResponse = {
+  authorizeUrl?: string;
+};
+
 export type authenticationservicev1_GenerateCaptchaResponse = {
   captchaId: string | undefined;
   imageBase64: string | undefined;
+};
+
+// 忘记密码 - 请求（identifier 为已绑定的邮箱）
+export type authenticationservicev1_ForgotPasswordRequest = {
+  identifier?: string;
+};
+
+// 凭验证码重置密码 - 请求
+export type authenticationservicev1_ResetPasswordByCodeRequest = {
+  code?: string;
+  identifier?: string;
+  // 新密码（AES 密文传输，与登录同规）
+  newPassword?: string;
+};
+
+// 租户白标查询 - 请求（登录页 tenant_code 输入框的值）
+export type authenticationservicev1_GetTenantBrandingRequest = {
+  code: string | undefined;
+};
+
+// 租户白标查询 - 响应
+export type authenticationservicev1_GetTenantBrandingResponse = {
+  // 编号未命中时 false（前端保持默认品牌，不区分"不存在"与"未设置"）
+  found: boolean | undefined;
+  logoUrl: string | undefined;
+  name: string | undefined;
 };
 
 export type authenticationservicev1_VerifyCaptchaRequest = {
@@ -1107,6 +3034,86 @@ export type authenticationservicev1_VerifyCaptchaRequest = {
 
 export type authenticationservicev1_VerifyCaptchaResponse = {
   valid: boolean | undefined;
+};
+
+// 备份档案服务（BFF 面：代理 core BackupArchiveService，只读）。
+// 备份历史列表 + 下载；恢复保持一次性程序（防误触），无任何写入口。
+export interface BackupService {
+  // 备份历史列表
+  ListBackups(
+    request: taskservicev1_ListBackupsRequest,
+  ): Promise<taskservicev1_ListBackupsResponse>;
+  // 下载备份档案（bytes 内联，前端解 base64 存盘）
+  DownloadBackup(
+    request: taskservicev1_DownloadBackupRequest,
+  ): Promise<taskservicev1_DownloadBackupResponse>;
+}
+
+export function createBackupServiceClient(
+  transport: ClientTransport,
+): BackupService {
+  return {
+    ListBackups(_request) {
+      const path = `/admin/v1/backups`;
+      const body = null;
+      return transport.unary(path, 'GET', body, {
+        service: 'BackupService',
+        method: 'ListBackups',
+      }) as Promise<taskservicev1_ListBackupsResponse>;
+    },
+    DownloadBackup(request) {
+      const path = `/admin/v1/backups/download`;
+      const body = null;
+      const queryParams: string[] = [];
+      if (request.objectKey) {
+        queryParams.push(
+          `objectKey=${encodeURIComponent(request.objectKey.toString())}`,
+        );
+      }
+      let uri = path;
+      if (queryParams.length > 0) {
+        uri += `?${queryParams.join('&')}`;
+      }
+      return transport.unary(uri, 'GET', body, {
+        service: 'BackupService',
+        method: 'DownloadBackup',
+      }) as Promise<taskservicev1_DownloadBackupResponse>;
+    },
+  };
+}
+// 列出备份 - 请求
+export type taskservicev1_ListBackupsRequest = {
+};
+
+// 列出备份 - 回应
+export type taskservicev1_ListBackupsResponse = {
+  items: taskservicev1_BackupArchive[] | undefined;
+};
+
+// 备份档案条目
+export type taskservicev1_BackupArchive = {
+  // 展示名（去前缀去日期目录）
+  displayName: string | undefined;
+  // 上传时间
+  lastModified?: wellKnownTimestamp;
+  // 对象键（gowind-cms/YYYY/MM/DD/<name>-<hhmmss>.json.gz）
+  objectKey: string | undefined;
+  // 压缩后字节数
+  sizeBytes: number | undefined;
+};
+
+// 下载备份 - 请求
+export type taskservicev1_DownloadBackupRequest = {
+  // 对象键（须在本项目前缀下，防路径穿越）
+  objectKey: string | undefined;
+};
+
+// 下载备份 - 回应
+export type taskservicev1_DownloadBackupResponse = {
+  // 对象 MIME（application/gzip）
+  contentType: string | undefined;
+  // 文件字节（gzip JSON）
+  file: string | undefined;
 };
 
 // 类别服务
@@ -1138,7 +3145,7 @@ export function createCategoryServiceClient(
 ): CategoryService {
   return {
     List(request) {
-      const path = `admin/v1/categories`;
+      const path = `/admin/v1/categories`;
       const body = null;
       const queryParams: string[] = [];
       if (request.page) {
@@ -1186,56 +3193,9 @@ export function createCategoryServiceClient(
           `filterExpr.type=${encodeURIComponent(request.filterExpr.type.toString())}`,
         );
       }
-      if (request.filterExpr?.conditions?.field) {
-        queryParams.push(
-          `filterExpr.conditions.field=${encodeURIComponent(request.filterExpr.conditions.field.toString())}`,
-        );
-      }
-      if (request.filterExpr?.conditions?.op) {
-        queryParams.push(
-          `filterExpr.conditions.op=${encodeURIComponent(request.filterExpr.conditions.op.toString())}`,
-        );
-      }
-      if (request.filterExpr?.conditions?.value) {
-        queryParams.push(
-          `filterExpr.conditions.value=${encodeURIComponent(request.filterExpr.conditions.value.toString())}`,
-        );
-      }
-      if (request.filterExpr?.conditions?.jsonValue) {
-        queryParams.push(
-          `filterExpr.conditions.jsonValue=${encodeURIComponent(request.filterExpr.conditions.jsonValue.toString())}`,
-        );
-      }
-      if (request.filterExpr?.conditions?.values) {
-        request.filterExpr.conditions.values.forEach((x) => {
-          queryParams.push(
-            `filterExpr.conditions.values=${encodeURIComponent(x.toString())}`,
-          );
-        });
-      }
-      if (request.filterExpr?.conditions?.datePart) {
-        queryParams.push(
-          `filterExpr.conditions.datePart=${encodeURIComponent(request.filterExpr.conditions.datePart.toString())}`,
-        );
-      }
-      if (request.filterExpr?.conditions?.jsonPath) {
-        queryParams.push(
-          `filterExpr.conditions.jsonPath=${encodeURIComponent(request.filterExpr.conditions.jsonPath.toString())}`,
-        );
-      }
       if (request.orderBy) {
         queryParams.push(
           `orderBy=${encodeURIComponent(request.orderBy.toString())}`,
-        );
-      }
-      if (request.sorting?.field) {
-        queryParams.push(
-          `sorting.field=${encodeURIComponent(request.sorting.field.toString())}`,
-        );
-      }
-      if (request.sorting?.direction) {
-        queryParams.push(
-          `sorting.direction=${encodeURIComponent(request.sorting.direction.toString())}`,
         );
       }
       if (request.fieldMask) {
@@ -1256,7 +3216,7 @@ export function createCategoryServiceClient(
       if (request.id === undefined || request.id === null) {
         throw new Error('missing required field request.id');
       }
-      const path = `admin/v1/categories/${request.id}`;
+      const path = `/admin/v1/categories/${request.id}`;
       const body = null;
       const queryParams: string[] = [];
       if (request.code) {
@@ -1284,7 +3244,7 @@ export function createCategoryServiceClient(
       }) as Promise<contentservicev1_Category>;
     },
     Create(request) {
-      const path = `admin/v1/categories`;
+      const path = `/admin/v1/categories`;
       const body = JSON.stringify(request);
       return transport.unary(path, 'POST', body, {
         service: 'CategoryService',
@@ -1295,8 +3255,10 @@ export function createCategoryServiceClient(
       if (request.id === undefined || request.id === null) {
         throw new Error('missing required field request.id');
       }
-      const path = `admin/v1/categories/${request.id}`;
-      const body = JSON.stringify(request);
+      const path = `/admin/v1/categories/${request.id}`;
+      const bodyMap = { ...request } as Record<string, unknown>;
+      delete bodyMap["id"];
+      const body = JSON.stringify(bodyMap);
       return transport.unary(path, 'PUT', body, {
         service: 'CategoryService',
         method: 'Update',
@@ -1306,7 +3268,7 @@ export function createCategoryServiceClient(
       if (request.id === undefined || request.id === null) {
         throw new Error('missing required field request.id');
       }
-      const path = `admin/v1/categories/${request.id}`;
+      const path = `/admin/v1/categories/${request.id}`;
       const body = null;
       return transport.unary(path, 'DELETE', body, {
         service: 'CategoryService',
@@ -1439,7 +3401,7 @@ export function createCommentServiceClient(
 ): CommentService {
   return {
     List(request) {
-      const path = `admin/v1/comments`;
+      const path = `/admin/v1/comments`;
       const body = null;
       const queryParams: string[] = [];
       if (request.page) {
@@ -1487,56 +3449,9 @@ export function createCommentServiceClient(
           `filterExpr.type=${encodeURIComponent(request.filterExpr.type.toString())}`,
         );
       }
-      if (request.filterExpr?.conditions?.field) {
-        queryParams.push(
-          `filterExpr.conditions.field=${encodeURIComponent(request.filterExpr.conditions.field.toString())}`,
-        );
-      }
-      if (request.filterExpr?.conditions?.op) {
-        queryParams.push(
-          `filterExpr.conditions.op=${encodeURIComponent(request.filterExpr.conditions.op.toString())}`,
-        );
-      }
-      if (request.filterExpr?.conditions?.value) {
-        queryParams.push(
-          `filterExpr.conditions.value=${encodeURIComponent(request.filterExpr.conditions.value.toString())}`,
-        );
-      }
-      if (request.filterExpr?.conditions?.jsonValue) {
-        queryParams.push(
-          `filterExpr.conditions.jsonValue=${encodeURIComponent(request.filterExpr.conditions.jsonValue.toString())}`,
-        );
-      }
-      if (request.filterExpr?.conditions?.values) {
-        request.filterExpr.conditions.values.forEach((x) => {
-          queryParams.push(
-            `filterExpr.conditions.values=${encodeURIComponent(x.toString())}`,
-          );
-        });
-      }
-      if (request.filterExpr?.conditions?.datePart) {
-        queryParams.push(
-          `filterExpr.conditions.datePart=${encodeURIComponent(request.filterExpr.conditions.datePart.toString())}`,
-        );
-      }
-      if (request.filterExpr?.conditions?.jsonPath) {
-        queryParams.push(
-          `filterExpr.conditions.jsonPath=${encodeURIComponent(request.filterExpr.conditions.jsonPath.toString())}`,
-        );
-      }
       if (request.orderBy) {
         queryParams.push(
           `orderBy=${encodeURIComponent(request.orderBy.toString())}`,
-        );
-      }
-      if (request.sorting?.field) {
-        queryParams.push(
-          `sorting.field=${encodeURIComponent(request.sorting.field.toString())}`,
-        );
-      }
-      if (request.sorting?.direction) {
-        queryParams.push(
-          `sorting.direction=${encodeURIComponent(request.sorting.direction.toString())}`,
         );
       }
       if (request.fieldMask) {
@@ -1557,7 +3472,7 @@ export function createCommentServiceClient(
       if (request.id === undefined || request.id === null) {
         throw new Error('missing required field request.id');
       }
-      const path = `admin/v1/comments/${request.id}`;
+      const path = `/admin/v1/comments/${request.id}`;
       const body = null;
       const queryParams: string[] = [];
       if (request.viewMask) {
@@ -1575,7 +3490,7 @@ export function createCommentServiceClient(
       }) as Promise<commentservicev1_Comment>;
     },
     Create(request) {
-      const path = `admin/v1/comments`;
+      const path = `/admin/v1/comments`;
       const body = JSON.stringify(request);
       return transport.unary(path, 'POST', body, {
         service: 'CommentService',
@@ -1586,8 +3501,10 @@ export function createCommentServiceClient(
       if (request.id === undefined || request.id === null) {
         throw new Error('missing required field request.id');
       }
-      const path = `admin/v1/comments/${request.id}`;
-      const body = JSON.stringify(request);
+      const path = `/admin/v1/comments/${request.id}`;
+      const bodyMap = { ...request } as Record<string, unknown>;
+      delete bodyMap["id"];
+      const body = JSON.stringify(bodyMap);
       return transport.unary(path, 'PUT', body, {
         service: 'CommentService',
         method: 'Update',
@@ -1597,7 +3514,7 @@ export function createCommentServiceClient(
       if (request.id === undefined || request.id === null) {
         throw new Error('missing required field request.id');
       }
-      const path = `admin/v1/comments/${request.id}`;
+      const path = `/admin/v1/comments/${request.id}`;
       const body = null;
       return transport.unary(path, 'DELETE', body, {
         service: 'CommentService',
@@ -1685,40 +3602,44 @@ export type commentservicev1_DeleteCommentRequest = {
   id?: number;
 };
 
-// 内容模型管理服务
-export interface ContentModelService {
-  // 查询内容模型列表
+// 组件定义服务（内容建模 Components 的管理面）
+export interface ComponentDefinitionService {
+  // 组件定义列表
   List(
     request: pagination_PagingRequest,
-  ): Promise<contentservicev1_ListContentModelResponse>;
-  // 查询内容模型详情
+  ): Promise<contentservicev1_ListComponentDefinitionsResponse>;
+  // 组件定义详情
   Get(
-    request: contentservicev1_GetContentModelRequest,
-  ): Promise<contentservicev1_ContentModel>;
-  // 创建内容模型
+    request: contentservicev1_GetComponentDefinitionRequest,
+  ): Promise<contentservicev1_ComponentDefinition>;
+  // 创建组件定义
   Create(
-    request: contentservicev1_CreateContentModelRequest,
-  ): Promise<contentservicev1_ContentModel>;
-  // 更新内容模型
+    request: contentservicev1_CreateComponentDefinitionRequest,
+  ): Promise<contentservicev1_ComponentDefinition>;
+  // 更新组件定义
   Update(
-    request: contentservicev1_UpdateContentModelRequest,
-  ): Promise<contentservicev1_ContentModel>;
-  // 删除内容模型
+    request: contentservicev1_UpdateComponentDefinitionRequest,
+  ): Promise<contentservicev1_ComponentDefinition>;
+  // 删除组件定义（被模型字段引用时拒绝）
   Delete(
-    request: contentservicev1_DeleteContentModelRequest,
+    request: contentservicev1_DeleteComponentDefinitionRequest,
   ): Promise<wellKnownEmpty>;
-  // 列出模型下的字段定义
+  // 列组件字段定义
   ListFieldDefinitions(
     request: contentservicev1_ListFieldDefinitionsRequest,
   ): Promise<contentservicev1_ListFieldDefinitionsResponse>;
+  // 保存组件字段定义（replace 语义：整体替换该组件的字段集）
+  SaveFieldDefinitions(
+    request: contentservicev1_SaveComponentFieldDefinitionsRequest,
+  ): Promise<contentservicev1_ListFieldDefinitionsResponse>;
 }
 
-export function createContentModelServiceClient(
+export function createComponentDefinitionServiceClient(
   transport: ClientTransport,
-): ContentModelService {
+): ComponentDefinitionService {
   return {
     List(request) {
-      const path = `admin/v1/content-models`;
+      const path = `/admin/v1/content-components`;
       const body = null;
       const queryParams: string[] = [];
       if (request.page) {
@@ -1766,41 +3687,299 @@ export function createContentModelServiceClient(
           `filterExpr.type=${encodeURIComponent(request.filterExpr.type.toString())}`,
         );
       }
-      if (request.filterExpr?.conditions?.field) {
+      if (request.orderBy) {
         queryParams.push(
-          `filterExpr.conditions.field=${encodeURIComponent(request.filterExpr.conditions.field.toString())}`,
+          `orderBy=${encodeURIComponent(request.orderBy.toString())}`,
         );
       }
-      if (request.filterExpr?.conditions?.op) {
+      if (request.fieldMask) {
         queryParams.push(
-          `filterExpr.conditions.op=${encodeURIComponent(request.filterExpr.conditions.op.toString())}`,
+          `fieldMask=${encodeURIComponent(request.fieldMask.toString())}`,
         );
       }
-      if (request.filterExpr?.conditions?.value) {
+      let uri = path;
+      if (queryParams.length > 0) {
+        uri += `?${queryParams.join('&')}`;
+      }
+      return transport.unary(uri, 'GET', body, {
+        service: 'ComponentDefinitionService',
+        method: 'List',
+      }) as Promise<contentservicev1_ListComponentDefinitionsResponse>;
+    },
+    Get(request) {
+      if (request.id === undefined || request.id === null) {
+        throw new Error('missing required field request.id');
+      }
+      const path = `/admin/v1/content-components/${request.id}`;
+      const body = null;
+      return transport.unary(path, 'GET', body, {
+        service: 'ComponentDefinitionService',
+        method: 'Get',
+      }) as Promise<contentservicev1_ComponentDefinition>;
+    },
+    Create(request) {
+      const path = `/admin/v1/content-components`;
+      const body = JSON.stringify(request);
+      return transport.unary(path, 'POST', body, {
+        service: 'ComponentDefinitionService',
+        method: 'Create',
+      }) as Promise<contentservicev1_ComponentDefinition>;
+    },
+    Update(request) {
+      if (request.id === undefined || request.id === null) {
+        throw new Error('missing required field request.id');
+      }
+      const path = `/admin/v1/content-components/${request.id}`;
+      const bodyMap = { ...request } as Record<string, unknown>;
+      delete bodyMap["id"];
+      const body = JSON.stringify(bodyMap);
+      return transport.unary(path, 'PUT', body, {
+        service: 'ComponentDefinitionService',
+        method: 'Update',
+      }) as Promise<contentservicev1_ComponentDefinition>;
+    },
+    Delete(request) {
+      if (request.id === undefined || request.id === null) {
+        throw new Error('missing required field request.id');
+      }
+      const path = `/admin/v1/content-components/${request.id}`;
+      const body = null;
+      return transport.unary(path, 'DELETE', body, {
+        service: 'ComponentDefinitionService',
+        method: 'Delete',
+      }) as Promise<wellKnownEmpty>;
+    },
+    ListFieldDefinitions(request) {
+      if (request.componentId === undefined || request.componentId === null) {
+        throw new Error('missing required field request.component_id');
+      }
+      const path = `/admin/v1/content-components/${request.componentId}/field-definitions`;
+      const body = null;
+      const queryParams: string[] = [];
+      if (request.contentModelId) {
         queryParams.push(
-          `filterExpr.conditions.value=${encodeURIComponent(request.filterExpr.conditions.value.toString())}`,
+          `contentModelId=${encodeURIComponent(request.contentModelId.toString())}`,
         );
       }
-      if (request.filterExpr?.conditions?.jsonValue) {
+      if (request.viewMask) {
         queryParams.push(
-          `filterExpr.conditions.jsonValue=${encodeURIComponent(request.filterExpr.conditions.jsonValue.toString())}`,
+          `viewMask=${encodeURIComponent(request.viewMask.toString())}`,
         );
       }
-      if (request.filterExpr?.conditions?.values) {
-        request.filterExpr.conditions.values.forEach((x) => {
-          queryParams.push(
-            `filterExpr.conditions.values=${encodeURIComponent(x.toString())}`,
-          );
-        });
+      let uri = path;
+      if (queryParams.length > 0) {
+        uri += `?${queryParams.join('&')}`;
       }
-      if (request.filterExpr?.conditions?.datePart) {
+      return transport.unary(uri, 'GET', body, {
+        service: 'ComponentDefinitionService',
+        method: 'ListFieldDefinitions',
+      }) as Promise<contentservicev1_ListFieldDefinitionsResponse>;
+    },
+    SaveFieldDefinitions(request) {
+      if (request.componentId === undefined || request.componentId === null) {
+        throw new Error('missing required field request.component_id');
+      }
+      const path = `/admin/v1/content-components/${request.componentId}/field-definitions`;
+      const bodyMap = { ...request } as Record<string, unknown>;
+      delete bodyMap["componentId"];
+      const body = JSON.stringify(bodyMap);
+      return transport.unary(path, 'PUT', body, {
+        service: 'ComponentDefinitionService',
+        method: 'SaveFieldDefinitions',
+      }) as Promise<contentservicev1_ListFieldDefinitionsResponse>;
+    },
+  };
+}
+// 组件定义列表 - 回应
+export type contentservicev1_ListComponentDefinitionsResponse = {
+  items: contentservicev1_ComponentDefinition[] | undefined;
+  total: number | undefined;
+};
+
+// 组件定义：具名可复用字段组（字段经 FieldDefinition 面 按 componentId 存取）
+export type contentservicev1_ComponentDefinition = {
+  code?: string;
+  createdAt?: wellKnownTimestamp;
+  description?: string;
+  fieldCount?: number;
+  id?: number;
+  name?: string;
+  updatedAt?: wellKnownTimestamp;
+};
+
+// 组件定义详情 - 请求
+export type contentservicev1_GetComponentDefinitionRequest = {
+  id: number | undefined;
+};
+
+// 创建组件定义 - 请求
+export type contentservicev1_CreateComponentDefinitionRequest = {
+  data: contentservicev1_ComponentDefinition | undefined;
+};
+
+// 更新组件定义 - 请求
+export type contentservicev1_UpdateComponentDefinitionRequest = {
+  data: contentservicev1_ComponentDefinition | undefined;
+  id: number | undefined;
+  updateMask: undefined | wellKnownFieldMask;
+};
+
+// 删除组件定义 - 请求
+export type contentservicev1_DeleteComponentDefinitionRequest = {
+  id: number | undefined;
+};
+
+// 查询字段定义列表 - 请求（component_id 非 0 时列组件字段，content_model_id 忽略）
+export type contentservicev1_ListFieldDefinitionsRequest = {
+  componentId?: number;
+  contentModelId: number | undefined;
+  viewMask?: wellKnownFieldMask;
+};
+
+// 查询字段定义列表 - 回应
+export type contentservicev1_ListFieldDefinitionsResponse = {
+  items: contentservicev1_FieldDefinition[] | undefined;
+  total: number | undefined;
+};
+
+// 字段定义
+export type contentservicev1_FieldDefinition = {
+  componentConfig?: contentservicev1_ComponentConfig;
+  componentId?: number;
+  contentModelId?: number;
+  createdAt?: wellKnownTimestamp;
+  createdBy?: number;
+  description?: string;
+  id?: number;
+  isRequired?: boolean;
+  label?: string;
+  name?: string;
+  options: { [key: string]: string } | undefined;
+  placeholder?: string;
+  relationConfig?: contentservicev1_RelationConfig;
+  sortOrder?: number;
+  translations: contentservicev1_FieldDefinitionTranslation[] | undefined;
+  type?: contentservicev1_FieldDefinition_Type;
+  validationRegex?: string;
+};
+
+// 字段类型
+export type contentservicev1_FieldDefinition_Type =
+  | 'FIELD_TYPE_COMPONENT'
+  | 'FIELD_TYPE_DYNAMIC_ZONE'
+  | 'FIELD_TYPE_FILE'
+  | 'FIELD_TYPE_IMAGE'
+  | 'FIELD_TYPE_NUMBER'
+  | 'FIELD_TYPE_RELATION'
+  | 'FIELD_TYPE_RICHTEXT'
+  | 'FIELD_TYPE_TEXT';
+// relation 类型字段的引用配置
+export type contentservicev1_RelationConfig = {
+  allowCrossTenant?: boolean;
+  filterCategoryId?: number;
+  targetEntityType?: string;
+};
+
+// 组件配置（component/dynamic_zone 字段用）
+export type contentservicev1_ComponentConfig = {
+  allowedComponentCodes: string[] | undefined;
+  componentCode?: string;
+  repeatable?: boolean;
+};
+
+// 字段定义翻译
+export type contentservicev1_FieldDefinitionTranslation = {
+  createdAt?: wellKnownTimestamp;
+  createdBy?: number;
+  description?: string;
+  fieldDefinitionId?: number;
+  id?: number;
+  label?: string;
+  languageCode?: string;
+  placeholder?: string;
+};
+
+// 保存组件字段定义 - 请求（整体替换）
+export type contentservicev1_SaveComponentFieldDefinitionsRequest = {
+  componentId: number | undefined;
+  fields: contentservicev1_FieldDefinition[] | undefined;
+};
+
+// 系统参数管理服务
+export interface ConfigService {
+  // 查询系统参数列表
+  List(
+    request: pagination_PagingRequest,
+  ): Promise<configservicev1_ListConfigResponse>;
+  // 查询系统参数详情
+  Get(
+    request: configservicev1_GetConfigRequest,
+  ): Promise<configservicev1_Config>;
+  // 创建系统参数
+  Create(
+    request: configservicev1_CreateConfigRequest,
+  ): Promise<wellKnownEmpty>;
+  // 更新系统参数
+  Update(
+    request: configservicev1_UpdateConfigRequest,
+  ): Promise<wellKnownEmpty>;
+  // 删除系统参数
+  Delete(
+    request: configservicev1_DeleteConfigRequest,
+  ): Promise<wellKnownEmpty>;
+}
+
+export function createConfigServiceClient(
+  transport: ClientTransport,
+): ConfigService {
+  return {
+    List(request) {
+      const path = `/admin/v1/configs`;
+      const body = null;
+      const queryParams: string[] = [];
+      if (request.page) {
         queryParams.push(
-          `filterExpr.conditions.datePart=${encodeURIComponent(request.filterExpr.conditions.datePart.toString())}`,
+          `page=${encodeURIComponent(request.page.toString())}`,
         );
       }
-      if (request.filterExpr?.conditions?.jsonPath) {
+      if (request.pageSize) {
         queryParams.push(
-          `filterExpr.conditions.jsonPath=${encodeURIComponent(request.filterExpr.conditions.jsonPath.toString())}`,
+          `pageSize=${encodeURIComponent(request.pageSize.toString())}`,
+        );
+      }
+      if (request.offset) {
+        queryParams.push(
+          `offset=${encodeURIComponent(request.offset.toString())}`,
+        );
+      }
+      if (request.limit) {
+        queryParams.push(
+          `limit=${encodeURIComponent(request.limit.toString())}`,
+        );
+      }
+      if (request.token) {
+        queryParams.push(
+          `token=${encodeURIComponent(request.token.toString())}`,
+        );
+      }
+      if (request.noPaging) {
+        queryParams.push(
+          `noPaging=${encodeURIComponent(request.noPaging.toString())}`,
+        );
+      }
+      if (request.query) {
+        queryParams.push(
+          `query=${encodeURIComponent(request.query.toString())}`,
+        );
+      }
+      if (request.filter) {
+        queryParams.push(
+          `filter=${encodeURIComponent(request.filter.toString())}`,
+        );
+      }
+      if (request.filterExpr?.type) {
+        queryParams.push(
+          `filterExpr.type=${encodeURIComponent(request.filterExpr.type.toString())}`,
         );
       }
       if (request.orderBy) {
@@ -1808,14 +3987,215 @@ export function createContentModelServiceClient(
           `orderBy=${encodeURIComponent(request.orderBy.toString())}`,
         );
       }
-      if (request.sorting?.field) {
+      if (request.fieldMask) {
         queryParams.push(
-          `sorting.field=${encodeURIComponent(request.sorting.field.toString())}`,
+          `fieldMask=${encodeURIComponent(request.fieldMask.toString())}`,
         );
       }
-      if (request.sorting?.direction) {
+      let uri = path;
+      if (queryParams.length > 0) {
+        uri += `?${queryParams.join('&')}`;
+      }
+      return transport.unary(uri, 'GET', body, {
+        service: 'ConfigService',
+        method: 'List',
+      }) as Promise<configservicev1_ListConfigResponse>;
+    },
+    Get(request) {
+      if (request.id === undefined || request.id === null) {
+        throw new Error('missing required field request.id');
+      }
+      const path = `/admin/v1/configs/${request.id}`;
+      const body = null;
+      const queryParams: string[] = [];
+      if (request.viewMask) {
         queryParams.push(
-          `sorting.direction=${encodeURIComponent(request.sorting.direction.toString())}`,
+          `viewMask=${encodeURIComponent(request.viewMask.toString())}`,
+        );
+      }
+      let uri = path;
+      if (queryParams.length > 0) {
+        uri += `?${queryParams.join('&')}`;
+      }
+      return transport.unary(uri, 'GET', body, {
+        service: 'ConfigService',
+        method: 'Get',
+      }) as Promise<configservicev1_Config>;
+    },
+    Create(request) {
+      const path = `/admin/v1/configs`;
+      const body = JSON.stringify(request);
+      return transport.unary(path, 'POST', body, {
+        service: 'ConfigService',
+        method: 'Create',
+      }) as Promise<wellKnownEmpty>;
+    },
+    Update(request) {
+      if (request.id === undefined || request.id === null) {
+        throw new Error('missing required field request.id');
+      }
+      const path = `/admin/v1/configs/${request.id}`;
+      const bodyMap = { ...request } as Record<string, unknown>;
+      delete bodyMap["id"];
+      const body = JSON.stringify(bodyMap);
+      return transport.unary(path, 'PUT', body, {
+        service: 'ConfigService',
+        method: 'Update',
+      }) as Promise<wellKnownEmpty>;
+    },
+    Delete(request) {
+      if (request.id === undefined || request.id === null) {
+        throw new Error('missing required field request.id');
+      }
+      const path = `/admin/v1/configs/${request.id}`;
+      const body = null;
+      return transport.unary(path, 'DELETE', body, {
+        service: 'ConfigService',
+        method: 'Delete',
+      }) as Promise<wellKnownEmpty>;
+    },
+  };
+}
+// 查询系统参数列表 - 回应
+export type configservicev1_ListConfigResponse = {
+  items: configservicev1_Config[] | undefined;
+  total: number | undefined;
+};
+
+// 系统参数（动态 KV 运行时配置；区别于字典管理的业务枚举，本表只承载平台全局系统开关）
+export type configservicev1_Config = {
+  createdAt?: wellKnownTimestamp;
+  createdBy?: number;
+  deletedAt?: wellKnownTimestamp;
+  deletedBy?: number;
+  id?: number;
+  isBuiltIn?: boolean;
+  key?: string;
+  name?: string;
+  updatedAt?: wellKnownTimestamp;
+  updatedBy?: number;
+  value?: string;
+  valueType?: configservicev1_Config_ConfigValueType;
+};
+
+// 参数值类型
+export type configservicev1_Config_ConfigValueType =
+  | 'BOOL'
+  | 'CONFIG_VALUE_TYPE_INVALID'
+  | 'INT'
+  | 'STRING';
+// 查询系统参数 - 请求
+export type configservicev1_GetConfigRequest = {
+  id?: number;
+  viewMask?: wellKnownFieldMask;
+};
+
+// 创建系统参数 - 请求
+export type configservicev1_CreateConfigRequest = {
+  data: configservicev1_Config | undefined;
+};
+
+// 更新系统参数 - 请求
+export type configservicev1_UpdateConfigRequest = {
+  allowMissing?: boolean;
+  data: configservicev1_Config | undefined;
+  id: number | undefined;
+  updateMask: undefined | wellKnownFieldMask;
+};
+
+// 删除系统参数 - 请求
+export type configservicev1_DeleteConfigRequest = {
+  id?: number;
+};
+
+// 内容模型管理服务
+export interface ContentModelService {
+  // 查询内容模型列表
+  List(
+    request: pagination_PagingRequest,
+  ): Promise<contentservicev1_ListContentModelResponse>;
+  // 查询内容模型详情
+  Get(
+    request: contentservicev1_GetContentModelRequest,
+  ): Promise<contentservicev1_ContentModel>;
+  /** Alternate HTTP binding #1 of Get: GET /admin/v1/content-models/code/{code} */
+  GetAlt1(
+    request: contentservicev1_GetContentModelRequest,
+  ): Promise<contentservicev1_ContentModel>;
+  // 创建内容模型
+  Create(
+    request: contentservicev1_CreateContentModelRequest,
+  ): Promise<contentservicev1_ContentModel>;
+  // 更新内容模型
+  Update(
+    request: contentservicev1_UpdateContentModelRequest,
+  ): Promise<contentservicev1_ContentModel>;
+  // 删除内容模型
+  Delete(
+    request: contentservicev1_DeleteContentModelRequest,
+  ): Promise<wellKnownEmpty>;
+  // 列出模型下的字段定义
+  ListFieldDefinitions(
+    request: contentservicev1_ListFieldDefinitionsRequest,
+  ): Promise<contentservicev1_ListFieldDefinitionsResponse>;
+}
+
+export function createContentModelServiceClient(
+  transport: ClientTransport,
+): ContentModelService {
+  return {
+    List(request) {
+      const path = `/admin/v1/content-models`;
+      const body = null;
+      const queryParams: string[] = [];
+      if (request.page) {
+        queryParams.push(
+          `page=${encodeURIComponent(request.page.toString())}`,
+        );
+      }
+      if (request.pageSize) {
+        queryParams.push(
+          `pageSize=${encodeURIComponent(request.pageSize.toString())}`,
+        );
+      }
+      if (request.offset) {
+        queryParams.push(
+          `offset=${encodeURIComponent(request.offset.toString())}`,
+        );
+      }
+      if (request.limit) {
+        queryParams.push(
+          `limit=${encodeURIComponent(request.limit.toString())}`,
+        );
+      }
+      if (request.token) {
+        queryParams.push(
+          `token=${encodeURIComponent(request.token.toString())}`,
+        );
+      }
+      if (request.noPaging) {
+        queryParams.push(
+          `noPaging=${encodeURIComponent(request.noPaging.toString())}`,
+        );
+      }
+      if (request.query) {
+        queryParams.push(
+          `query=${encodeURIComponent(request.query.toString())}`,
+        );
+      }
+      if (request.filter) {
+        queryParams.push(
+          `filter=${encodeURIComponent(request.filter.toString())}`,
+        );
+      }
+      if (request.filterExpr?.type) {
+        queryParams.push(
+          `filterExpr.type=${encodeURIComponent(request.filterExpr.type.toString())}`,
+        );
+      }
+      if (request.orderBy) {
+        queryParams.push(
+          `orderBy=${encodeURIComponent(request.orderBy.toString())}`,
         );
       }
       if (request.fieldMask) {
@@ -1836,7 +4216,7 @@ export function createContentModelServiceClient(
       if (request.id === undefined || request.id === null) {
         throw new Error('missing required field request.id');
       }
-      const path = `admin/v1/content-models/${request.id}`;
+      const path = `/admin/v1/content-models/${request.id}`;
       const body = null;
       const queryParams: string[] = [];
       if (request.code) {
@@ -1858,8 +4238,36 @@ export function createContentModelServiceClient(
         method: 'Get',
       }) as Promise<contentservicev1_ContentModel>;
     },
+
+    // Alternate HTTP binding #1 of Get: GET /admin/v1/content-models/code/{code}
+    GetAlt1(request) {
+      if (request.code === undefined || request.code === null) {
+        throw new Error('missing required field request.code');
+      }
+      const path = `/admin/v1/content-models/code/${request.code}`;
+      const body = null;
+      const queryParams: string[] = [];
+      if (request.id) {
+        queryParams.push(
+          `id=${encodeURIComponent(request.id.toString())}`,
+        );
+      }
+      if (request.viewMask) {
+        queryParams.push(
+          `viewMask=${encodeURIComponent(request.viewMask.toString())}`,
+        );
+      }
+      let uri = path;
+      if (queryParams.length > 0) {
+        uri += `?${queryParams.join('&')}`;
+      }
+      return transport.unary(uri, 'GET', body, {
+        service: 'ContentModelService',
+        method: 'Get',
+      }) as Promise<contentservicev1_ContentModel>;
+    },
     Create(request) {
-      const path = `admin/v1/content-models`;
+      const path = `/admin/v1/content-models`;
       const body = JSON.stringify(request);
       return transport.unary(path, 'POST', body, {
         service: 'ContentModelService',
@@ -1870,8 +4278,10 @@ export function createContentModelServiceClient(
       if (request.id === undefined || request.id === null) {
         throw new Error('missing required field request.id');
       }
-      const path = `admin/v1/content-models/${request.id}`;
-      const body = JSON.stringify(request);
+      const path = `/admin/v1/content-models/${request.id}`;
+      const bodyMap = { ...request } as Record<string, unknown>;
+      delete bodyMap["id"];
+      const body = JSON.stringify(bodyMap);
       return transport.unary(path, 'PUT', body, {
         service: 'ContentModelService',
         method: 'Update',
@@ -1881,7 +4291,7 @@ export function createContentModelServiceClient(
       if (request.id === undefined || request.id === null) {
         throw new Error('missing required field request.id');
       }
-      const path = `admin/v1/content-models/${request.id}`;
+      const path = `/admin/v1/content-models/${request.id}`;
       const body = null;
       return transport.unary(path, 'DELETE', body, {
         service: 'ContentModelService',
@@ -1892,9 +4302,14 @@ export function createContentModelServiceClient(
       if (request.contentModelId === undefined || request.contentModelId === null) {
         throw new Error('missing required field request.content_model_id');
       }
-      const path = `admin/v1/content-models/${request.contentModelId}/field-definitions`;
+      const path = `/admin/v1/content-models/${request.contentModelId}/field-definitions`;
       const body = null;
       const queryParams: string[] = [];
+      if (request.componentId) {
+        queryParams.push(
+          `componentId=${encodeURIComponent(request.componentId.toString())}`,
+        );
+      }
       if (request.viewMask) {
         queryParams.push(
           `viewMask=${encodeURIComponent(request.viewMask.toString())}`,
@@ -1911,7 +4326,6 @@ export function createContentModelServiceClient(
     },
   };
 }
-// 查询内容模型列表 - 回应
 export type contentservicev1_ListContentModelResponse = {
   items: contentservicev1_ContentModel[] | undefined;
   total: number | undefined;
@@ -1922,6 +4336,9 @@ export type contentservicev1_ContentModel = {
   //
   // Behaviors: OPTIONAL
   code?: string;
+  // 组件定义集（只读，服务端按 fields 里 COMPONENT/DYNAMIC_ZONE 引用解析填充；
+  // C 端渲染组件值所需的最小 schema 面）
+  components: contentservicev1_ContentModelComponent[] | undefined;
   createdAt?: wellKnownTimestamp;
   createdBy?: number;
   description?: string;
@@ -1936,50 +4353,10 @@ export type contentservicev1_ContentModel = {
   updatedBy?: number;
 };
 
-// 字段定义
-export type contentservicev1_FieldDefinition = {
-  contentModelId?: number;
-  createdAt?: wellKnownTimestamp;
-  createdBy?: number;
-  description?: string;
-  id?: number;
-  isRequired?: boolean;
-  label?: string;
-  name?: string;
-  options: { [key: string]: string } | undefined;
-  placeholder?: string;
-  relationConfig?: contentservicev1_RelationConfig;
-  sortOrder?: number;
-  translations: contentservicev1_FieldDefinitionTranslation[] | undefined;
-  type?: contentservicev1_FieldDefinition_Type;
-  validationRegex?: string;
-};
-
-// 字段类型
-export type contentservicev1_FieldDefinition_Type =
-  | 'FIELD_TYPE_FILE'
-  | 'FIELD_TYPE_IMAGE'
-  | 'FIELD_TYPE_NUMBER'
-  | 'FIELD_TYPE_RELATION'
-  | 'FIELD_TYPE_RICHTEXT'
-  | 'FIELD_TYPE_TEXT';
-// relation 类型字段的引用配置
-export type contentservicev1_RelationConfig = {
-  allowCrossTenant?: boolean;
-  filterCategoryId?: number;
-  targetEntityType?: string;
-};
-
-// 字段定义翻译
-export type contentservicev1_FieldDefinitionTranslation = {
-  createdAt?: wellKnownTimestamp;
-  createdBy?: number;
-  description?: string;
-  fieldDefinitionId?: number;
-  id?: number;
-  label?: string;
-  languageCode?: string;
-  placeholder?: string;
+// 组件定义 + 字段（C 端渲染组件值用最小面）
+export type contentservicev1_ContentModelComponent = {
+  definition: contentservicev1_ComponentDefinition | undefined;
+  fields: contentservicev1_FieldDefinition[] | undefined;
 };
 
 // 内容模型翻译
@@ -2019,18 +4396,6 @@ export type contentservicev1_DeleteContentModelRequest = {
   id?: number;
 };
 
-// 查询字段定义列表 - 请求
-export type contentservicev1_ListFieldDefinitionsRequest = {
-  contentModelId: number | undefined;
-  viewMask?: wellKnownFieldMask;
-};
-
-// 查询字段定义列表 - 回应
-export type contentservicev1_ListFieldDefinitionsResponse = {
-  items: contentservicev1_FieldDefinition[] | undefined;
-  total: number | undefined;
-};
-
 // 数据访问审计日志管理服务
 export interface DataAccessAuditLogService {
   // 查询数据访问审计日志列表
@@ -2048,7 +4413,7 @@ export function createDataAccessAuditLogServiceClient(
 ): DataAccessAuditLogService {
   return {
     List(request) {
-      const path = `admin/v1/data-access-audit-logs`;
+      const path = `/admin/v1/data-access-audit-logs`;
       const body = null;
       const queryParams: string[] = [];
       if (request.page) {
@@ -2096,56 +4461,9 @@ export function createDataAccessAuditLogServiceClient(
           `filterExpr.type=${encodeURIComponent(request.filterExpr.type.toString())}`,
         );
       }
-      if (request.filterExpr?.conditions?.field) {
-        queryParams.push(
-          `filterExpr.conditions.field=${encodeURIComponent(request.filterExpr.conditions.field.toString())}`,
-        );
-      }
-      if (request.filterExpr?.conditions?.op) {
-        queryParams.push(
-          `filterExpr.conditions.op=${encodeURIComponent(request.filterExpr.conditions.op.toString())}`,
-        );
-      }
-      if (request.filterExpr?.conditions?.value) {
-        queryParams.push(
-          `filterExpr.conditions.value=${encodeURIComponent(request.filterExpr.conditions.value.toString())}`,
-        );
-      }
-      if (request.filterExpr?.conditions?.jsonValue) {
-        queryParams.push(
-          `filterExpr.conditions.jsonValue=${encodeURIComponent(request.filterExpr.conditions.jsonValue.toString())}`,
-        );
-      }
-      if (request.filterExpr?.conditions?.values) {
-        request.filterExpr.conditions.values.forEach((x) => {
-          queryParams.push(
-            `filterExpr.conditions.values=${encodeURIComponent(x.toString())}`,
-          );
-        });
-      }
-      if (request.filterExpr?.conditions?.datePart) {
-        queryParams.push(
-          `filterExpr.conditions.datePart=${encodeURIComponent(request.filterExpr.conditions.datePart.toString())}`,
-        );
-      }
-      if (request.filterExpr?.conditions?.jsonPath) {
-        queryParams.push(
-          `filterExpr.conditions.jsonPath=${encodeURIComponent(request.filterExpr.conditions.jsonPath.toString())}`,
-        );
-      }
       if (request.orderBy) {
         queryParams.push(
           `orderBy=${encodeURIComponent(request.orderBy.toString())}`,
-        );
-      }
-      if (request.sorting?.field) {
-        queryParams.push(
-          `sorting.field=${encodeURIComponent(request.sorting.field.toString())}`,
-        );
-      }
-      if (request.sorting?.direction) {
-        queryParams.push(
-          `sorting.direction=${encodeURIComponent(request.sorting.direction.toString())}`,
         );
       }
       if (request.fieldMask) {
@@ -2166,7 +4484,7 @@ export function createDataAccessAuditLogServiceClient(
       if (request.id === undefined || request.id === null) {
         throw new Error('missing required field request.id');
       }
-      const path = `admin/v1/data-access-audit-logs/${request.id}`;
+      const path = `/admin/v1/data-access-audit-logs/${request.id}`;
       const body = null;
       const queryParams: string[] = [];
       if (request.viewMask) {
@@ -2283,7 +4601,7 @@ export function createDictEntryServiceClient(
 ): DictEntryService {
   return {
     List(request) {
-      const path = `admin/v1/dict/entries`;
+      const path = `/admin/v1/dict/entries`;
       const body = null;
       const queryParams: string[] = [];
       if (request.page) {
@@ -2331,56 +4649,9 @@ export function createDictEntryServiceClient(
           `filterExpr.type=${encodeURIComponent(request.filterExpr.type.toString())}`,
         );
       }
-      if (request.filterExpr?.conditions?.field) {
-        queryParams.push(
-          `filterExpr.conditions.field=${encodeURIComponent(request.filterExpr.conditions.field.toString())}`,
-        );
-      }
-      if (request.filterExpr?.conditions?.op) {
-        queryParams.push(
-          `filterExpr.conditions.op=${encodeURIComponent(request.filterExpr.conditions.op.toString())}`,
-        );
-      }
-      if (request.filterExpr?.conditions?.value) {
-        queryParams.push(
-          `filterExpr.conditions.value=${encodeURIComponent(request.filterExpr.conditions.value.toString())}`,
-        );
-      }
-      if (request.filterExpr?.conditions?.jsonValue) {
-        queryParams.push(
-          `filterExpr.conditions.jsonValue=${encodeURIComponent(request.filterExpr.conditions.jsonValue.toString())}`,
-        );
-      }
-      if (request.filterExpr?.conditions?.values) {
-        request.filterExpr.conditions.values.forEach((x) => {
-          queryParams.push(
-            `filterExpr.conditions.values=${encodeURIComponent(x.toString())}`,
-          );
-        });
-      }
-      if (request.filterExpr?.conditions?.datePart) {
-        queryParams.push(
-          `filterExpr.conditions.datePart=${encodeURIComponent(request.filterExpr.conditions.datePart.toString())}`,
-        );
-      }
-      if (request.filterExpr?.conditions?.jsonPath) {
-        queryParams.push(
-          `filterExpr.conditions.jsonPath=${encodeURIComponent(request.filterExpr.conditions.jsonPath.toString())}`,
-        );
-      }
       if (request.orderBy) {
         queryParams.push(
           `orderBy=${encodeURIComponent(request.orderBy.toString())}`,
-        );
-      }
-      if (request.sorting?.field) {
-        queryParams.push(
-          `sorting.field=${encodeURIComponent(request.sorting.field.toString())}`,
-        );
-      }
-      if (request.sorting?.direction) {
-        queryParams.push(
-          `sorting.direction=${encodeURIComponent(request.sorting.direction.toString())}`,
         );
       }
       if (request.fieldMask) {
@@ -2398,7 +4669,7 @@ export function createDictEntryServiceClient(
       }) as Promise<dictservicev1_ListDictEntryResponse>;
     },
     Create(request) {
-      const path = `admin/v1/dict/entries`;
+      const path = `/admin/v1/dict/entries`;
       const body = JSON.stringify(request);
       return transport.unary(path, 'POST', body, {
         service: 'DictEntryService',
@@ -2409,15 +4680,17 @@ export function createDictEntryServiceClient(
       if (request.id === undefined || request.id === null) {
         throw new Error('missing required field request.id');
       }
-      const path = `admin/v1/dict/entries/${request.id}`;
-      const body = JSON.stringify(request);
+      const path = `/admin/v1/dict/entries/${request.id}`;
+      const bodyMap = { ...request } as Record<string, unknown>;
+      delete bodyMap["id"];
+      const body = JSON.stringify(bodyMap);
       return transport.unary(path, 'PUT', body, {
         service: 'DictEntryService',
         method: 'Update',
       }) as Promise<wellKnownEmpty>;
     },
     Delete(request) {
-      const path = `admin/v1/dict/entries`;
+      const path = `/admin/v1/dict/entries`;
       const body = null;
       const queryParams: string[] = [];
       if (request.ids) {
@@ -2437,7 +4710,7 @@ export function createDictEntryServiceClient(
       }) as Promise<wellKnownEmpty>;
     },
     ListByTypeCode(request) {
-      const path = `admin/v1/dict/entries/by-type-code`;
+      const path = `/admin/v1/dict/entries/by-type-code`;
       const body = null;
       const queryParams: string[] = [];
       if (request.typeCode) {
@@ -2532,6 +4805,10 @@ export interface DictTypeService {
   Get(
     request: dictservicev1_GetDictTypeRequest,
   ): Promise<dictservicev1_DictType>;
+  /** Alternate HTTP binding #1 of Get: GET /admin/v1/dict/types/code/{code} */
+  GetAlt1(
+    request: dictservicev1_GetDictTypeRequest,
+  ): Promise<dictservicev1_DictType>;
   // 创建字典类型
   Create(
     request: dictservicev1_CreateDictTypeRequest,
@@ -2551,7 +4828,7 @@ export function createDictTypeServiceClient(
 ): DictTypeService {
   return {
     List(request) {
-      const path = `admin/v1/dict/types`;
+      const path = `/admin/v1/dict/types`;
       const body = null;
       const queryParams: string[] = [];
       if (request.page) {
@@ -2599,56 +4876,9 @@ export function createDictTypeServiceClient(
           `filterExpr.type=${encodeURIComponent(request.filterExpr.type.toString())}`,
         );
       }
-      if (request.filterExpr?.conditions?.field) {
-        queryParams.push(
-          `filterExpr.conditions.field=${encodeURIComponent(request.filterExpr.conditions.field.toString())}`,
-        );
-      }
-      if (request.filterExpr?.conditions?.op) {
-        queryParams.push(
-          `filterExpr.conditions.op=${encodeURIComponent(request.filterExpr.conditions.op.toString())}`,
-        );
-      }
-      if (request.filterExpr?.conditions?.value) {
-        queryParams.push(
-          `filterExpr.conditions.value=${encodeURIComponent(request.filterExpr.conditions.value.toString())}`,
-        );
-      }
-      if (request.filterExpr?.conditions?.jsonValue) {
-        queryParams.push(
-          `filterExpr.conditions.jsonValue=${encodeURIComponent(request.filterExpr.conditions.jsonValue.toString())}`,
-        );
-      }
-      if (request.filterExpr?.conditions?.values) {
-        request.filterExpr.conditions.values.forEach((x) => {
-          queryParams.push(
-            `filterExpr.conditions.values=${encodeURIComponent(x.toString())}`,
-          );
-        });
-      }
-      if (request.filterExpr?.conditions?.datePart) {
-        queryParams.push(
-          `filterExpr.conditions.datePart=${encodeURIComponent(request.filterExpr.conditions.datePart.toString())}`,
-        );
-      }
-      if (request.filterExpr?.conditions?.jsonPath) {
-        queryParams.push(
-          `filterExpr.conditions.jsonPath=${encodeURIComponent(request.filterExpr.conditions.jsonPath.toString())}`,
-        );
-      }
       if (request.orderBy) {
         queryParams.push(
           `orderBy=${encodeURIComponent(request.orderBy.toString())}`,
-        );
-      }
-      if (request.sorting?.field) {
-        queryParams.push(
-          `sorting.field=${encodeURIComponent(request.sorting.field.toString())}`,
-        );
-      }
-      if (request.sorting?.direction) {
-        queryParams.push(
-          `sorting.direction=${encodeURIComponent(request.sorting.direction.toString())}`,
         );
       }
       if (request.fieldMask) {
@@ -2669,7 +4899,7 @@ export function createDictTypeServiceClient(
       if (request.id === undefined || request.id === null) {
         throw new Error('missing required field request.id');
       }
-      const path = `admin/v1/dict/types/${request.id}`;
+      const path = `/admin/v1/dict/types/${request.id}`;
       const body = null;
       const queryParams: string[] = [];
       if (request.code) {
@@ -2691,8 +4921,36 @@ export function createDictTypeServiceClient(
         method: 'Get',
       }) as Promise<dictservicev1_DictType>;
     },
+
+    // Alternate HTTP binding #1 of Get: GET /admin/v1/dict/types/code/{code}
+    GetAlt1(request) {
+      if (request.code === undefined || request.code === null) {
+        throw new Error('missing required field request.code');
+      }
+      const path = `/admin/v1/dict/types/code/${request.code}`;
+      const body = null;
+      const queryParams: string[] = [];
+      if (request.id) {
+        queryParams.push(
+          `id=${encodeURIComponent(request.id.toString())}`,
+        );
+      }
+      if (request.viewMask) {
+        queryParams.push(
+          `viewMask=${encodeURIComponent(request.viewMask.toString())}`,
+        );
+      }
+      let uri = path;
+      if (queryParams.length > 0) {
+        uri += `?${queryParams.join('&')}`;
+      }
+      return transport.unary(uri, 'GET', body, {
+        service: 'DictTypeService',
+        method: 'Get',
+      }) as Promise<dictservicev1_DictType>;
+    },
     Create(request) {
-      const path = `admin/v1/dict/types`;
+      const path = `/admin/v1/dict/types`;
       const body = JSON.stringify(request);
       return transport.unary(path, 'POST', body, {
         service: 'DictTypeService',
@@ -2703,15 +4961,17 @@ export function createDictTypeServiceClient(
       if (request.id === undefined || request.id === null) {
         throw new Error('missing required field request.id');
       }
-      const path = `admin/v1/dict/types/${request.id}`;
-      const body = JSON.stringify(request);
+      const path = `/admin/v1/dict/types/${request.id}`;
+      const bodyMap = { ...request } as Record<string, unknown>;
+      delete bodyMap["id"];
+      const body = JSON.stringify(bodyMap);
       return transport.unary(path, 'PUT', body, {
         service: 'DictTypeService',
         method: 'Update',
       }) as Promise<wellKnownEmpty>;
     },
     Delete(request) {
-      const path = `admin/v1/dict/types`;
+      const path = `/admin/v1/dict/types`;
       const body = null;
       const queryParams: string[] = [];
       if (request.ids) {
@@ -2780,36 +5040,98 @@ export type dictservicev1_DeleteDictTypeRequest = {
   ids: number[] | undefined;
 };
 
-// 文件管理服务
-export interface FileService {
-  // 查询文件列表
-  List(
-    request: pagination_PagingRequest,
-  ): Promise<storageservicev1_ListFileResponse>;
-  // 查询文件详情
-  Get(
-    request: storageservicev1_GetFileRequest,
-  ): Promise<storageservicev1_File>;
-  // 创建文件
-  Create(
-    request: storageservicev1_CreateFileRequest,
-  ): Promise<wellKnownEmpty>;
-  // 更新文件
-  Update(
-    request: storageservicev1_UpdateFileRequest,
-  ): Promise<wellKnownEmpty>;
-  // 删除文件
-  Delete(
-    request: storageservicev1_DeleteFileRequest,
+// 编辑锁管理服务（协同编辑 v1）
+export interface EditLockService {
+  // 获取/续期编辑锁（重复调用即心跳）
+  Acquire(
+    request: contentservicev1_AcquireEditLockRequest,
+  ): Promise<contentservicev1_EditLock>;
+  // 释放编辑锁（仅持锁者可释放）
+  Release(
+    request: contentservicev1_ReleaseEditLockRequest,
   ): Promise<wellKnownEmpty>;
 }
 
-export function createFileServiceClient(
+export function createEditLockServiceClient(
   transport: ClientTransport,
-): FileService {
+): EditLockService {
+  return {
+    Acquire(request) {
+      const path = `/admin/v1/edit-locks/acquire`;
+      const body = JSON.stringify(request);
+      return transport.unary(path, 'POST', body, {
+        service: 'EditLockService',
+        method: 'Acquire',
+      }) as Promise<contentservicev1_EditLock>;
+    },
+    Release(request) {
+      const path = `/admin/v1/edit-locks/release`;
+      const body = JSON.stringify(request);
+      return transport.unary(path, 'POST', body, {
+        service: 'EditLockService',
+        method: 'Release',
+      }) as Promise<wellKnownEmpty>;
+    },
+  };
+}
+// 请求 - 获取/续期编辑锁
+export type contentservicev1_AcquireEditLockRequest = {
+  targetId: number | undefined;
+  targetType: string | undefined;
+};
+
+// 编辑锁
+export type contentservicev1_EditLock = {
+  acquired?: boolean;
+  acquiredAt?: wellKnownTimestamp;
+  holderId?: number;
+  holderName?: string;
+};
+
+// 请求 - 释放编辑锁
+export type contentservicev1_ReleaseEditLockRequest = {
+  targetId: number | undefined;
+  targetType: string | undefined;
+};
+
+// 内容实验管理服务（A/B 分流 + 受众定向）
+export interface ExperimentService {
+  // 获取实验列表
+  List(
+    request: pagination_PagingRequest,
+  ): Promise<contentservicev1_ListExperimentsResponse>;
+  // 获取实验数据（含变体）
+  Get(
+    request: contentservicev1_GetExperimentRequest,
+  ): Promise<contentservicev1_Experiment>;
+  // 创建实验（连同变体）
+  Create(
+    request: contentservicev1_CreateExperimentRequest,
+  ): Promise<contentservicev1_Experiment>;
+  // 更新实验（变体整组替换）
+  Update(
+    request: contentservicev1_UpdateExperimentRequest,
+  ): Promise<contentservicev1_Experiment>;
+  // 删除实验
+  Delete(
+    request: contentservicev1_DeleteExperimentRequest,
+  ): Promise<wellKnownEmpty>;
+  // 设置实验状态
+  SetStatus(
+    request: contentservicev1_SetExperimentStatusRequest,
+  ): Promise<contentservicev1_Experiment>;
+  // 变体参与统计
+  GetVariantStats(
+    request: contentservicev1_GetExperimentVariantStatsRequest,
+  ): Promise<contentservicev1_ExperimentVariantStatsResponse>;
+}
+
+export function createExperimentServiceClient(
+  transport: ClientTransport,
+): ExperimentService {
   return {
     List(request) {
-      const path = `admin/v1/files`;
+      const path = `/admin/v1/experiments`;
       const body = null;
       const queryParams: string[] = [];
       if (request.page) {
@@ -2857,56 +5179,263 @@ export function createFileServiceClient(
           `filterExpr.type=${encodeURIComponent(request.filterExpr.type.toString())}`,
         );
       }
-      if (request.filterExpr?.conditions?.field) {
-        queryParams.push(
-          `filterExpr.conditions.field=${encodeURIComponent(request.filterExpr.conditions.field.toString())}`,
-        );
-      }
-      if (request.filterExpr?.conditions?.op) {
-        queryParams.push(
-          `filterExpr.conditions.op=${encodeURIComponent(request.filterExpr.conditions.op.toString())}`,
-        );
-      }
-      if (request.filterExpr?.conditions?.value) {
-        queryParams.push(
-          `filterExpr.conditions.value=${encodeURIComponent(request.filterExpr.conditions.value.toString())}`,
-        );
-      }
-      if (request.filterExpr?.conditions?.jsonValue) {
-        queryParams.push(
-          `filterExpr.conditions.jsonValue=${encodeURIComponent(request.filterExpr.conditions.jsonValue.toString())}`,
-        );
-      }
-      if (request.filterExpr?.conditions?.values) {
-        request.filterExpr.conditions.values.forEach((x) => {
-          queryParams.push(
-            `filterExpr.conditions.values=${encodeURIComponent(x.toString())}`,
-          );
-        });
-      }
-      if (request.filterExpr?.conditions?.datePart) {
-        queryParams.push(
-          `filterExpr.conditions.datePart=${encodeURIComponent(request.filterExpr.conditions.datePart.toString())}`,
-        );
-      }
-      if (request.filterExpr?.conditions?.jsonPath) {
-        queryParams.push(
-          `filterExpr.conditions.jsonPath=${encodeURIComponent(request.filterExpr.conditions.jsonPath.toString())}`,
-        );
-      }
       if (request.orderBy) {
         queryParams.push(
           `orderBy=${encodeURIComponent(request.orderBy.toString())}`,
         );
       }
-      if (request.sorting?.field) {
+      if (request.fieldMask) {
         queryParams.push(
-          `sorting.field=${encodeURIComponent(request.sorting.field.toString())}`,
+          `fieldMask=${encodeURIComponent(request.fieldMask.toString())}`,
         );
       }
-      if (request.sorting?.direction) {
+      let uri = path;
+      if (queryParams.length > 0) {
+        uri += `?${queryParams.join('&')}`;
+      }
+      return transport.unary(uri, 'GET', body, {
+        service: 'ExperimentService',
+        method: 'List',
+      }) as Promise<contentservicev1_ListExperimentsResponse>;
+    },
+    Get(request) {
+      if (request.id === undefined || request.id === null) {
+        throw new Error('missing required field request.id');
+      }
+      const path = `/admin/v1/experiments/${request.id}`;
+      const body = null;
+      return transport.unary(path, 'GET', body, {
+        service: 'ExperimentService',
+        method: 'Get',
+      }) as Promise<contentservicev1_Experiment>;
+    },
+    Create(request) {
+      const path = `/admin/v1/experiments`;
+      const body = JSON.stringify(request);
+      return transport.unary(path, 'POST', body, {
+        service: 'ExperimentService',
+        method: 'Create',
+      }) as Promise<contentservicev1_Experiment>;
+    },
+    Update(request) {
+      if (request.id === undefined || request.id === null) {
+        throw new Error('missing required field request.id');
+      }
+      const path = `/admin/v1/experiments/${request.id}`;
+      const bodyMap = { ...request } as Record<string, unknown>;
+      delete bodyMap["id"];
+      const body = JSON.stringify(bodyMap);
+      return transport.unary(path, 'PUT', body, {
+        service: 'ExperimentService',
+        method: 'Update',
+      }) as Promise<contentservicev1_Experiment>;
+    },
+    Delete(request) {
+      if (request.id === undefined || request.id === null) {
+        throw new Error('missing required field request.id');
+      }
+      const path = `/admin/v1/experiments/${request.id}`;
+      const body = null;
+      return transport.unary(path, 'DELETE', body, {
+        service: 'ExperimentService',
+        method: 'Delete',
+      }) as Promise<wellKnownEmpty>;
+    },
+    SetStatus(request) {
+      if (request.id === undefined || request.id === null) {
+        throw new Error('missing required field request.id');
+      }
+      const path = `/admin/v1/experiments/${request.id}/status`;
+      const bodyMap = { ...request } as Record<string, unknown>;
+      delete bodyMap["id"];
+      const body = JSON.stringify(bodyMap);
+      return transport.unary(path, 'PUT', body, {
+        service: 'ExperimentService',
+        method: 'SetStatus',
+      }) as Promise<contentservicev1_Experiment>;
+    },
+    GetVariantStats(request) {
+      if (request.experimentId === undefined || request.experimentId === null) {
+        throw new Error('missing required field request.experiment_id');
+      }
+      const path = `/admin/v1/experiments/${request.experimentId}/variant-stats`;
+      const body = null;
+      return transport.unary(path, 'GET', body, {
+        service: 'ExperimentService',
+        method: 'GetVariantStats',
+      }) as Promise<contentservicev1_ExperimentVariantStatsResponse>;
+    },
+  };
+}
+// 回应 - 实验列表
+export type contentservicev1_ListExperimentsResponse = {
+  items: contentservicev1_Experiment[] | undefined;
+  total: number | undefined;
+};
+
+// 内容实验
+export type contentservicev1_Experiment = {
+  assignmentType?: contentservicev1_Experiment_AssignmentType;
+  createdAt?: wellKnownTimestamp;
+  createdBy?: number;
+  description?: string;
+  id?: number;
+  name?: string;
+  pageId?: number;
+  status?: contentservicev1_Experiment_Status;
+  updatedAt?: wellKnownTimestamp;
+  updatedBy?: number;
+  variants: contentservicev1_ExperimentVariant[] | undefined;
+};
+
+// 实验状态
+export type contentservicev1_Experiment_Status =
+  | 'EXPERIMENT_STATUS_DRAFT'
+  | 'EXPERIMENT_STATUS_ENDED'
+  | 'EXPERIMENT_STATUS_PAUSED'
+  | 'EXPERIMENT_STATUS_RUNNING'
+  | 'EXPERIMENT_STATUS_UNSPECIFIED';
+// 分配方式
+export type contentservicev1_Experiment_AssignmentType =
+  | 'ASSIGNMENT_TYPE_RANDOM'
+  | 'ASSIGNMENT_TYPE_RULE'
+  | 'ASSIGNMENT_TYPE_UNSPECIFIED';
+// 实验变体
+export type contentservicev1_ExperimentVariant = {
+  conditions?: string;
+  experimentId?: number;
+  id?: number;
+  name?: string;
+  sections?: string;
+  sortOrder?: number;
+  weight?: number;
+};
+
+// 请求 - 实验数据
+export type contentservicev1_GetExperimentRequest = {
+  id: number | undefined;
+};
+
+// 请求 - 创建实验
+export type contentservicev1_CreateExperimentRequest = {
+  data: contentservicev1_Experiment | undefined;
+};
+
+// 请求 - 更新实验
+export type contentservicev1_UpdateExperimentRequest = {
+  allowMissing?: boolean;
+  data: contentservicev1_Experiment | undefined;
+  id: number | undefined;
+  updateMask: undefined | wellKnownFieldMask;
+};
+
+// 请求 - 删除实验
+export type contentservicev1_DeleteExperimentRequest = {
+  id: number | undefined;
+};
+
+// 请求 - 设置实验状态
+export type contentservicev1_SetExperimentStatusRequest = {
+  id: number | undefined;
+  status: contentservicev1_Experiment_Status | undefined;
+};
+
+// 请求 - 变体参与统计
+export type contentservicev1_GetExperimentVariantStatsRequest = {
+  experimentId: number | undefined;
+};
+
+// 回应 - 变体参与统计
+export type contentservicev1_ExperimentVariantStatsResponse = {
+  items: contentservicev1_ExperimentVariantStatsResponse_VariantCount[] | undefined;
+};
+
+export type contentservicev1_ExperimentVariantStatsResponse_VariantCount = {
+  conversions: number | undefined;
+  participants: number | undefined;
+  variantName: string | undefined;
+};
+
+// 文件管理服务
+export interface FileService {
+  // 查询文件列表
+  List(
+    request: pagination_PagingRequest,
+  ): Promise<storageservicev1_ListFileResponse>;
+  // 查询文件详情
+  Get(
+    request: storageservicev1_GetFileRequest,
+  ): Promise<storageservicev1_File>;
+  // 创建文件
+  Create(
+    request: storageservicev1_CreateFileRequest,
+  ): Promise<wellKnownEmpty>;
+  // 更新文件
+  Update(
+    request: storageservicev1_UpdateFileRequest,
+  ): Promise<wellKnownEmpty>;
+  // 删除文件
+  Delete(
+    request: storageservicev1_DeleteFileRequest,
+  ): Promise<wellKnownEmpty>;
+}
+
+export function createFileServiceClient(
+  transport: ClientTransport,
+): FileService {
+  return {
+    List(request) {
+      const path = `/admin/v1/files`;
+      const body = null;
+      const queryParams: string[] = [];
+      if (request.page) {
         queryParams.push(
-          `sorting.direction=${encodeURIComponent(request.sorting.direction.toString())}`,
+          `page=${encodeURIComponent(request.page.toString())}`,
+        );
+      }
+      if (request.pageSize) {
+        queryParams.push(
+          `pageSize=${encodeURIComponent(request.pageSize.toString())}`,
+        );
+      }
+      if (request.offset) {
+        queryParams.push(
+          `offset=${encodeURIComponent(request.offset.toString())}`,
+        );
+      }
+      if (request.limit) {
+        queryParams.push(
+          `limit=${encodeURIComponent(request.limit.toString())}`,
+        );
+      }
+      if (request.token) {
+        queryParams.push(
+          `token=${encodeURIComponent(request.token.toString())}`,
+        );
+      }
+      if (request.noPaging) {
+        queryParams.push(
+          `noPaging=${encodeURIComponent(request.noPaging.toString())}`,
+        );
+      }
+      if (request.query) {
+        queryParams.push(
+          `query=${encodeURIComponent(request.query.toString())}`,
+        );
+      }
+      if (request.filter) {
+        queryParams.push(
+          `filter=${encodeURIComponent(request.filter.toString())}`,
+        );
+      }
+      if (request.filterExpr?.type) {
+        queryParams.push(
+          `filterExpr.type=${encodeURIComponent(request.filterExpr.type.toString())}`,
+        );
+      }
+      if (request.orderBy) {
+        queryParams.push(
+          `orderBy=${encodeURIComponent(request.orderBy.toString())}`,
         );
       }
       if (request.fieldMask) {
@@ -2927,7 +5456,7 @@ export function createFileServiceClient(
       if (request.id === undefined || request.id === null) {
         throw new Error('missing required field request.id');
       }
-      const path = `admin/v1/files/${request.id}`;
+      const path = `/admin/v1/files/${request.id}`;
       const body = null;
       const queryParams: string[] = [];
       if (request.viewMask) {
@@ -2945,7 +5474,7 @@ export function createFileServiceClient(
       }) as Promise<storageservicev1_File>;
     },
     Create(request) {
-      const path = `admin/v1/files`;
+      const path = `/admin/v1/files`;
       const body = JSON.stringify(request);
       return transport.unary(path, 'POST', body, {
         service: 'FileService',
@@ -2956,8 +5485,10 @@ export function createFileServiceClient(
       if (request.id === undefined || request.id === null) {
         throw new Error('missing required field request.id');
       }
-      const path = `admin/v1/files/${request.id}`;
-      const body = JSON.stringify(request);
+      const path = `/admin/v1/files/${request.id}`;
+      const bodyMap = { ...request } as Record<string, unknown>;
+      delete bodyMap["id"];
+      const body = JSON.stringify(bodyMap);
       return transport.unary(path, 'PUT', body, {
         service: 'FileService',
         method: 'Update',
@@ -2967,7 +5498,7 @@ export function createFileServiceClient(
       if (request.id === undefined || request.id === null) {
         throw new Error('missing required field request.id');
       }
-      const path = `admin/v1/files/${request.id}`;
+      const path = `/admin/v1/files/${request.id}`;
       const body = null;
       return transport.unary(path, 'DELETE', body, {
         service: 'FileService',
@@ -3065,7 +5596,7 @@ export function createFileTransferServiceClient(
 ): FileTransferService {
   return {
     DownloadFile(request) {
-      const path = `admin/v1/file/download`;
+      const path = `/admin/v1/file/download`;
       const body = null;
       const queryParams: string[] = [];
       if (request.fileId) {
@@ -3133,7 +5664,7 @@ export function createFileTransferServiceClient(
       }) as Promise<storageservicev1_DownloadFileResponse>;
     },
     PutUploadFile(request) {
-      const path = `admin/v1/file/upload`;
+      const path = `/admin/v1/file/upload`;
       const body = JSON.stringify(request);
       return transport.unary(path, 'PUT', body, {
         service: 'FileTransferService',
@@ -3141,7 +5672,7 @@ export function createFileTransferServiceClient(
       }) as Promise<storageservicev1_UploadFileResponse>;
     },
     PostUploadFile(request) {
-      const path = `admin/v1/file/upload`;
+      const path = `/admin/v1/file/upload`;
       const body = JSON.stringify(request);
       return transport.unary(path, 'POST', body, {
         service: 'FileTransferService',
@@ -3219,134 +5750,36 @@ export type storageservicev1_UploadMediaAssetRequest = {
   userId?: number;
 };
 
-// 交互管理服务（运营清数据面）。仅转发至 core InteractionAdminService，
-// 调用方须为平台管理员（由 core 侧运营上下文 guard 校验）。
-export interface InteractionAdminService {
-  // 清除单条目标上的全部交互 ledger 并同步计数
-  PurgeTargetInteractions(
-    request: interactionservicev1_PurgeTargetInteractionsRequest,
-  ): Promise<interactionservicev1_PurgeTargetInteractionsResponse>;
-  // 清除指定用户在全站的全部交互 ledger（分批短事务）
-  PurgeUserInteractions(
-    request: interactionservicev1_PurgeUserInteractionsRequest,
-  ): Promise<interactionservicev1_PurgeUserInteractionsResponse>;
-  // 按 ledger 重算指定 (target, metric) 的计数
-  ResetCounter(
-    request: interactionservicev1_ResetCounterRequest,
-  ): Promise<interactionservicev1_ResetCounterResponse>;
-}
-
-export function createInteractionAdminServiceClient(
-  transport: ClientTransport,
-): InteractionAdminService {
-  return {
-    PurgeTargetInteractions(request) {
-      if (request.targetType === undefined || request.targetType === null) {
-        throw new Error('missing required field request.target_type');
-      }
-      if (request.targetId === undefined || request.targetId === null) {
-        throw new Error('missing required field request.target_id');
-      }
-      const path = `admin/v1/interactions/target/${request.targetType}/${request.targetId}`;
-      const body = null;
-      return transport.unary(path, 'DELETE', body, {
-        service: 'InteractionAdminService',
-        method: 'PurgeTargetInteractions',
-      }) as Promise<interactionservicev1_PurgeTargetInteractionsResponse>;
-    },
-    PurgeUserInteractions(request) {
-      if (request.userId === undefined || request.userId === null) {
-        throw new Error('missing required field request.user_id');
-      }
-      const path = `admin/v1/interactions/user/${request.userId}`;
-      const body = null;
-      return transport.unary(path, 'DELETE', body, {
-        service: 'InteractionAdminService',
-        method: 'PurgeUserInteractions',
-      }) as Promise<interactionservicev1_PurgeUserInteractionsResponse>;
-    },
-    ResetCounter(request) {
-      const path = `admin/v1/interactions/counter/reset`;
-      const body = JSON.stringify(request);
-      return transport.unary(path, 'POST', body, {
-        service: 'InteractionAdminService',
-        method: 'ResetCounter',
-      }) as Promise<interactionservicev1_ResetCounterResponse>;
-    },
-  };
-}
-export type interactionservicev1_PurgeTargetInteractionsRequest = {
-  targetId: number | undefined;
-  targetType: interactionservicev1_TargetType | undefined;
-};
-
-// 交互目标类型
-export type interactionservicev1_TargetType =
-  | 'TARGET_TYPE_COMMENT'
-  | 'TARGET_TYPE_POST'
-  | 'TARGET_TYPE_UNSPECIFIED';
-export type interactionservicev1_PurgeTargetInteractionsResponse = {
-  affectedRows: number | undefined;
-};
-
-export type interactionservicev1_PurgeUserInteractionsRequest = {
-  userId: number | undefined;
-};
-
-export type interactionservicev1_PurgeUserInteractionsResponse = {
-  affectedRows: number | undefined;
-};
-
-export type interactionservicev1_ResetCounterRequest = {
-  metric: interactionservicev1_CounterMetric | undefined;
-  targetId: number | undefined;
-  targetType: interactionservicev1_TargetType | undefined;
-};
-
-// 计数指标类型。与 interaction_counter 表的 metric 列对应。
-// 当前仅点赞计数活跃；后续若新增浏览量/点踩等，在此扩展枚举值即可，无需改 schema。
-export type interactionservicev1_CounterMetric =
-  | 'COUNTER_METRIC_LIKE'
-  | 'COUNTER_METRIC_UNSPECIFIED'
-  | 'COUNTER_METRIC_WATCH';
-export type interactionservicev1_ResetCounterResponse = {
-  recount: number | undefined;
-};
-
-// 站内信消息管理服务
-export interface InternalMessageService {
-  // 查询站内信消息列表
-  ListMessage(
+// 自动化 Flow 规则服务（admin 门面）
+export interface FlowRuleService {
+  // 规则列表
+  List(
     request: pagination_PagingRequest,
-  ): Promise<internal_messageservicev1_ListInternalMessageResponse>;
-  // 查询站内信消息详情
-  GetMessage(
-    request: internal_messageservicev1_GetInternalMessageRequest,
-  ): Promise<internal_messageservicev1_InternalMessage>;
-  // 更新站内信消息
-  UpdateMessage(
-    request: internal_messageservicev1_UpdateInternalMessageRequest,
-  ): Promise<wellKnownEmpty>;
-  // 删除站内信消息
-  DeleteMessage(
-    request: internal_messageservicev1_DeleteInternalMessageRequest,
-  ): Promise<wellKnownEmpty>;
-  // 发送消息
-  SendMessage(
-    request: internal_messageservicev1_SendMessageRequest,
-  ): Promise<internal_messageservicev1_SendMessageResponse>;
-  // 撤销某条消息
-  RevokeMessage(
-    request: internal_messageservicev1_RevokeMessageRequest,
+  ): Promise<flowservicev1_ListFlowRuleResponse>;
+  // 规则详情
+  Get(
+    request: flowservicev1_GetFlowRuleRequest,
+  ): Promise<flowservicev1_FlowRule>;
+  // 创建规则
+  Create(
+    request: flowservicev1_CreateFlowRuleRequest,
+  ): Promise<flowservicev1_FlowRule>;
+  // 更新规则
+  Update(
+    request: flowservicev1_UpdateFlowRuleRequest,
+  ): Promise<flowservicev1_FlowRule>;
+  // 删除规则
+  Delete(
+    request: flowservicev1_DeleteFlowRuleRequest,
   ): Promise<wellKnownEmpty>;
 }
 
-export function createInternalMessageServiceClient(
+export function createFlowRuleServiceClient(
   transport: ClientTransport,
-): InternalMessageService {
+): FlowRuleService {
   return {
-    ListMessage(request) {
-      const path = `admin/v1/internal-message/messages`;
+    List(request) {
+      const path = `/admin/v1/flow-rules`;
       const body = null;
       const queryParams: string[] = [];
       if (request.page) {
@@ -3394,41 +5827,181 @@ export function createInternalMessageServiceClient(
           `filterExpr.type=${encodeURIComponent(request.filterExpr.type.toString())}`,
         );
       }
-      if (request.filterExpr?.conditions?.field) {
+      if (request.orderBy) {
         queryParams.push(
-          `filterExpr.conditions.field=${encodeURIComponent(request.filterExpr.conditions.field.toString())}`,
+          `orderBy=${encodeURIComponent(request.orderBy.toString())}`,
         );
       }
-      if (request.filterExpr?.conditions?.op) {
+      if (request.fieldMask) {
         queryParams.push(
-          `filterExpr.conditions.op=${encodeURIComponent(request.filterExpr.conditions.op.toString())}`,
+          `fieldMask=${encodeURIComponent(request.fieldMask.toString())}`,
         );
       }
-      if (request.filterExpr?.conditions?.value) {
+      let uri = path;
+      if (queryParams.length > 0) {
+        uri += `?${queryParams.join('&')}`;
+      }
+      return transport.unary(uri, 'GET', body, {
+        service: 'FlowRuleService',
+        method: 'List',
+      }) as Promise<flowservicev1_ListFlowRuleResponse>;
+    },
+    Get(request) {
+      if (request.id === undefined || request.id === null) {
+        throw new Error('missing required field request.id');
+      }
+      const path = `/admin/v1/flow-rules/${request.id}`;
+      const body = null;
+      return transport.unary(path, 'GET', body, {
+        service: 'FlowRuleService',
+        method: 'Get',
+      }) as Promise<flowservicev1_FlowRule>;
+    },
+    Create(request) {
+      const path = `/admin/v1/flow-rules`;
+      const body = JSON.stringify(request);
+      return transport.unary(path, 'POST', body, {
+        service: 'FlowRuleService',
+        method: 'Create',
+      }) as Promise<flowservicev1_FlowRule>;
+    },
+    Update(request) {
+      if (request.id === undefined || request.id === null) {
+        throw new Error('missing required field request.id');
+      }
+      const path = `/admin/v1/flow-rules/${request.id}`;
+      const bodyMap = { ...request } as Record<string, unknown>;
+      delete bodyMap["id"];
+      const body = JSON.stringify(bodyMap);
+      return transport.unary(path, 'PUT', body, {
+        service: 'FlowRuleService',
+        method: 'Update',
+      }) as Promise<flowservicev1_FlowRule>;
+    },
+    Delete(request) {
+      if (request.id === undefined || request.id === null) {
+        throw new Error('missing required field request.id');
+      }
+      const path = `/admin/v1/flow-rules/${request.id}`;
+      const body = null;
+      return transport.unary(path, 'DELETE', body, {
+        service: 'FlowRuleService',
+        method: 'Delete',
+      }) as Promise<wellKnownEmpty>;
+    },
+  };
+}
+// 回应 - 规则列表
+export type flowservicev1_ListFlowRuleResponse = {
+  items: flowservicev1_FlowRule[] | undefined;
+  total: number | undefined;
+};
+
+// 自动化 Flow 规则：内容事件触发，条件命中后执行动作链
+export type flowservicev1_FlowRule = {
+  actions?: string;
+  conditionStatus?: string;
+  conditions?: string;
+  createdAt?: wellKnownTimestamp;
+  elseActions?: string;
+  enabled?: boolean;
+  id?: number;
+  matchCount?: number;
+  name?: string;
+  triggerCron?: string;
+  triggerEvent?: string;
+  updatedAt?: wellKnownTimestamp;
+};
+
+// 请求 - 规则详情
+export type flowservicev1_GetFlowRuleRequest = {
+  id: number | undefined;
+};
+
+// 请求 - 创建规则
+export type flowservicev1_CreateFlowRuleRequest = {
+  data: flowservicev1_FlowRule | undefined;
+};
+
+// 请求 - 更新规则
+export type flowservicev1_UpdateFlowRuleRequest = {
+  data: flowservicev1_FlowRule | undefined;
+  id: number | undefined;
+  updateMask: undefined | wellKnownFieldMask;
+};
+
+// 请求 - 删除规则
+export type flowservicev1_DeleteFlowRuleRequest = {
+  id: number | undefined;
+};
+
+// 表单提交管理服务（页面 FORM 区块的访客提交）
+export interface FormSubmissionService {
+  // 获取提交列表
+  List(
+    request: pagination_PagingRequest,
+  ): Promise<contentservicev1_ListFormSubmissionsResponse>;
+  // 获取提交详情
+  Get(
+    request: contentservicev1_GetFormSubmissionRequest,
+  ): Promise<contentservicev1_FormSubmission>;
+  // 删除提交
+  Delete(
+    request: contentservicev1_DeleteFormSubmissionRequest,
+  ): Promise<wellKnownEmpty>;
+}
+
+export function createFormSubmissionServiceClient(
+  transport: ClientTransport,
+): FormSubmissionService {
+  return {
+    List(request) {
+      const path = `/admin/v1/form-submissions`;
+      const body = null;
+      const queryParams: string[] = [];
+      if (request.page) {
         queryParams.push(
-          `filterExpr.conditions.value=${encodeURIComponent(request.filterExpr.conditions.value.toString())}`,
+          `page=${encodeURIComponent(request.page.toString())}`,
         );
       }
-      if (request.filterExpr?.conditions?.jsonValue) {
+      if (request.pageSize) {
         queryParams.push(
-          `filterExpr.conditions.jsonValue=${encodeURIComponent(request.filterExpr.conditions.jsonValue.toString())}`,
+          `pageSize=${encodeURIComponent(request.pageSize.toString())}`,
         );
       }
-      if (request.filterExpr?.conditions?.values) {
-        request.filterExpr.conditions.values.forEach((x) => {
-          queryParams.push(
-            `filterExpr.conditions.values=${encodeURIComponent(x.toString())}`,
-          );
-        });
-      }
-      if (request.filterExpr?.conditions?.datePart) {
+      if (request.offset) {
         queryParams.push(
-          `filterExpr.conditions.datePart=${encodeURIComponent(request.filterExpr.conditions.datePart.toString())}`,
+          `offset=${encodeURIComponent(request.offset.toString())}`,
         );
       }
-      if (request.filterExpr?.conditions?.jsonPath) {
+      if (request.limit) {
         queryParams.push(
-          `filterExpr.conditions.jsonPath=${encodeURIComponent(request.filterExpr.conditions.jsonPath.toString())}`,
+          `limit=${encodeURIComponent(request.limit.toString())}`,
+        );
+      }
+      if (request.token) {
+        queryParams.push(
+          `token=${encodeURIComponent(request.token.toString())}`,
+        );
+      }
+      if (request.noPaging) {
+        queryParams.push(
+          `noPaging=${encodeURIComponent(request.noPaging.toString())}`,
+        );
+      }
+      if (request.query) {
+        queryParams.push(
+          `query=${encodeURIComponent(request.query.toString())}`,
+        );
+      }
+      if (request.filter) {
+        queryParams.push(
+          `filter=${encodeURIComponent(request.filter.toString())}`,
+        );
+      }
+      if (request.filterExpr?.type) {
+        queryParams.push(
+          `filterExpr.type=${encodeURIComponent(request.filterExpr.type.toString())}`,
         );
       }
       if (request.orderBy) {
@@ -3436,14 +6009,250 @@ export function createInternalMessageServiceClient(
           `orderBy=${encodeURIComponent(request.orderBy.toString())}`,
         );
       }
-      if (request.sorting?.field) {
+      if (request.fieldMask) {
         queryParams.push(
-          `sorting.field=${encodeURIComponent(request.sorting.field.toString())}`,
+          `fieldMask=${encodeURIComponent(request.fieldMask.toString())}`,
         );
       }
-      if (request.sorting?.direction) {
+      let uri = path;
+      if (queryParams.length > 0) {
+        uri += `?${queryParams.join('&')}`;
+      }
+      return transport.unary(uri, 'GET', body, {
+        service: 'FormSubmissionService',
+        method: 'List',
+      }) as Promise<contentservicev1_ListFormSubmissionsResponse>;
+    },
+    Get(request) {
+      if (request.id === undefined || request.id === null) {
+        throw new Error('missing required field request.id');
+      }
+      const path = `/admin/v1/form-submissions/${request.id}`;
+      const body = null;
+      return transport.unary(path, 'GET', body, {
+        service: 'FormSubmissionService',
+        method: 'Get',
+      }) as Promise<contentservicev1_FormSubmission>;
+    },
+    Delete(request) {
+      if (request.id === undefined || request.id === null) {
+        throw new Error('missing required field request.id');
+      }
+      const path = `/admin/v1/form-submissions/${request.id}`;
+      const body = null;
+      return transport.unary(path, 'DELETE', body, {
+        service: 'FormSubmissionService',
+        method: 'Delete',
+      }) as Promise<wellKnownEmpty>;
+    },
+  };
+}
+// 回应 - 提交列表
+export type contentservicev1_ListFormSubmissionsResponse = {
+  items: contentservicev1_FormSubmission[] | undefined;
+  total: number | undefined;
+};
+
+// 表单提交
+export type contentservicev1_FormSubmission = {
+  createdAt?: wellKnownTimestamp;
+  data: { [key: string]: string } | undefined;
+  id?: number;
+  pageId?: number;
+  sectionId?: number;
+  userId?: number;
+};
+
+// 请求 - 提交详情
+export type contentservicev1_GetFormSubmissionRequest = {
+  id: number | undefined;
+};
+
+// 请求 - 删除提交
+export type contentservicev1_DeleteFormSubmissionRequest = {
+  id: number | undefined;
+};
+
+// 交互管理服务（运营清数据面）。仅转发至 core InteractionAdminService，
+// 调用方须为平台管理员（由 core 侧运营上下文 guard 校验）。
+export interface InteractionAdminService {
+  // 清除单条目标上的全部交互 ledger 并同步计数
+  PurgeTargetInteractions(
+    request: interactionservicev1_PurgeTargetInteractionsRequest,
+  ): Promise<interactionservicev1_PurgeTargetInteractionsResponse>;
+  // 清除指定用户在全站的全部交互 ledger（分批短事务）
+  PurgeUserInteractions(
+    request: interactionservicev1_PurgeUserInteractionsRequest,
+  ): Promise<interactionservicev1_PurgeUserInteractionsResponse>;
+  // 按 ledger 重算指定 (target, metric) 的计数
+  ResetCounter(
+    request: interactionservicev1_ResetCounterRequest,
+  ): Promise<interactionservicev1_ResetCounterResponse>;
+}
+
+export function createInteractionAdminServiceClient(
+  transport: ClientTransport,
+): InteractionAdminService {
+  return {
+    PurgeTargetInteractions(request) {
+      if (request.targetType === undefined || request.targetType === null) {
+        throw new Error('missing required field request.target_type');
+      }
+      if (request.targetId === undefined || request.targetId === null) {
+        throw new Error('missing required field request.target_id');
+      }
+      const path = `/admin/v1/interactions/target/${request.targetType}/${request.targetId}`;
+      const body = null;
+      return transport.unary(path, 'DELETE', body, {
+        service: 'InteractionAdminService',
+        method: 'PurgeTargetInteractions',
+      }) as Promise<interactionservicev1_PurgeTargetInteractionsResponse>;
+    },
+    PurgeUserInteractions(request) {
+      if (request.userId === undefined || request.userId === null) {
+        throw new Error('missing required field request.user_id');
+      }
+      const path = `/admin/v1/interactions/user/${request.userId}`;
+      const body = null;
+      return transport.unary(path, 'DELETE', body, {
+        service: 'InteractionAdminService',
+        method: 'PurgeUserInteractions',
+      }) as Promise<interactionservicev1_PurgeUserInteractionsResponse>;
+    },
+    ResetCounter(request) {
+      const path = `/admin/v1/interactions/counter/reset`;
+      const body = JSON.stringify(request);
+      return transport.unary(path, 'POST', body, {
+        service: 'InteractionAdminService',
+        method: 'ResetCounter',
+      }) as Promise<interactionservicev1_ResetCounterResponse>;
+    },
+  };
+}
+export type interactionservicev1_PurgeTargetInteractionsRequest = {
+  targetId: number | undefined;
+  targetType: interactionservicev1_TargetType | undefined;
+};
+
+// 交互目标类型
+export type interactionservicev1_TargetType =
+  | 'TARGET_TYPE_COMMENT'
+  | 'TARGET_TYPE_PAGE'
+  | 'TARGET_TYPE_POST'
+  | 'TARGET_TYPE_UNSPECIFIED';
+export type interactionservicev1_PurgeTargetInteractionsResponse = {
+  affectedRows: number | undefined;
+};
+
+export type interactionservicev1_PurgeUserInteractionsRequest = {
+  userId: number | undefined;
+};
+
+export type interactionservicev1_PurgeUserInteractionsResponse = {
+  affectedRows: number | undefined;
+};
+
+export type interactionservicev1_ResetCounterRequest = {
+  metric: interactionservicev1_CounterMetric | undefined;
+  targetId: number | undefined;
+  targetType: interactionservicev1_TargetType | undefined;
+};
+
+// 计数指标类型。与 interaction_counter 表的 metric 列对应。
+// VIEW（浏览量）为只增计数：无 ledger 行，不支持取消；匿名可上报。
+export type interactionservicev1_CounterMetric =
+  | 'COUNTER_METRIC_LIKE'
+  | 'COUNTER_METRIC_UNSPECIFIED'
+  | 'COUNTER_METRIC_VIEW'
+  | 'COUNTER_METRIC_WATCH';
+export type interactionservicev1_ResetCounterResponse = {
+  recount: number | undefined;
+};
+
+// 站内信消息管理服务
+export interface InternalMessageService {
+  // 查询站内信消息列表
+  ListMessage(
+    request: pagination_PagingRequest,
+  ): Promise<internal_messageservicev1_ListInternalMessageResponse>;
+  // 查询站内信消息详情
+  GetMessage(
+    request: internal_messageservicev1_GetInternalMessageRequest,
+  ): Promise<internal_messageservicev1_InternalMessage>;
+  // 更新站内信消息
+  UpdateMessage(
+    request: internal_messageservicev1_UpdateInternalMessageRequest,
+  ): Promise<wellKnownEmpty>;
+  // 删除站内信消息
+  DeleteMessage(
+    request: internal_messageservicev1_DeleteInternalMessageRequest,
+  ): Promise<wellKnownEmpty>;
+  // 发送消息
+  SendMessage(
+    request: internal_messageservicev1_SendMessageRequest,
+  ): Promise<internal_messageservicev1_SendMessageResponse>;
+  // 撤销某条消息
+  RevokeMessage(
+    request: internal_messageservicev1_RevokeMessageRequest,
+  ): Promise<wellKnownEmpty>;
+}
+
+export function createInternalMessageServiceClient(
+  transport: ClientTransport,
+): InternalMessageService {
+  return {
+    ListMessage(request) {
+      const path = `/admin/v1/internal-message/messages`;
+      const body = null;
+      const queryParams: string[] = [];
+      if (request.page) {
         queryParams.push(
-          `sorting.direction=${encodeURIComponent(request.sorting.direction.toString())}`,
+          `page=${encodeURIComponent(request.page.toString())}`,
+        );
+      }
+      if (request.pageSize) {
+        queryParams.push(
+          `pageSize=${encodeURIComponent(request.pageSize.toString())}`,
+        );
+      }
+      if (request.offset) {
+        queryParams.push(
+          `offset=${encodeURIComponent(request.offset.toString())}`,
+        );
+      }
+      if (request.limit) {
+        queryParams.push(
+          `limit=${encodeURIComponent(request.limit.toString())}`,
+        );
+      }
+      if (request.token) {
+        queryParams.push(
+          `token=${encodeURIComponent(request.token.toString())}`,
+        );
+      }
+      if (request.noPaging) {
+        queryParams.push(
+          `noPaging=${encodeURIComponent(request.noPaging.toString())}`,
+        );
+      }
+      if (request.query) {
+        queryParams.push(
+          `query=${encodeURIComponent(request.query.toString())}`,
+        );
+      }
+      if (request.filter) {
+        queryParams.push(
+          `filter=${encodeURIComponent(request.filter.toString())}`,
+        );
+      }
+      if (request.filterExpr?.type) {
+        queryParams.push(
+          `filterExpr.type=${encodeURIComponent(request.filterExpr.type.toString())}`,
+        );
+      }
+      if (request.orderBy) {
+        queryParams.push(
+          `orderBy=${encodeURIComponent(request.orderBy.toString())}`,
         );
       }
       if (request.fieldMask) {
@@ -3464,7 +6273,7 @@ export function createInternalMessageServiceClient(
       if (request.id === undefined || request.id === null) {
         throw new Error('missing required field request.id');
       }
-      const path = `admin/v1/internal-message/messages/${request.id}`;
+      const path = `/admin/v1/internal-message/messages/${request.id}`;
       const body = null;
       const queryParams: string[] = [];
       if (request.viewMask) {
@@ -3485,8 +6294,10 @@ export function createInternalMessageServiceClient(
       if (request.id === undefined || request.id === null) {
         throw new Error('missing required field request.id');
       }
-      const path = `admin/v1/internal-message/messages/${request.id}`;
-      const body = JSON.stringify(request);
+      const path = `/admin/v1/internal-message/messages/${request.id}`;
+      const bodyMap = { ...request } as Record<string, unknown>;
+      delete bodyMap["id"];
+      const body = JSON.stringify(bodyMap);
       return transport.unary(path, 'PUT', body, {
         service: 'InternalMessageService',
         method: 'UpdateMessage',
@@ -3496,7 +6307,7 @@ export function createInternalMessageServiceClient(
       if (request.id === undefined || request.id === null) {
         throw new Error('missing required field request.id');
       }
-      const path = `admin/v1/internal-message/messages/${request.id}`;
+      const path = `/admin/v1/internal-message/messages/${request.id}`;
       const body = null;
       return transport.unary(path, 'DELETE', body, {
         service: 'InternalMessageService',
@@ -3504,7 +6315,7 @@ export function createInternalMessageServiceClient(
       }) as Promise<wellKnownEmpty>;
     },
     SendMessage(request) {
-      const path = `admin/v1/internal-message/send`;
+      const path = `/admin/v1/internal-message/send`;
       const body = JSON.stringify(request);
       return transport.unary(path, 'POST', body, {
         service: 'InternalMessageService',
@@ -3512,7 +6323,7 @@ export function createInternalMessageServiceClient(
       }) as Promise<internal_messageservicev1_SendMessageResponse>;
     },
     RevokeMessage(request) {
-      const path = `admin/v1/internal-message/revoke`;
+      const path = `/admin/v1/internal-message/revoke`;
       const body = JSON.stringify(request);
       return transport.unary(path, 'POST', body, {
         service: 'InternalMessageService',
@@ -3587,6 +6398,7 @@ export type internal_messageservicev1_SendMessageRequest = {
   content: string | undefined;
   conversationId?: number;
   recipientUserId?: number;
+  sendEmail?: boolean;
   sendUserId?: number;
   targetAll?: boolean;
   targetUserIds: number[] | undefined;
@@ -3632,7 +6444,7 @@ export function createInternalMessageCategoryServiceClient(
 ): InternalMessageCategoryService {
   return {
     List(request) {
-      const path = `admin/v1/internal-message/categories`;
+      const path = `/admin/v1/internal-message/categories`;
       const body = null;
       const queryParams: string[] = [];
       if (request.page) {
@@ -3680,56 +6492,9 @@ export function createInternalMessageCategoryServiceClient(
           `filterExpr.type=${encodeURIComponent(request.filterExpr.type.toString())}`,
         );
       }
-      if (request.filterExpr?.conditions?.field) {
-        queryParams.push(
-          `filterExpr.conditions.field=${encodeURIComponent(request.filterExpr.conditions.field.toString())}`,
-        );
-      }
-      if (request.filterExpr?.conditions?.op) {
-        queryParams.push(
-          `filterExpr.conditions.op=${encodeURIComponent(request.filterExpr.conditions.op.toString())}`,
-        );
-      }
-      if (request.filterExpr?.conditions?.value) {
-        queryParams.push(
-          `filterExpr.conditions.value=${encodeURIComponent(request.filterExpr.conditions.value.toString())}`,
-        );
-      }
-      if (request.filterExpr?.conditions?.jsonValue) {
-        queryParams.push(
-          `filterExpr.conditions.jsonValue=${encodeURIComponent(request.filterExpr.conditions.jsonValue.toString())}`,
-        );
-      }
-      if (request.filterExpr?.conditions?.values) {
-        request.filterExpr.conditions.values.forEach((x) => {
-          queryParams.push(
-            `filterExpr.conditions.values=${encodeURIComponent(x.toString())}`,
-          );
-        });
-      }
-      if (request.filterExpr?.conditions?.datePart) {
-        queryParams.push(
-          `filterExpr.conditions.datePart=${encodeURIComponent(request.filterExpr.conditions.datePart.toString())}`,
-        );
-      }
-      if (request.filterExpr?.conditions?.jsonPath) {
-        queryParams.push(
-          `filterExpr.conditions.jsonPath=${encodeURIComponent(request.filterExpr.conditions.jsonPath.toString())}`,
-        );
-      }
       if (request.orderBy) {
         queryParams.push(
           `orderBy=${encodeURIComponent(request.orderBy.toString())}`,
-        );
-      }
-      if (request.sorting?.field) {
-        queryParams.push(
-          `sorting.field=${encodeURIComponent(request.sorting.field.toString())}`,
-        );
-      }
-      if (request.sorting?.direction) {
-        queryParams.push(
-          `sorting.direction=${encodeURIComponent(request.sorting.direction.toString())}`,
         );
       }
       if (request.fieldMask) {
@@ -3750,7 +6515,7 @@ export function createInternalMessageCategoryServiceClient(
       if (request.id === undefined || request.id === null) {
         throw new Error('missing required field request.id');
       }
-      const path = `admin/v1/internal-message/categories/${request.id}`;
+      const path = `/admin/v1/internal-message/categories/${request.id}`;
       const body = null;
       const queryParams: string[] = [];
       if (request.viewMask) {
@@ -3768,7 +6533,7 @@ export function createInternalMessageCategoryServiceClient(
       }) as Promise<internal_messageservicev1_InternalMessageCategory>;
     },
     Create(request) {
-      const path = `admin/v1/internal-message/categories`;
+      const path = `/admin/v1/internal-message/categories`;
       const body = JSON.stringify(request);
       return transport.unary(path, 'POST', body, {
         service: 'InternalMessageCategoryService',
@@ -3779,8 +6544,10 @@ export function createInternalMessageCategoryServiceClient(
       if (request.id === undefined || request.id === null) {
         throw new Error('missing required field request.id');
       }
-      const path = `admin/v1/internal-message/categories/${request.id}`;
-      const body = JSON.stringify(request);
+      const path = `/admin/v1/internal-message/categories/${request.id}`;
+      const bodyMap = { ...request } as Record<string, unknown>;
+      delete bodyMap["id"];
+      const body = JSON.stringify(bodyMap);
       return transport.unary(path, 'PUT', body, {
         service: 'InternalMessageCategoryService',
         method: 'Update',
@@ -3790,7 +6557,7 @@ export function createInternalMessageCategoryServiceClient(
       if (request.id === undefined || request.id === null) {
         throw new Error('missing required field request.id');
       }
-      const path = `admin/v1/internal-message/categories/${request.id}`;
+      const path = `/admin/v1/internal-message/categories/${request.id}`;
       const body = null;
       return transport.unary(path, 'DELETE', body, {
         service: 'InternalMessageCategoryService',
@@ -3872,7 +6639,7 @@ export function createInternalMessageRecipientServiceClient(
 ): InternalMessageRecipientService {
   return {
     ListUserInbox(request) {
-      const path = `admin/v1/internal-message/inbox`;
+      const path = `/admin/v1/internal-message/inbox`;
       const body = null;
       const queryParams: string[] = [];
       if (request.page) {
@@ -3920,56 +6687,9 @@ export function createInternalMessageRecipientServiceClient(
           `filterExpr.type=${encodeURIComponent(request.filterExpr.type.toString())}`,
         );
       }
-      if (request.filterExpr?.conditions?.field) {
-        queryParams.push(
-          `filterExpr.conditions.field=${encodeURIComponent(request.filterExpr.conditions.field.toString())}`,
-        );
-      }
-      if (request.filterExpr?.conditions?.op) {
-        queryParams.push(
-          `filterExpr.conditions.op=${encodeURIComponent(request.filterExpr.conditions.op.toString())}`,
-        );
-      }
-      if (request.filterExpr?.conditions?.value) {
-        queryParams.push(
-          `filterExpr.conditions.value=${encodeURIComponent(request.filterExpr.conditions.value.toString())}`,
-        );
-      }
-      if (request.filterExpr?.conditions?.jsonValue) {
-        queryParams.push(
-          `filterExpr.conditions.jsonValue=${encodeURIComponent(request.filterExpr.conditions.jsonValue.toString())}`,
-        );
-      }
-      if (request.filterExpr?.conditions?.values) {
-        request.filterExpr.conditions.values.forEach((x) => {
-          queryParams.push(
-            `filterExpr.conditions.values=${encodeURIComponent(x.toString())}`,
-          );
-        });
-      }
-      if (request.filterExpr?.conditions?.datePart) {
-        queryParams.push(
-          `filterExpr.conditions.datePart=${encodeURIComponent(request.filterExpr.conditions.datePart.toString())}`,
-        );
-      }
-      if (request.filterExpr?.conditions?.jsonPath) {
-        queryParams.push(
-          `filterExpr.conditions.jsonPath=${encodeURIComponent(request.filterExpr.conditions.jsonPath.toString())}`,
-        );
-      }
       if (request.orderBy) {
         queryParams.push(
           `orderBy=${encodeURIComponent(request.orderBy.toString())}`,
-        );
-      }
-      if (request.sorting?.field) {
-        queryParams.push(
-          `sorting.field=${encodeURIComponent(request.sorting.field.toString())}`,
-        );
-      }
-      if (request.sorting?.direction) {
-        queryParams.push(
-          `sorting.direction=${encodeURIComponent(request.sorting.direction.toString())}`,
         );
       }
       if (request.fieldMask) {
@@ -3987,7 +6707,7 @@ export function createInternalMessageRecipientServiceClient(
       }) as Promise<internal_messageservicev1_ListUserInboxResponse>;
     },
     DeleteNotificationFromInbox(request) {
-      const path = `admin/v1/internal-message/inbox/delete`;
+      const path = `/admin/v1/internal-message/inbox/delete`;
       const body = JSON.stringify(request);
       return transport.unary(path, 'POST', body, {
         service: 'InternalMessageRecipientService',
@@ -3995,7 +6715,7 @@ export function createInternalMessageRecipientServiceClient(
       }) as Promise<wellKnownEmpty>;
     },
     MarkNotificationAsRead(request) {
-      const path = `admin/v1/internal-message/read`;
+      const path = `/admin/v1/internal-message/read`;
       const body = JSON.stringify(request);
       return transport.unary(path, 'POST', body, {
         service: 'InternalMessageRecipientService',
@@ -4079,7 +6799,7 @@ export function createLanguageServiceClient(
 ): LanguageService {
   return {
     List(request) {
-      const path = `admin/v1/dict/langs`;
+      const path = `/admin/v1/dict/langs`;
       const body = null;
       const queryParams: string[] = [];
       if (request.page) {
@@ -4127,56 +6847,9 @@ export function createLanguageServiceClient(
           `filterExpr.type=${encodeURIComponent(request.filterExpr.type.toString())}`,
         );
       }
-      if (request.filterExpr?.conditions?.field) {
-        queryParams.push(
-          `filterExpr.conditions.field=${encodeURIComponent(request.filterExpr.conditions.field.toString())}`,
-        );
-      }
-      if (request.filterExpr?.conditions?.op) {
-        queryParams.push(
-          `filterExpr.conditions.op=${encodeURIComponent(request.filterExpr.conditions.op.toString())}`,
-        );
-      }
-      if (request.filterExpr?.conditions?.value) {
-        queryParams.push(
-          `filterExpr.conditions.value=${encodeURIComponent(request.filterExpr.conditions.value.toString())}`,
-        );
-      }
-      if (request.filterExpr?.conditions?.jsonValue) {
-        queryParams.push(
-          `filterExpr.conditions.jsonValue=${encodeURIComponent(request.filterExpr.conditions.jsonValue.toString())}`,
-        );
-      }
-      if (request.filterExpr?.conditions?.values) {
-        request.filterExpr.conditions.values.forEach((x) => {
-          queryParams.push(
-            `filterExpr.conditions.values=${encodeURIComponent(x.toString())}`,
-          );
-        });
-      }
-      if (request.filterExpr?.conditions?.datePart) {
-        queryParams.push(
-          `filterExpr.conditions.datePart=${encodeURIComponent(request.filterExpr.conditions.datePart.toString())}`,
-        );
-      }
-      if (request.filterExpr?.conditions?.jsonPath) {
-        queryParams.push(
-          `filterExpr.conditions.jsonPath=${encodeURIComponent(request.filterExpr.conditions.jsonPath.toString())}`,
-        );
-      }
       if (request.orderBy) {
         queryParams.push(
           `orderBy=${encodeURIComponent(request.orderBy.toString())}`,
-        );
-      }
-      if (request.sorting?.field) {
-        queryParams.push(
-          `sorting.field=${encodeURIComponent(request.sorting.field.toString())}`,
-        );
-      }
-      if (request.sorting?.direction) {
-        queryParams.push(
-          `sorting.direction=${encodeURIComponent(request.sorting.direction.toString())}`,
         );
       }
       if (request.fieldMask) {
@@ -4197,7 +6870,7 @@ export function createLanguageServiceClient(
       if (request.id === undefined || request.id === null) {
         throw new Error('missing required field request.id');
       }
-      const path = `admin/v1/dict/langs/${request.id}`;
+      const path = `/admin/v1/dict/langs/${request.id}`;
       const body = null;
       const queryParams: string[] = [];
       if (request.code) {
@@ -4220,7 +6893,7 @@ export function createLanguageServiceClient(
       }) as Promise<dictservicev1_Language>;
     },
     Create(request) {
-      const path = `admin/v1/dict/langs`;
+      const path = `/admin/v1/dict/langs`;
       const body = JSON.stringify(request);
       return transport.unary(path, 'POST', body, {
         service: 'LanguageService',
@@ -4231,15 +6904,17 @@ export function createLanguageServiceClient(
       if (request.id === undefined || request.id === null) {
         throw new Error('missing required field request.id');
       }
-      const path = `admin/v1/dict/langs/${request.id}`;
-      const body = JSON.stringify(request);
+      const path = `/admin/v1/dict/langs/${request.id}`;
+      const bodyMap = { ...request } as Record<string, unknown>;
+      delete bodyMap["id"];
+      const body = JSON.stringify(bodyMap);
       return transport.unary(path, 'PUT', body, {
         service: 'LanguageService',
         method: 'Update',
       }) as Promise<wellKnownEmpty>;
     },
     Delete(request) {
-      const path = `admin/v1/dict/langs`;
+      const path = `/admin/v1/dict/langs`;
       const body = null;
       const queryParams: string[] = [];
       if (request.id) {
@@ -4257,7 +6932,7 @@ export function createLanguageServiceClient(
       }) as Promise<wellKnownEmpty>;
     },
     BatchCreate(request) {
-      const path = `admin/v1/dict/langs/batch`;
+      const path = `/admin/v1/dict/langs/batch`;
       const body = JSON.stringify(request);
       return transport.unary(path, 'POST', body, {
         service: 'LanguageService',
@@ -4335,7 +7010,7 @@ export function createLoginAuditLogServiceClient(
 ): LoginAuditLogService {
   return {
     List(request) {
-      const path = `admin/v1/login-audit-logs`;
+      const path = `/admin/v1/login-audit-logs`;
       const body = null;
       const queryParams: string[] = [];
       if (request.page) {
@@ -4383,56 +7058,9 @@ export function createLoginAuditLogServiceClient(
           `filterExpr.type=${encodeURIComponent(request.filterExpr.type.toString())}`,
         );
       }
-      if (request.filterExpr?.conditions?.field) {
-        queryParams.push(
-          `filterExpr.conditions.field=${encodeURIComponent(request.filterExpr.conditions.field.toString())}`,
-        );
-      }
-      if (request.filterExpr?.conditions?.op) {
-        queryParams.push(
-          `filterExpr.conditions.op=${encodeURIComponent(request.filterExpr.conditions.op.toString())}`,
-        );
-      }
-      if (request.filterExpr?.conditions?.value) {
-        queryParams.push(
-          `filterExpr.conditions.value=${encodeURIComponent(request.filterExpr.conditions.value.toString())}`,
-        );
-      }
-      if (request.filterExpr?.conditions?.jsonValue) {
-        queryParams.push(
-          `filterExpr.conditions.jsonValue=${encodeURIComponent(request.filterExpr.conditions.jsonValue.toString())}`,
-        );
-      }
-      if (request.filterExpr?.conditions?.values) {
-        request.filterExpr.conditions.values.forEach((x) => {
-          queryParams.push(
-            `filterExpr.conditions.values=${encodeURIComponent(x.toString())}`,
-          );
-        });
-      }
-      if (request.filterExpr?.conditions?.datePart) {
-        queryParams.push(
-          `filterExpr.conditions.datePart=${encodeURIComponent(request.filterExpr.conditions.datePart.toString())}`,
-        );
-      }
-      if (request.filterExpr?.conditions?.jsonPath) {
-        queryParams.push(
-          `filterExpr.conditions.jsonPath=${encodeURIComponent(request.filterExpr.conditions.jsonPath.toString())}`,
-        );
-      }
       if (request.orderBy) {
         queryParams.push(
           `orderBy=${encodeURIComponent(request.orderBy.toString())}`,
-        );
-      }
-      if (request.sorting?.field) {
-        queryParams.push(
-          `sorting.field=${encodeURIComponent(request.sorting.field.toString())}`,
-        );
-      }
-      if (request.sorting?.direction) {
-        queryParams.push(
-          `sorting.direction=${encodeURIComponent(request.sorting.direction.toString())}`,
         );
       }
       if (request.fieldMask) {
@@ -4453,7 +7081,7 @@ export function createLoginAuditLogServiceClient(
       if (request.id === undefined || request.id === null) {
         throw new Error('missing required field request.id');
       }
-      const path = `admin/v1/login-audit-logs/${request.id}`;
+      const path = `/admin/v1/login-audit-logs/${request.id}`;
       const body = null;
       const queryParams: string[] = [];
       if (request.viewMask) {
@@ -4569,7 +7197,7 @@ export function createLoginPolicyServiceClient(
 ): LoginPolicyService {
   return {
     List(request) {
-      const path = `admin/v1/login-policies`;
+      const path = `/admin/v1/login-policies`;
       const body = null;
       const queryParams: string[] = [];
       if (request.page) {
@@ -4617,56 +7245,9 @@ export function createLoginPolicyServiceClient(
           `filterExpr.type=${encodeURIComponent(request.filterExpr.type.toString())}`,
         );
       }
-      if (request.filterExpr?.conditions?.field) {
-        queryParams.push(
-          `filterExpr.conditions.field=${encodeURIComponent(request.filterExpr.conditions.field.toString())}`,
-        );
-      }
-      if (request.filterExpr?.conditions?.op) {
-        queryParams.push(
-          `filterExpr.conditions.op=${encodeURIComponent(request.filterExpr.conditions.op.toString())}`,
-        );
-      }
-      if (request.filterExpr?.conditions?.value) {
-        queryParams.push(
-          `filterExpr.conditions.value=${encodeURIComponent(request.filterExpr.conditions.value.toString())}`,
-        );
-      }
-      if (request.filterExpr?.conditions?.jsonValue) {
-        queryParams.push(
-          `filterExpr.conditions.jsonValue=${encodeURIComponent(request.filterExpr.conditions.jsonValue.toString())}`,
-        );
-      }
-      if (request.filterExpr?.conditions?.values) {
-        request.filterExpr.conditions.values.forEach((x) => {
-          queryParams.push(
-            `filterExpr.conditions.values=${encodeURIComponent(x.toString())}`,
-          );
-        });
-      }
-      if (request.filterExpr?.conditions?.datePart) {
-        queryParams.push(
-          `filterExpr.conditions.datePart=${encodeURIComponent(request.filterExpr.conditions.datePart.toString())}`,
-        );
-      }
-      if (request.filterExpr?.conditions?.jsonPath) {
-        queryParams.push(
-          `filterExpr.conditions.jsonPath=${encodeURIComponent(request.filterExpr.conditions.jsonPath.toString())}`,
-        );
-      }
       if (request.orderBy) {
         queryParams.push(
           `orderBy=${encodeURIComponent(request.orderBy.toString())}`,
-        );
-      }
-      if (request.sorting?.field) {
-        queryParams.push(
-          `sorting.field=${encodeURIComponent(request.sorting.field.toString())}`,
-        );
-      }
-      if (request.sorting?.direction) {
-        queryParams.push(
-          `sorting.direction=${encodeURIComponent(request.sorting.direction.toString())}`,
         );
       }
       if (request.fieldMask) {
@@ -4687,7 +7268,7 @@ export function createLoginPolicyServiceClient(
       if (request.id === undefined || request.id === null) {
         throw new Error('missing required field request.id');
       }
-      const path = `admin/v1/login-policies/${request.id}`;
+      const path = `/admin/v1/login-policies/${request.id}`;
       const body = null;
       const queryParams: string[] = [];
       if (request.viewMask) {
@@ -4705,7 +7286,7 @@ export function createLoginPolicyServiceClient(
       }) as Promise<authenticationservicev1_LoginPolicy>;
     },
     Create(request) {
-      const path = `admin/v1/login-policies`;
+      const path = `/admin/v1/login-policies`;
       const body = JSON.stringify(request);
       return transport.unary(path, 'POST', body, {
         service: 'LoginPolicyService',
@@ -4716,8 +7297,10 @@ export function createLoginPolicyServiceClient(
       if (request.id === undefined || request.id === null) {
         throw new Error('missing required field request.id');
       }
-      const path = `admin/v1/login-policies/${request.id}`;
-      const body = JSON.stringify(request);
+      const path = `/admin/v1/login-policies/${request.id}`;
+      const bodyMap = { ...request } as Record<string, unknown>;
+      delete bodyMap["id"];
+      const body = JSON.stringify(bodyMap);
       return transport.unary(path, 'PUT', body, {
         service: 'LoginPolicyService',
         method: 'Update',
@@ -4727,7 +7310,7 @@ export function createLoginPolicyServiceClient(
       if (request.id === undefined || request.id === null) {
         throw new Error('missing required field request.id');
       }
-      const path = `admin/v1/login-policies/${request.id}`;
+      const path = `/admin/v1/login-policies/${request.id}`;
       const body = null;
       return transport.unary(path, 'DELETE', body, {
         service: 'LoginPolicyService',
@@ -4817,7 +7400,19 @@ export interface MediaAssetService {
   Update(
     request: mediaservicev1_UpdateMediaAssetRequest,
   ): Promise<mediaservicev1_MediaAsset>;
-  // 删除媒体资源库
+  // 按内容哈希查重。注意不能挂在 /media-assets/{file_hash} 形态下——
+  // 与 Get({id}) 单段路由冲突（先注册者胜，{id} 会把字面量当 ID 解析报 CODEC）。
+  FindByHash(
+    request: mediaservicev1_FindMediaAssetByHashRequest,
+  ): Promise<mediaservicev1_FindMediaAssetByHashResponse>;
+  // 重复资源分组（同租户内同内容哈希 >1 条）。路径避开 /media-assets/{id} 单段遮蔽。
+  ListDuplicatedMediaAssets(
+    request: mediaservicev1_ListDuplicatedMediaAssetsRequest,
+  ): Promise<mediaservicev1_ListDuplicatedMediaAssetsResponse>;
+  // 媒体被内容引用的关系（引用图谱查询）
+  ListMediaAssetReferences(
+    request: mediaservicev1_ListMediaAssetReferencesRequest,
+  ): Promise<mediaservicev1_ListMediaAssetReferencesResponse>;
   Delete(
     request: mediaservicev1_DeleteMediaAssetRequest,
   ): Promise<wellKnownEmpty>;
@@ -4828,7 +7423,7 @@ export function createMediaAssetServiceClient(
 ): MediaAssetService {
   return {
     List(request) {
-      const path = `admin/v1/media-assets`;
+      const path = `/admin/v1/media-assets`;
       const body = null;
       const queryParams: string[] = [];
       if (request.page) {
@@ -4876,56 +7471,9 @@ export function createMediaAssetServiceClient(
           `filterExpr.type=${encodeURIComponent(request.filterExpr.type.toString())}`,
         );
       }
-      if (request.filterExpr?.conditions?.field) {
-        queryParams.push(
-          `filterExpr.conditions.field=${encodeURIComponent(request.filterExpr.conditions.field.toString())}`,
-        );
-      }
-      if (request.filterExpr?.conditions?.op) {
-        queryParams.push(
-          `filterExpr.conditions.op=${encodeURIComponent(request.filterExpr.conditions.op.toString())}`,
-        );
-      }
-      if (request.filterExpr?.conditions?.value) {
-        queryParams.push(
-          `filterExpr.conditions.value=${encodeURIComponent(request.filterExpr.conditions.value.toString())}`,
-        );
-      }
-      if (request.filterExpr?.conditions?.jsonValue) {
-        queryParams.push(
-          `filterExpr.conditions.jsonValue=${encodeURIComponent(request.filterExpr.conditions.jsonValue.toString())}`,
-        );
-      }
-      if (request.filterExpr?.conditions?.values) {
-        request.filterExpr.conditions.values.forEach((x) => {
-          queryParams.push(
-            `filterExpr.conditions.values=${encodeURIComponent(x.toString())}`,
-          );
-        });
-      }
-      if (request.filterExpr?.conditions?.datePart) {
-        queryParams.push(
-          `filterExpr.conditions.datePart=${encodeURIComponent(request.filterExpr.conditions.datePart.toString())}`,
-        );
-      }
-      if (request.filterExpr?.conditions?.jsonPath) {
-        queryParams.push(
-          `filterExpr.conditions.jsonPath=${encodeURIComponent(request.filterExpr.conditions.jsonPath.toString())}`,
-        );
-      }
       if (request.orderBy) {
         queryParams.push(
           `orderBy=${encodeURIComponent(request.orderBy.toString())}`,
-        );
-      }
-      if (request.sorting?.field) {
-        queryParams.push(
-          `sorting.field=${encodeURIComponent(request.sorting.field.toString())}`,
-        );
-      }
-      if (request.sorting?.direction) {
-        queryParams.push(
-          `sorting.direction=${encodeURIComponent(request.sorting.direction.toString())}`,
         );
       }
       if (request.fieldMask) {
@@ -4946,7 +7494,7 @@ export function createMediaAssetServiceClient(
       if (request.id === undefined || request.id === null) {
         throw new Error('missing required field request.id');
       }
-      const path = `admin/v1/media-assets/${request.id}`;
+      const path = `/admin/v1/media-assets/${request.id}`;
       const body = null;
       const queryParams: string[] = [];
       if (request.viewMask) {
@@ -4964,7 +7512,7 @@ export function createMediaAssetServiceClient(
       }) as Promise<mediaservicev1_MediaAsset>;
     },
     Create(request) {
-      const path = `admin/v1/media-assets`;
+      const path = `/admin/v1/media-assets`;
       const body = JSON.stringify(request);
       return transport.unary(path, 'POST', body, {
         service: 'MediaAssetService',
@@ -4975,18 +7523,60 @@ export function createMediaAssetServiceClient(
       if (request.id === undefined || request.id === null) {
         throw new Error('missing required field request.id');
       }
-      const path = `admin/v1/media-assets/${request.id}`;
-      const body = JSON.stringify(request);
+      const path = `/admin/v1/media-assets/${request.id}`;
+      const bodyMap = { ...request } as Record<string, unknown>;
+      delete bodyMap["id"];
+      const body = JSON.stringify(bodyMap);
       return transport.unary(path, 'PUT', body, {
         service: 'MediaAssetService',
         method: 'Update',
       }) as Promise<mediaservicev1_MediaAsset>;
     },
+    FindByHash(request) {
+      if (request.fileHash === undefined || request.fileHash === null) {
+        throw new Error('missing required field request.file_hash');
+      }
+      const path = `/admin/v1/media-asset-by-hash/${request.fileHash}`;
+      const body = null;
+      return transport.unary(path, 'GET', body, {
+        service: 'MediaAssetService',
+        method: 'FindByHash',
+      }) as Promise<mediaservicev1_FindMediaAssetByHashResponse>;
+    },
+    ListDuplicatedMediaAssets(request) {
+      const path = `/admin/v1/media-duplicates`;
+      const body = null;
+      const queryParams: string[] = [];
+      if (request.limit) {
+        queryParams.push(
+          `limit=${encodeURIComponent(request.limit.toString())}`,
+        );
+      }
+      let uri = path;
+      if (queryParams.length > 0) {
+        uri += `?${queryParams.join('&')}`;
+      }
+      return transport.unary(uri, 'GET', body, {
+        service: 'MediaAssetService',
+        method: 'ListDuplicatedMediaAssets',
+      }) as Promise<mediaservicev1_ListDuplicatedMediaAssetsResponse>;
+    },
+    ListMediaAssetReferences(request) {
+      if (request.mediaAssetId === undefined || request.mediaAssetId === null) {
+        throw new Error('missing required field request.media_asset_id');
+      }
+      const path = `/admin/v1/media-assets/${request.mediaAssetId}/references`;
+      const body = null;
+      return transport.unary(path, 'GET', body, {
+        service: 'MediaAssetService',
+        method: 'ListMediaAssetReferences',
+      }) as Promise<mediaservicev1_ListMediaAssetReferencesResponse>;
+    },
     Delete(request) {
       if (request.id === undefined || request.id === null) {
         throw new Error('missing required field request.id');
       }
-      const path = `admin/v1/media-assets/${request.id}`;
+      const path = `/admin/v1/media-assets/${request.id}`;
       const body = null;
       return transport.unary(path, 'DELETE', body, {
         service: 'MediaAssetService',
@@ -5069,6 +7659,55 @@ export type mediaservicev1_UpdateMediaAssetRequest = {
   updateMask: undefined | wellKnownFieldMask;
 };
 
+// 请求 - 按内容哈希查重
+export type mediaservicev1_FindMediaAssetByHashRequest = {
+  fileHash?: string;
+};
+
+// 回应 - 按内容哈希查重
+export type mediaservicev1_FindMediaAssetByHashResponse = {
+  asset?: mediaservicev1_MediaAsset;
+};
+
+// 请求 - 重复资源列表
+export type mediaservicev1_ListDuplicatedMediaAssetsRequest = {
+  limit?: number;
+};
+
+// 回应 - 重复资源列表
+export type mediaservicev1_ListDuplicatedMediaAssetsResponse = {
+  groups: mediaservicev1_MediaAssetDuplicateGroup[] | undefined;
+  total: number | undefined;
+};
+
+// 重复资源组：同租户内同内容哈希的资源共享一组
+export type mediaservicev1_MediaAssetDuplicateGroup = {
+  assets: mediaservicev1_MediaAsset[] | undefined;
+  count?: number;
+  fileHash?: string;
+};
+
+// 请求 - 媒体引用关系列表
+export type mediaservicev1_ListMediaAssetReferencesRequest = {
+  mediaAssetId: number | undefined;
+};
+
+// 回应 - 媒体引用关系列表
+export type mediaservicev1_ListMediaAssetReferencesResponse = {
+  items: mediaservicev1_MediaAssetReference[] | undefined;
+  total: number | undefined;
+};
+
+// 引用关系：源内容（文章/页面）在哪个字段使用了该媒体
+export type mediaservicev1_MediaAssetReference = {
+  field?: string;
+  mediaAssetId?: number;
+  sourceId?: number;
+  sourceTitle?: string;
+  sourceType?: string;
+  updatedAt?: wellKnownTimestamp;
+};
+
 // 请求 - 删除媒体资源库
 export type mediaservicev1_DeleteMediaAssetRequest = {
   id?: number;
@@ -5103,7 +7742,7 @@ export function createMenuServiceClient(
 ): MenuService {
   return {
     List(request) {
-      const path = `admin/v1/menus`;
+      const path = `/admin/v1/menus`;
       const body = null;
       const queryParams: string[] = [];
       if (request.page) {
@@ -5151,56 +7790,9 @@ export function createMenuServiceClient(
           `filterExpr.type=${encodeURIComponent(request.filterExpr.type.toString())}`,
         );
       }
-      if (request.filterExpr?.conditions?.field) {
-        queryParams.push(
-          `filterExpr.conditions.field=${encodeURIComponent(request.filterExpr.conditions.field.toString())}`,
-        );
-      }
-      if (request.filterExpr?.conditions?.op) {
-        queryParams.push(
-          `filterExpr.conditions.op=${encodeURIComponent(request.filterExpr.conditions.op.toString())}`,
-        );
-      }
-      if (request.filterExpr?.conditions?.value) {
-        queryParams.push(
-          `filterExpr.conditions.value=${encodeURIComponent(request.filterExpr.conditions.value.toString())}`,
-        );
-      }
-      if (request.filterExpr?.conditions?.jsonValue) {
-        queryParams.push(
-          `filterExpr.conditions.jsonValue=${encodeURIComponent(request.filterExpr.conditions.jsonValue.toString())}`,
-        );
-      }
-      if (request.filterExpr?.conditions?.values) {
-        request.filterExpr.conditions.values.forEach((x) => {
-          queryParams.push(
-            `filterExpr.conditions.values=${encodeURIComponent(x.toString())}`,
-          );
-        });
-      }
-      if (request.filterExpr?.conditions?.datePart) {
-        queryParams.push(
-          `filterExpr.conditions.datePart=${encodeURIComponent(request.filterExpr.conditions.datePart.toString())}`,
-        );
-      }
-      if (request.filterExpr?.conditions?.jsonPath) {
-        queryParams.push(
-          `filterExpr.conditions.jsonPath=${encodeURIComponent(request.filterExpr.conditions.jsonPath.toString())}`,
-        );
-      }
       if (request.orderBy) {
         queryParams.push(
           `orderBy=${encodeURIComponent(request.orderBy.toString())}`,
-        );
-      }
-      if (request.sorting?.field) {
-        queryParams.push(
-          `sorting.field=${encodeURIComponent(request.sorting.field.toString())}`,
-        );
-      }
-      if (request.sorting?.direction) {
-        queryParams.push(
-          `sorting.direction=${encodeURIComponent(request.sorting.direction.toString())}`,
         );
       }
       if (request.fieldMask) {
@@ -5221,7 +7813,7 @@ export function createMenuServiceClient(
       if (request.id === undefined || request.id === null) {
         throw new Error('missing required field request.id');
       }
-      const path = `admin/v1/menus/${request.id}`;
+      const path = `/admin/v1/menus/${request.id}`;
       const body = null;
       const queryParams: string[] = [];
       if (request.viewMask) {
@@ -5239,7 +7831,7 @@ export function createMenuServiceClient(
       }) as Promise<permissionservicev1_Menu>;
     },
     Create(request) {
-      const path = `admin/v1/menus`;
+      const path = `/admin/v1/menus`;
       const body = JSON.stringify(request);
       return transport.unary(path, 'POST', body, {
         service: 'MenuService',
@@ -5250,8 +7842,10 @@ export function createMenuServiceClient(
       if (request.id === undefined || request.id === null) {
         throw new Error('missing required field request.id');
       }
-      const path = `admin/v1/menus/${request.id}`;
-      const body = JSON.stringify(request);
+      const path = `/admin/v1/menus/${request.id}`;
+      const bodyMap = { ...request } as Record<string, unknown>;
+      delete bodyMap["id"];
+      const body = JSON.stringify(bodyMap);
       return transport.unary(path, 'PUT', body, {
         service: 'MenuService',
         method: 'Update',
@@ -5261,7 +7855,7 @@ export function createMenuServiceClient(
       if (request.id === undefined || request.id === null) {
         throw new Error('missing required field request.id');
       }
-      const path = `admin/v1/menus/${request.id}`;
+      const path = `/admin/v1/menus/${request.id}`;
       const body = null;
       const queryParams: string[] = [];
       if (request.operatorId) {
@@ -5357,36 +7951,271 @@ export type permissionservicev1_DeleteMenuRequest = {
   operatorId?: number;
 };
 
-// 导航服务
-export interface NavigationService {
-  // 获取导航列表
-  List(
-    request: pagination_PagingRequest,
-  ): Promise<siteservicev1_ListNavigationResponse>;
-  // 获取导航数据
-  Get(
-    request: siteservicev1_GetNavigationRequest,
-  ): Promise<siteservicev1_Navigation>;
-  // 创建导航
-  Create(
-    request: siteservicev1_CreateNavigationRequest,
-  ): Promise<siteservicev1_Navigation>;
-  // 更新导航
-  Update(
-    request: siteservicev1_UpdateNavigationRequest,
-  ): Promise<siteservicev1_Navigation>;
-  // 删除导航
-  Delete(
-    request: siteservicev1_DeleteNavigationRequest,
+// 多因素认证（MFA）服务（BFF 面：代理 core MFAService）
+// 个人中心绑定/解绑 + 登录两步验证挑战换令牌 + 平台管理员救援重置。
+export interface MFAService {
+  // 查询当前用户 MFA 总览
+  GetMFAStatus(
+    request: authenticationservicev1_GetMFAStatusRequest,
+  ): Promise<authenticationservicev1_GetMFAStatusResponse>;
+  // 开始绑定 MFA 方法（TOTP：返回 secret 与 otpauth 绑定 URI）
+  StartEnrollMethod(
+    request: authenticationservicev1_StartEnrollMethodRequest,
+  ): Promise<authenticationservicev1_StartEnrollMethodResponse>;
+  // 确认绑定（提交验证器当前动态码）
+  ConfirmEnrollMethod(
+    request: authenticationservicev1_ConfirmEnrollMethodRequest,
+  ): Promise<authenticationservicev1_ConfirmEnrollMethodResponse>;
+  // 解除绑定（提交当前动态码）
+  DisableMFA(
+    request: authenticationservicev1_DisableMFARequest,
+  ): Promise<wellKnownEmpty>;
+  // 两步验证挑战校验（免鉴权：Login 返回 mfa_operation_id 后的半登录态调用；
+  // 通过后返回与 Login 同构的正式令牌对）
+  VerifyMFAChallenge(
+    request: authenticationservicev1_VerifyMFAChallengeRequest,
+  ): Promise<authenticationservicev1_LoginResponse>;
+  // 平台管理员救援重置：清空目标用户全部 TOTP 因子
+  ResetUserMFA(
+    request: authenticationservicev1_ResetUserMFARequest,
   ): Promise<wellKnownEmpty>;
 }
 
-export function createNavigationServiceClient(
+export function createMFAServiceClient(
   transport: ClientTransport,
-): NavigationService {
+): MFAService {
   return {
-    List(request) {
-      const path = `admin/v1/navigations`;
+    GetMFAStatus(request) {
+      const path = `/admin/v1/me/mfa`;
+      const body = null;
+      const queryParams: string[] = [];
+      if (request.userId) {
+        queryParams.push(
+          `userId=${encodeURIComponent(request.userId.toString())}`,
+        );
+      }
+      let uri = path;
+      if (queryParams.length > 0) {
+        uri += `?${queryParams.join('&')}`;
+      }
+      return transport.unary(uri, 'GET', body, {
+        service: 'MFAService',
+        method: 'GetMFAStatus',
+      }) as Promise<authenticationservicev1_GetMFAStatusResponse>;
+    },
+    StartEnrollMethod(request) {
+      const path = `/admin/v1/me/mfa/enroll/start`;
+      const body = JSON.stringify(request);
+      return transport.unary(path, 'POST', body, {
+        service: 'MFAService',
+        method: 'StartEnrollMethod',
+      }) as Promise<authenticationservicev1_StartEnrollMethodResponse>;
+    },
+    ConfirmEnrollMethod(request) {
+      const path = `/admin/v1/me/mfa/enroll/confirm`;
+      const body = JSON.stringify(request);
+      return transport.unary(path, 'POST', body, {
+        service: 'MFAService',
+        method: 'ConfirmEnrollMethod',
+      }) as Promise<authenticationservicev1_ConfirmEnrollMethodResponse>;
+    },
+    DisableMFA(request) {
+      const path = `/admin/v1/me/mfa/disable`;
+      const body = JSON.stringify(request);
+      return transport.unary(path, 'POST', body, {
+        service: 'MFAService',
+        method: 'DisableMFA',
+      }) as Promise<wellKnownEmpty>;
+    },
+    VerifyMFAChallenge(request) {
+      const path = `/admin/v1/mfa/challenge/verify`;
+      const body = JSON.stringify(request);
+      return transport.unary(path, 'POST', body, {
+        service: 'MFAService',
+        method: 'VerifyMFAChallenge',
+      }) as Promise<authenticationservicev1_LoginResponse>;
+    },
+    ResetUserMFA(request) {
+      if (request.userId === undefined || request.userId === null) {
+        throw new Error('missing required field request.user_id');
+      }
+      const path = `/admin/v1/users/${request.userId}/mfa/reset`;
+      const bodyMap = { ...request } as Record<string, unknown>;
+      delete bodyMap["userId"];
+      const body = JSON.stringify(bodyMap);
+      return transport.unary(path, 'POST', body, {
+        service: 'MFAService',
+        method: 'ResetUserMFA',
+      }) as Promise<wellKnownEmpty>;
+    },
+  };
+}
+export type authenticationservicev1_GetMFAStatusRequest = {
+  // 可选：若服务端通过上下文识别用户，可不传 user_id
+  userId?: string;
+};
+
+export type authenticationservicev1_GetMFAStatusResponse = {
+  enabled: boolean | undefined;
+  enforcement: authenticationservicev1_MFAEnforcement | undefined;
+  enrolled: authenticationservicev1_EnrolledMethod[] | undefined;
+};
+
+export type authenticationservicev1_EnrolledMethod = {
+  createdAt?: wellKnownTimestamp;
+  display: string | undefined;
+  enabled: boolean | undefined;
+  id: string | undefined;
+  lastUsedAt?: wellKnownTimestamp;
+  method: authenticationservicev1_MFAMethod | undefined;
+};
+
+// 多因素认证方法
+export type authenticationservicev1_MFAMethod =
+  | 'BACKUP_CODE'
+  | 'EMAIL'
+  | 'MFA_METHOD_UNSPECIFIED'
+  | 'OTHER'
+  | 'SMS'
+  | 'TOTP'
+  | 'U2F'
+  | 'WEBAUTHN';
+export type authenticationservicev1_MFAEnforcement =
+  | 'MFA_NOT_REQUIRED'
+  | 'MFA_OPTIONAL'
+  | 'MFA_REQUIRED';
+// Start enroll
+export type authenticationservicev1_StartEnrollMethodRequest = {
+  // 绑定展示用账号标识（otpauth URI 的 account 段，如用户名/邮箱）
+  account?: string;
+  email?: string;
+  method: authenticationservicev1_MFAMethod | undefined;
+  // 根据 method 可能需要额外参数（例如 SMS 需要 phone）
+  phone?: string;
+  // 操作者用户 ID（BFF 从会话注入；上下文不可靠时显式传递）
+  userId?: number;
+};
+
+export type authenticationservicev1_StartEnrollMethodResponse = {
+  expiresAt?: wellKnownTimestamp;
+  // 临时操作 id，用于 ConfirmEnrollMethod / 后续验证
+  operationId: string | undefined;
+  sms?: authenticationservicev1_SMSResult;
+  totp?: authenticationservicev1_TOTPResult;
+  webauthn?: authenticationservicev1_WebAuthnResult;
+};
+
+export type authenticationservicev1_TOTPResult = {
+  otpAuthUrl: string | undefined;
+  qrCodeDataUri: string | undefined;
+  // base32 secret：仅在注册时返回一次，服务端应只存哈希/引用
+  secret: string | undefined;
+};
+
+export type authenticationservicev1_SMSResult = {
+  maskedPhone: string | undefined;
+  smsSent: boolean | undefined;
+  verificationId: string | undefined;
+};
+
+export type authenticationservicev1_WebAuthnResult = {
+  challenge: string | undefined;
+  optionsJson: string | undefined;
+  rpId: string | undefined;
+};
+
+// Confirm enroll
+export type authenticationservicev1_ConfirmEnrollMethodRequest = {
+  backupCode?: string;
+  // 可选：设备/显示名
+  display?: string;
+  method: authenticationservicev1_MFAMethod | undefined;
+  operationId: string | undefined;
+  sms?: authenticationservicev1_SMSVerification;
+  totpCode?: string;
+  webauthn?: authenticationservicev1_WebAuthnAssertion;
+};
+
+export type authenticationservicev1_SMSVerification = {
+  code: string | undefined;
+  verificationId: string | undefined;
+};
+
+export type authenticationservicev1_WebAuthnAssertion = {
+  authenticatorData: string | undefined;
+  clientDataJson: string | undefined;
+  id: string | undefined;
+  signature: string | undefined;
+  userHandle?: string;
+};
+
+export type authenticationservicev1_ConfirmEnrollMethodResponse = {
+  credentialId: string | undefined;
+  success: boolean | undefined;
+};
+
+// Disable / remove
+export type authenticationservicev1_DisableMFARequest = {
+  // 指定凭证 id 或仅按方法禁用全部
+  credentialId?: string;
+  method?: authenticationservicev1_MFAMethod;
+  password?: string;
+  reason?: string;
+  sms?: authenticationservicev1_SMSVerification;
+  totpCode?: string;
+  // 操作者用户 ID（BFF 从会话注入）
+  userId?: number;
+  webauthn?: authenticationservicev1_WebAuthnAssertion;
+};
+
+export type authenticationservicev1_VerifyMFAChallengeRequest = {
+  backupCode?: string;
+  operationId: string | undefined;
+  sms?: authenticationservicev1_SMSVerification;
+  totpCode?: string;
+  webauthn?: authenticationservicev1_WebAuthnAssertion;
+};
+
+// 管理员救援重置 - 请求
+export type authenticationservicev1_ResetUserMFARequest = {
+  // 目标用户 ID
+  userId: number | undefined;
+};
+
+// 监控告警规则管理服务（平台级配置；只读 asynq 之外的采集在 core 进程内完成）。
+export interface MonitorAlertService {
+  // 查询告警规则列表
+  ListMonitorAlertRule(
+    request: pagination_PagingRequest,
+  ): Promise<monitor_alertservicev1_ListMonitorAlertRuleResponse>;
+  // 查询告警规则详情
+  GetMonitorAlertRule(
+    request: monitor_alertservicev1_GetMonitorAlertRuleRequest,
+  ): Promise<monitor_alertservicev1_MonitorAlertRule>;
+  // 创建告警规则
+  CreateMonitorAlertRule(
+    request: monitor_alertservicev1_CreateMonitorAlertRuleRequest,
+  ): Promise<monitor_alertservicev1_MonitorAlertRule>;
+  // 更新告警规则
+  UpdateMonitorAlertRule(
+    request: monitor_alertservicev1_UpdateMonitorAlertRuleRequest,
+  ): Promise<wellKnownEmpty>;
+  // 删除告警规则
+  DeleteMonitorAlertRule(
+    request: monitor_alertservicev1_DeleteMonitorAlertRuleRequest,
+  ): Promise<wellKnownEmpty>;
+  // 手动触发一轮评估（与周期扫描同一内核）
+  EvaluateMonitorAlerts(
+    request: monitor_alertservicev1_EvaluateMonitorAlertsRequest,
+  ): Promise<monitor_alertservicev1_EvaluateMonitorAlertsResponse>;
+}
+
+export function createMonitorAlertServiceClient(
+  transport: ClientTransport,
+): MonitorAlertService {
+  return {
+    ListMonitorAlertRule(request) {
+      const path = `/admin/v1/monitor-alert-rules`;
       const body = null;
       const queryParams: string[] = [];
       if (request.page) {
@@ -5434,56 +8263,378 @@ export function createNavigationServiceClient(
           `filterExpr.type=${encodeURIComponent(request.filterExpr.type.toString())}`,
         );
       }
-      if (request.filterExpr?.conditions?.field) {
-        queryParams.push(
-          `filterExpr.conditions.field=${encodeURIComponent(request.filterExpr.conditions.field.toString())}`,
-        );
-      }
-      if (request.filterExpr?.conditions?.op) {
-        queryParams.push(
-          `filterExpr.conditions.op=${encodeURIComponent(request.filterExpr.conditions.op.toString())}`,
-        );
-      }
-      if (request.filterExpr?.conditions?.value) {
-        queryParams.push(
-          `filterExpr.conditions.value=${encodeURIComponent(request.filterExpr.conditions.value.toString())}`,
-        );
-      }
-      if (request.filterExpr?.conditions?.jsonValue) {
-        queryParams.push(
-          `filterExpr.conditions.jsonValue=${encodeURIComponent(request.filterExpr.conditions.jsonValue.toString())}`,
-        );
-      }
-      if (request.filterExpr?.conditions?.values) {
-        request.filterExpr.conditions.values.forEach((x) => {
-          queryParams.push(
-            `filterExpr.conditions.values=${encodeURIComponent(x.toString())}`,
-          );
-        });
-      }
-      if (request.filterExpr?.conditions?.datePart) {
-        queryParams.push(
-          `filterExpr.conditions.datePart=${encodeURIComponent(request.filterExpr.conditions.datePart.toString())}`,
-        );
-      }
-      if (request.filterExpr?.conditions?.jsonPath) {
-        queryParams.push(
-          `filterExpr.conditions.jsonPath=${encodeURIComponent(request.filterExpr.conditions.jsonPath.toString())}`,
-        );
-      }
       if (request.orderBy) {
         queryParams.push(
           `orderBy=${encodeURIComponent(request.orderBy.toString())}`,
         );
       }
-      if (request.sorting?.field) {
+      if (request.fieldMask) {
         queryParams.push(
-          `sorting.field=${encodeURIComponent(request.sorting.field.toString())}`,
+          `fieldMask=${encodeURIComponent(request.fieldMask.toString())}`,
         );
       }
-      if (request.sorting?.direction) {
+      let uri = path;
+      if (queryParams.length > 0) {
+        uri += `?${queryParams.join('&')}`;
+      }
+      return transport.unary(uri, 'GET', body, {
+        service: 'MonitorAlertService',
+        method: 'ListMonitorAlertRule',
+      }) as Promise<monitor_alertservicev1_ListMonitorAlertRuleResponse>;
+    },
+    GetMonitorAlertRule(request) {
+      if (request.id === undefined || request.id === null) {
+        throw new Error('missing required field request.id');
+      }
+      const path = `/admin/v1/monitor-alert-rules/${request.id}`;
+      const body = null;
+      return transport.unary(path, 'GET', body, {
+        service: 'MonitorAlertService',
+        method: 'GetMonitorAlertRule',
+      }) as Promise<monitor_alertservicev1_MonitorAlertRule>;
+    },
+    CreateMonitorAlertRule(request) {
+      const path = `/admin/v1/monitor-alert-rules`;
+      const body = JSON.stringify(request);
+      return transport.unary(path, 'POST', body, {
+        service: 'MonitorAlertService',
+        method: 'CreateMonitorAlertRule',
+      }) as Promise<monitor_alertservicev1_MonitorAlertRule>;
+    },
+    UpdateMonitorAlertRule(request) {
+      if (request.id === undefined || request.id === null) {
+        throw new Error('missing required field request.id');
+      }
+      const path = `/admin/v1/monitor-alert-rules/${request.id}`;
+      const bodyMap = { ...request } as Record<string, unknown>;
+      delete bodyMap["id"];
+      const body = JSON.stringify(bodyMap);
+      return transport.unary(path, 'PUT', body, {
+        service: 'MonitorAlertService',
+        method: 'UpdateMonitorAlertRule',
+      }) as Promise<wellKnownEmpty>;
+    },
+    DeleteMonitorAlertRule(request) {
+      if (request.id === undefined || request.id === null) {
+        throw new Error('missing required field request.id');
+      }
+      const path = `/admin/v1/monitor-alert-rules/${request.id}`;
+      const body = null;
+      return transport.unary(path, 'DELETE', body, {
+        service: 'MonitorAlertService',
+        method: 'DeleteMonitorAlertRule',
+      }) as Promise<wellKnownEmpty>;
+    },
+    EvaluateMonitorAlerts(request) {
+      const path = `/admin/v1/monitor-alert-rules:evaluate`;
+      const body = JSON.stringify(request);
+      return transport.unary(path, 'POST', body, {
+        service: 'MonitorAlertService',
+        method: 'EvaluateMonitorAlerts',
+      }) as Promise<monitor_alertservicev1_EvaluateMonitorAlertsResponse>;
+    },
+  };
+}
+export type monitor_alertservicev1_ListMonitorAlertRuleResponse = {
+  items: monitor_alertservicev1_MonitorAlertRule[] | undefined;
+  total: number | undefined;
+};
+
+// 监控告警规则：指标阈值 → 触发通知。
+// 渠道与目标显式写在规则上（不经路由表）：告警是"点对点"的运营配置，
+// 路由表解决的是"事件该发去哪类渠道"，而这里要的是"这条告警发到这个邮箱"。
+export type monitor_alertservicev1_MonitorAlertRule = {
+  // 告警渠道（显式指定）
+  channel?: notifyservicev1_Channel;
+  // 重复告警冷却（分钟）：持续越限时按此间隔重发，默认 30
+  cooldownMinutes?: number;
+  createdAt?: wellKnownTimestamp;
+  createdBy?: number;
+  id?: number;
+  isEnabled?: boolean;
+  lastAlertedAt?: wellKnownTimestamp;
+  // —— 以下为评估器回写状态（只读） ——
+  lastFiring?: boolean;
+  lastValue?: number;
+  metric?: monitor_alertservicev1_MonitorMetric;
+  name?: string;
+  // DB_PING_FAIL 时忽略 op/threshold
+  op?: monitor_alertservicev1_AlertOp;
+  remark?: string;
+  // 投递目标：EMAIL 为收件地址，WEBHOOK 为回调 URL
+  target?: string;
+  threshold?: number;
+  updatedAt?: wellKnownTimestamp;
+  updatedBy?: number;
+};
+
+// 监控指标（评估器支持的全集；新增指标 = 枚举加值 + evaluator 补取数分支）。
+// 采集全部在 core 进程内完成：GO_* 为 core 自身 runtime，DB_*/REDIS_* 为共享基础设施。
+export type monitor_alertservicev1_MonitorMetric =
+  // 数据库当前打开连接数
+  | 'DB_OPEN_CONNECTIONS'
+  // 数据库连通性失败（布尔指标：越限即 ping 失败，op/threshold 被忽略）
+  | 'DB_PING_FAIL'
+  // Go goroutine 数量（core 进程）
+  | 'GO_GOROUTINES'
+  // Go 堆内存分配（MB，core 进程）
+  | 'GO_MEM_ALLOC_MB'
+  | 'MONITOR_METRIC_UNSPECIFIED'
+  // Redis 逻辑库 key 总数（DBSIZE）
+  | 'REDIS_DB_SIZE';
+// 比较运算
+export type monitor_alertservicev1_AlertOp =
+  | 'ALERT_OP_UNSPECIFIED'
+  // 当前值 >= 阈值
+  | 'GE'
+  // 当前值 <= 阈值
+  | 'LE';
+// 投递渠道。成员名必须与 ent 列值逐字相同（EnumTypeConverter 按名字字符串配对）。
+export type notifyservicev1_Channel =
+  | 'CHANNEL_UNSPECIFIED'
+  | 'EMAIL'
+  | 'EXT'
+  | 'INTERNAL'
+  | 'SMS'
+  | 'WEBHOOK';
+export type monitor_alertservicev1_GetMonitorAlertRuleRequest = {
+  id: number | undefined;
+};
+
+export type monitor_alertservicev1_CreateMonitorAlertRuleRequest = {
+  data: monitor_alertservicev1_MonitorAlertRule | undefined;
+};
+
+export type monitor_alertservicev1_UpdateMonitorAlertRuleRequest = {
+  data: monitor_alertservicev1_MonitorAlertRule | undefined;
+  id: number | undefined;
+  updateMask?: wellKnownFieldMask;
+};
+
+export type monitor_alertservicev1_DeleteMonitorAlertRuleRequest = {
+  id: number | undefined;
+};
+
+// 手动触发一轮评估（管理页「立即评估」）；返回各启用规则的求值结论
+export type monitor_alertservicev1_EvaluateMonitorAlertsRequest = {
+};
+
+export type monitor_alertservicev1_EvaluateMonitorAlertsResponse = {
+  outcomes: monitor_alertservicev1_EvaluateMonitorAlertsResponse_RuleOutcome[] | undefined;
+};
+
+export type monitor_alertservicev1_EvaluateMonitorAlertsResponse_RuleOutcome = {
+  // 本次扫描实际读到的指标值（采集失败为空）
+  currentValue?: number;
+  // 本次扫描是否越限
+  firing: boolean | undefined;
+  name: string | undefined;
+  // 本轮是否发出了通知（首次触发 / 冷却到期重发 / 恢复）
+  notified: boolean | undefined;
+  // 未发通知的原因（未越限未恢复 / 冷却中 / 采集失败）
+  reason?: string;
+  ruleId: number | undefined;
+};
+
+// 服务监控查询服务（只读聚合视图；采集在 core 进程内完成）。
+export interface ServerMonitorService {
+  // 查询服务监控信息
+  Get(
+    request: server_monitorservicev1_GetServerMonitorRequest,
+  ): Promise<server_monitorservicev1_ServerMonitorInfo>;
+}
+
+export function createServerMonitorServiceClient(
+  transport: ClientTransport,
+): ServerMonitorService {
+  return {
+    Get(_request) {
+      const path = `/admin/v1/server-monitor`;
+      const body = null;
+      return transport.unary(path, 'GET', body, {
+        service: 'ServerMonitorService',
+        method: 'Get',
+      }) as Promise<server_monitorservicev1_ServerMonitorInfo>;
+    },
+  };
+}
+// 查询服务监控信息 - 请求（空）
+export type server_monitorservicev1_GetServerMonitorRequest = {
+};
+
+// 服务监控聚合信息
+export type server_monitorservicev1_ServerMonitorInfo = {
+  collectedAt: undefined | wellKnownTimestamp;
+  database: server_monitorservicev1_DatabaseInfo | undefined;
+  go: server_monitorservicev1_GoRuntimeInfo | undefined;
+  host: server_monitorservicev1_HostInfo | undefined;
+};
+
+// Go 运行时信息
+export type server_monitorservicev1_GoRuntimeInfo = {
+  gcCycles?: number;
+  memAllocBytes?: number;
+  memSysBytes?: number;
+  numGoroutine?: number;
+  startedAt?: wellKnownTimestamp;
+  uptimeSeconds?: number;
+  version?: string;
+};
+
+// 数据库信息
+export type server_monitorservicev1_DatabaseInfo = {
+  driver?: string;
+  idleConnections?: number;
+  inUseConnections?: number;
+  maxOpenConnections?: number;
+  openConnections?: number;
+  pingError?: string;
+  pingOk?: boolean;
+};
+
+// 主机信息
+export type server_monitorservicev1_HostInfo = {
+  arch?: string;
+  hostname?: string;
+  numCpu?: number;
+  os?: string;
+};
+
+// Redis 缓存监控查询服务（只读聚合视图）。
+export interface RedisCacheMonitorService {
+  // 查询 Redis 缓存监控信息
+  Get(
+    request: redis_cacheservicev1_GetRedisCacheMonitorRequest,
+  ): Promise<redis_cacheservicev1_RedisCacheMonitorInfo>;
+}
+
+export function createRedisCacheMonitorServiceClient(
+  transport: ClientTransport,
+): RedisCacheMonitorService {
+  return {
+    Get(_request) {
+      const path = `/admin/v1/redis-cache-monitor`;
+      const body = null;
+      return transport.unary(path, 'GET', body, {
+        service: 'RedisCacheMonitorService',
+        method: 'Get',
+      }) as Promise<redis_cacheservicev1_RedisCacheMonitorInfo>;
+    },
+  };
+}
+// 查询Redis缓存监控信息 - 请求（空）
+export type redis_cacheservicev1_GetRedisCacheMonitorRequest = {
+};
+
+// Redis缓存监控信息
+export type redis_cacheservicev1_RedisCacheMonitorInfo = {
+  dbSize: number | undefined;
+  sections: redis_cacheservicev1_InfoSection[] | undefined;
+  slowlog: redis_cacheservicev1_SlowLogEntry[] | undefined;
+};
+
+// INFO 输出的单个 section
+export type redis_cacheservicev1_InfoSection = {
+  entries: redis_cacheservicev1_InfoEntry[] | undefined;
+  name: string | undefined;
+};
+
+// INFO 输出的单个 key/value 对
+export type redis_cacheservicev1_InfoEntry = {
+  key: string | undefined;
+  value: string | undefined;
+};
+
+// SLOWLOG GET 返回的单条慢日志
+export type redis_cacheservicev1_SlowLogEntry = {
+  args: string[] | undefined;
+  clientAddr: string | undefined;
+  clientName: string | undefined;
+  createdAt: undefined | wellKnownTimestamp;
+  durationUsec: number | undefined;
+  id: number | undefined;
+};
+
+// 导航服务
+export interface NavigationService {
+  // 获取导航列表
+  List(
+    request: pagination_PagingRequest,
+  ): Promise<siteservicev1_ListNavigationResponse>;
+  // 获取导航数据
+  Get(
+    request: siteservicev1_GetNavigationRequest,
+  ): Promise<siteservicev1_Navigation>;
+  // 创建导航
+  Create(
+    request: siteservicev1_CreateNavigationRequest,
+  ): Promise<siteservicev1_Navigation>;
+  // 更新导航
+  Update(
+    request: siteservicev1_UpdateNavigationRequest,
+  ): Promise<siteservicev1_Navigation>;
+  // 删除导航
+  Delete(
+    request: siteservicev1_DeleteNavigationRequest,
+  ): Promise<wellKnownEmpty>;
+}
+
+export function createNavigationServiceClient(
+  transport: ClientTransport,
+): NavigationService {
+  return {
+    List(request) {
+      const path = `/admin/v1/navigations`;
+      const body = null;
+      const queryParams: string[] = [];
+      if (request.page) {
         queryParams.push(
-          `sorting.direction=${encodeURIComponent(request.sorting.direction.toString())}`,
+          `page=${encodeURIComponent(request.page.toString())}`,
+        );
+      }
+      if (request.pageSize) {
+        queryParams.push(
+          `pageSize=${encodeURIComponent(request.pageSize.toString())}`,
+        );
+      }
+      if (request.offset) {
+        queryParams.push(
+          `offset=${encodeURIComponent(request.offset.toString())}`,
+        );
+      }
+      if (request.limit) {
+        queryParams.push(
+          `limit=${encodeURIComponent(request.limit.toString())}`,
+        );
+      }
+      if (request.token) {
+        queryParams.push(
+          `token=${encodeURIComponent(request.token.toString())}`,
+        );
+      }
+      if (request.noPaging) {
+        queryParams.push(
+          `noPaging=${encodeURIComponent(request.noPaging.toString())}`,
+        );
+      }
+      if (request.query) {
+        queryParams.push(
+          `query=${encodeURIComponent(request.query.toString())}`,
+        );
+      }
+      if (request.filter) {
+        queryParams.push(
+          `filter=${encodeURIComponent(request.filter.toString())}`,
+        );
+      }
+      if (request.filterExpr?.type) {
+        queryParams.push(
+          `filterExpr.type=${encodeURIComponent(request.filterExpr.type.toString())}`,
+        );
+      }
+      if (request.orderBy) {
+        queryParams.push(
+          `orderBy=${encodeURIComponent(request.orderBy.toString())}`,
         );
       }
       if (request.fieldMask) {
@@ -5504,7 +8655,7 @@ export function createNavigationServiceClient(
       if (request.id === undefined || request.id === null) {
         throw new Error('missing required field request.id');
       }
-      const path = `admin/v1/navigations/${request.id}`;
+      const path = `/admin/v1/navigations/${request.id}`;
       const body = null;
       const queryParams: string[] = [];
       if (request.name) {
@@ -5527,7 +8678,7 @@ export function createNavigationServiceClient(
       }) as Promise<siteservicev1_Navigation>;
     },
     Create(request) {
-      const path = `admin/v1/navigations`;
+      const path = `/admin/v1/navigations`;
       const body = JSON.stringify(request);
       return transport.unary(path, 'POST', body, {
         service: 'NavigationService',
@@ -5538,8 +8689,10 @@ export function createNavigationServiceClient(
       if (request.id === undefined || request.id === null) {
         throw new Error('missing required field request.id');
       }
-      const path = `admin/v1/navigations/${request.id}`;
-      const body = JSON.stringify(request);
+      const path = `/admin/v1/navigations/${request.id}`;
+      const bodyMap = { ...request } as Record<string, unknown>;
+      delete bodyMap["id"];
+      const body = JSON.stringify(bodyMap);
       return transport.unary(path, 'PUT', body, {
         service: 'NavigationService',
         method: 'Update',
@@ -5549,7 +8702,7 @@ export function createNavigationServiceClient(
       if (request.id === undefined || request.id === null) {
         throw new Error('missing required field request.id');
       }
-      const path = `admin/v1/navigations/${request.id}`;
+      const path = `/admin/v1/navigations/${request.id}`;
       const body = null;
       return transport.unary(path, 'DELETE', body, {
         service: 'NavigationService',
@@ -5677,7 +8830,7 @@ export function createNavigationItemServiceClient(
 ): NavigationItemService {
   return {
     List(request) {
-      const path = `admin/v1/navigation-items`;
+      const path = `/admin/v1/navigation-items`;
       const body = null;
       const queryParams: string[] = [];
       if (request.page) {
@@ -5725,56 +8878,9 @@ export function createNavigationItemServiceClient(
           `filterExpr.type=${encodeURIComponent(request.filterExpr.type.toString())}`,
         );
       }
-      if (request.filterExpr?.conditions?.field) {
-        queryParams.push(
-          `filterExpr.conditions.field=${encodeURIComponent(request.filterExpr.conditions.field.toString())}`,
-        );
-      }
-      if (request.filterExpr?.conditions?.op) {
-        queryParams.push(
-          `filterExpr.conditions.op=${encodeURIComponent(request.filterExpr.conditions.op.toString())}`,
-        );
-      }
-      if (request.filterExpr?.conditions?.value) {
-        queryParams.push(
-          `filterExpr.conditions.value=${encodeURIComponent(request.filterExpr.conditions.value.toString())}`,
-        );
-      }
-      if (request.filterExpr?.conditions?.jsonValue) {
-        queryParams.push(
-          `filterExpr.conditions.jsonValue=${encodeURIComponent(request.filterExpr.conditions.jsonValue.toString())}`,
-        );
-      }
-      if (request.filterExpr?.conditions?.values) {
-        request.filterExpr.conditions.values.forEach((x) => {
-          queryParams.push(
-            `filterExpr.conditions.values=${encodeURIComponent(x.toString())}`,
-          );
-        });
-      }
-      if (request.filterExpr?.conditions?.datePart) {
-        queryParams.push(
-          `filterExpr.conditions.datePart=${encodeURIComponent(request.filterExpr.conditions.datePart.toString())}`,
-        );
-      }
-      if (request.filterExpr?.conditions?.jsonPath) {
-        queryParams.push(
-          `filterExpr.conditions.jsonPath=${encodeURIComponent(request.filterExpr.conditions.jsonPath.toString())}`,
-        );
-      }
       if (request.orderBy) {
         queryParams.push(
           `orderBy=${encodeURIComponent(request.orderBy.toString())}`,
-        );
-      }
-      if (request.sorting?.field) {
-        queryParams.push(
-          `sorting.field=${encodeURIComponent(request.sorting.field.toString())}`,
-        );
-      }
-      if (request.sorting?.direction) {
-        queryParams.push(
-          `sorting.direction=${encodeURIComponent(request.sorting.direction.toString())}`,
         );
       }
       if (request.fieldMask) {
@@ -5795,7 +8901,7 @@ export function createNavigationItemServiceClient(
       if (request.id === undefined || request.id === null) {
         throw new Error('missing required field request.id');
       }
-      const path = `admin/v1/navigation-items/${request.id}`;
+      const path = `/admin/v1/navigation-items/${request.id}`;
       const body = null;
       const queryParams: string[] = [];
       if (request.title) {
@@ -5818,7 +8924,7 @@ export function createNavigationItemServiceClient(
       }) as Promise<siteservicev1_NavigationItem>;
     },
     Create(request) {
-      const path = `admin/v1/navigation-items`;
+      const path = `/admin/v1/navigation-items`;
       const body = JSON.stringify(request);
       return transport.unary(path, 'POST', body, {
         service: 'NavigationItemService',
@@ -5829,8 +8935,10 @@ export function createNavigationItemServiceClient(
       if (request.id === undefined || request.id === null) {
         throw new Error('missing required field request.id');
       }
-      const path = `admin/v1/navigation-items/${request.id}`;
-      const body = JSON.stringify(request);
+      const path = `/admin/v1/navigation-items/${request.id}`;
+      const bodyMap = { ...request } as Record<string, unknown>;
+      delete bodyMap["id"];
+      const body = JSON.stringify(bodyMap);
       return transport.unary(path, 'PUT', body, {
         service: 'NavigationItemService',
         method: 'Update',
@@ -5840,7 +8948,7 @@ export function createNavigationItemServiceClient(
       if (request.id === undefined || request.id === null) {
         throw new Error('missing required field request.id');
       }
-      const path = `admin/v1/navigation-items/${request.id}`;
+      const path = `/admin/v1/navigation-items/${request.id}`;
       const body = null;
       return transport.unary(path, 'DELETE', body, {
         service: 'NavigationItemService',
@@ -5880,24 +8988,29 @@ export type siteservicev1_DeleteNavigationItemRequest = {
   id?: number;
 };
 
-// 操作审计日志管理服务
-export interface OperationAuditLogService {
-  // 查询操作审计日志列表
-  List(
+// 通知投递台账管理服务（平台级只读视图）。
+//
+// 本域不含"发一条通知"的通用 HTTP 路由：SendDirect 只由进程内的业务 service 经 Notifier 接口调用。
+// 把它开放成端点等于给任意已登录操作员一个"向任意邮箱发信"的能力。
+// 两个刻意保留的手动触发口都是平台管理员专属、且只能发"测试文案"：
+// 渠道配置页的 send-test-email，与路由规则页的 notification-rules/{id}/test-dispatch。
+export interface NotificationService {
+  // 查询投递台账列表
+  ListDelivery(
     request: pagination_PagingRequest,
-  ): Promise<auditservicev1_ListOperationAuditLogResponse>;
-  // 查询操作审计日志详情
-  Get(
-    request: auditservicev1_GetOperationAuditLogRequest,
-  ): Promise<auditservicev1_OperationAuditLog>;
+  ): Promise<notifyservicev1_ListNotificationDeliveryResponse>;
+  // 查询投递台账详情
+  GetDelivery(
+    request: notifyservicev1_GetNotificationDeliveryRequest,
+  ): Promise<notifyservicev1_NotificationDelivery>;
 }
 
-export function createOperationAuditLogServiceClient(
+export function createNotificationServiceClient(
   transport: ClientTransport,
-): OperationAuditLogService {
+): NotificationService {
   return {
-    List(request) {
-      const path = `admin/v1/operation-audit-logs`;
+    ListDelivery(request) {
+      const path = `/admin/v1/notification-deliveries`;
       const body = null;
       const queryParams: string[] = [];
       if (request.page) {
@@ -5945,41 +9058,190 @@ export function createOperationAuditLogServiceClient(
           `filterExpr.type=${encodeURIComponent(request.filterExpr.type.toString())}`,
         );
       }
-      if (request.filterExpr?.conditions?.field) {
+      if (request.orderBy) {
         queryParams.push(
-          `filterExpr.conditions.field=${encodeURIComponent(request.filterExpr.conditions.field.toString())}`,
+          `orderBy=${encodeURIComponent(request.orderBy.toString())}`,
         );
       }
-      if (request.filterExpr?.conditions?.op) {
+      if (request.fieldMask) {
         queryParams.push(
-          `filterExpr.conditions.op=${encodeURIComponent(request.filterExpr.conditions.op.toString())}`,
+          `fieldMask=${encodeURIComponent(request.fieldMask.toString())}`,
         );
       }
-      if (request.filterExpr?.conditions?.value) {
+      let uri = path;
+      if (queryParams.length > 0) {
+        uri += `?${queryParams.join('&')}`;
+      }
+      return transport.unary(uri, 'GET', body, {
+        service: 'NotificationService',
+        method: 'ListDelivery',
+      }) as Promise<notifyservicev1_ListNotificationDeliveryResponse>;
+    },
+    GetDelivery(request) {
+      if (request.id === undefined || request.id === null) {
+        throw new Error('missing required field request.id');
+      }
+      const path = `/admin/v1/notification-deliveries/${request.id}`;
+      const body = null;
+      return transport.unary(path, 'GET', body, {
+        service: 'NotificationService',
+        method: 'GetDelivery',
+      }) as Promise<notifyservicev1_NotificationDelivery>;
+    },
+  };
+}
+// 查询投递台账列表 - 回应
+export type notifyservicev1_ListNotificationDeliveryResponse = {
+  items: notifyservicev1_NotificationDelivery[] | undefined;
+  total: number | undefined;
+};
+
+// 一条通知 × 一个渠道 × 一个收件人 = 一行投递台账。
+// 不存正文快照（防敏感正文明文集邮），target 落脱敏串；排障经 related_id 跳回业务对象。
+export type notifyservicev1_NotificationDelivery = {
+  // 已尝试投递次数（含首次）。同步投递恒为 1；异步投递每次尝试先加再一次拨号，
+  // 因此 attempts>0 而 status 仍为 SENDING = 拨过号但没回写结论。
+  attempts?: number;
+  channel?: notifyservicev1_Channel;
+  channelId?: number;
+  createdAt?: wellKnownTimestamp;
+  createdBy?: number;
+  eventType?: notifyservicev1_EventType;
+  id?: number;
+  lastError?: string;
+  // 服务商侧消息/请求 ID（阿里云 RequestId、IM 响应 ID 等，拿得到就带），跨系统对账有据可查
+  receiptProviderId?: string;
+  recipientUserId?: number;
+  // 产生本条投递的业务对象主键，含义由 event_type 决定（INTERNAL_MESSAGE → internal_messages.id）。
+  relatedId?: number;
+  // 一次派发意图的标识：调用方不传则服务端生成 UUID。唯一性按 (request_id, channel) 组合。
+  requestId?: string;
+  sentAt?: wellKnownTimestamp;
+  status?: notifyservicev1_DeliveryStatus;
+  // 脱敏后的投递目标：邮箱留首字符+域名，其余留末 4 位；INTERNAL 原样存用户 ID 十进制串
+  target?: string;
+  updatedAt?: wellKnownTimestamp;
+  updatedBy?: number;
+};
+
+// 业务事件类型。路由（事件 → 渠道 / 是否异步）由 notification_rules 表决定，
+// 初始行由代码里那份同形常量空表播种（删行不复活是特性：管理员删一行 = 该事件不再通知）。
+export type notifyservicev1_EventType =
+  // 渠道配置测试邮件（渠道页"测试发送"）。
+  | 'CHANNEL_TEST_EMAIL'
+  // 渠道测试消息（扩展渠道 EXT_* 的"测试发送"）。
+  | 'CHANNEL_TEST_EXT'
+  // 渠道测试短信（SMS 渠道的"测试发送"，发一条真实验证码）。
+  | 'CHANNEL_TEST_SMS'
+  | 'EVENT_TYPE_UNSPECIFIED'
+  // 站内信投递：一条站内信发给一个收件人 = 一行台账，related_id 指向 internal_messages.id。
+  // 它与其他事件的区别：其他事件由业务动作触发、渠道由路由表决定；这一个本身就是
+  // "站内信内容域经缝投递了一次"，related_id 必填，否则台账行无法回答"发的是哪条消息"。
+  | 'INTERNAL_MESSAGE'
+  // 监控告警通知：告警/恢复成对发送（监控告警规则的渠道与目标显式写在规则上，
+  // 不经路由表；related_id 指向 monitor_alert_rules.id）。
+  | 'MONITOR_ALERT'
+  // 密码重置验证码邮件（忘记密码流程；显式 EMAIL 渠道点对点，不经路由表）。
+  | 'PASSWORD_RESET_CODE'
+  // 系统通知邮件：站内信系统通知（NotifyUser）的附加邮件触达，收件目标为
+  // 收件用户邮箱。种子规则 SYSTEM_NOTIFY→EMAIL 提供路由（管理员停用该行即
+  // 整体关闭此类出站邮件）；related_id 指向 internal_messages.id。
+  | 'SYSTEM_NOTIFY';
+// 投递状态
+export type notifyservicev1_DeliveryStatus =
+  | 'DELIVERY_STATUS_UNSPECIFIED'
+  | 'FAILED'
+  | 'SENDING'
+  | 'SENT'
+  | 'SKIPPED';
+// 查询投递台账详情 - 请求
+export type notifyservicev1_GetNotificationDeliveryRequest = {
+  id: number | undefined;
+};
+
+// 通知渠道管理服务（平台级配置）
+export interface NotificationChannelService {
+  // 查询通知渠道列表
+  List(
+    request: pagination_PagingRequest,
+  ): Promise<notifyservicev1_ListNotificationChannelResponse>;
+  // 查询通知渠道详情
+  Get(
+    request: notifyservicev1_GetNotificationChannelRequest,
+  ): Promise<notifyservicev1_NotificationChannel>;
+  // 创建通知渠道
+  Create(
+    request: notifyservicev1_CreateNotificationChannelRequest,
+  ): Promise<notifyservicev1_NotificationChannel>;
+  // 更新通知渠道
+  Update(
+    request: notifyservicev1_UpdateNotificationChannelRequest,
+  ): Promise<notifyservicev1_NotificationChannel>;
+  // 删除通知渠道
+  Delete(
+    request: notifyservicev1_DeleteNotificationChannelRequest,
+  ): Promise<wellKnownEmpty>;
+  // 发送测试邮件（验证渠道配置）
+  SendTestEmail(
+    request: notifyservicev1_SendTestEmailRequest,
+  ): Promise<notifyservicev1_SendTestEmailResponse>;
+  // 扩展渠道 schema 清单（前端 settings 动态表单的数据源）
+  ListChannelSchemas(
+    request: wellKnownEmpty,
+  ): Promise<notifyservicev1_ListChannelSchemasResponse>;
+}
+
+export function createNotificationChannelServiceClient(
+  transport: ClientTransport,
+): NotificationChannelService {
+  return {
+    List(request) {
+      const path = `/admin/v1/notification-channels`;
+      const body = null;
+      const queryParams: string[] = [];
+      if (request.page) {
         queryParams.push(
-          `filterExpr.conditions.value=${encodeURIComponent(request.filterExpr.conditions.value.toString())}`,
+          `page=${encodeURIComponent(request.page.toString())}`,
         );
       }
-      if (request.filterExpr?.conditions?.jsonValue) {
+      if (request.pageSize) {
         queryParams.push(
-          `filterExpr.conditions.jsonValue=${encodeURIComponent(request.filterExpr.conditions.jsonValue.toString())}`,
+          `pageSize=${encodeURIComponent(request.pageSize.toString())}`,
         );
       }
-      if (request.filterExpr?.conditions?.values) {
-        request.filterExpr.conditions.values.forEach((x) => {
-          queryParams.push(
-            `filterExpr.conditions.values=${encodeURIComponent(x.toString())}`,
-          );
-        });
-      }
-      if (request.filterExpr?.conditions?.datePart) {
+      if (request.offset) {
         queryParams.push(
-          `filterExpr.conditions.datePart=${encodeURIComponent(request.filterExpr.conditions.datePart.toString())}`,
+          `offset=${encodeURIComponent(request.offset.toString())}`,
         );
       }
-      if (request.filterExpr?.conditions?.jsonPath) {
+      if (request.limit) {
         queryParams.push(
-          `filterExpr.conditions.jsonPath=${encodeURIComponent(request.filterExpr.conditions.jsonPath.toString())}`,
+          `limit=${encodeURIComponent(request.limit.toString())}`,
+        );
+      }
+      if (request.token) {
+        queryParams.push(
+          `token=${encodeURIComponent(request.token.toString())}`,
+        );
+      }
+      if (request.noPaging) {
+        queryParams.push(
+          `noPaging=${encodeURIComponent(request.noPaging.toString())}`,
+        );
+      }
+      if (request.query) {
+        queryParams.push(
+          `query=${encodeURIComponent(request.query.toString())}`,
+        );
+      }
+      if (request.filter) {
+        queryParams.push(
+          `filter=${encodeURIComponent(request.filter.toString())}`,
+        );
+      }
+      if (request.filterExpr?.type) {
+        queryParams.push(
+          `filterExpr.type=${encodeURIComponent(request.filterExpr.type.toString())}`,
         );
       }
       if (request.orderBy) {
@@ -5987,14 +9249,1012 @@ export function createOperationAuditLogServiceClient(
           `orderBy=${encodeURIComponent(request.orderBy.toString())}`,
         );
       }
-      if (request.sorting?.field) {
+      if (request.fieldMask) {
         queryParams.push(
-          `sorting.field=${encodeURIComponent(request.sorting.field.toString())}`,
+          `fieldMask=${encodeURIComponent(request.fieldMask.toString())}`,
         );
       }
-      if (request.sorting?.direction) {
+      let uri = path;
+      if (queryParams.length > 0) {
+        uri += `?${queryParams.join('&')}`;
+      }
+      return transport.unary(uri, 'GET', body, {
+        service: 'NotificationChannelService',
+        method: 'List',
+      }) as Promise<notifyservicev1_ListNotificationChannelResponse>;
+    },
+    Get(request) {
+      if (request.id === undefined || request.id === null) {
+        throw new Error('missing required field request.id');
+      }
+      const path = `/admin/v1/notification-channels/${request.id}`;
+      const body = null;
+      return transport.unary(path, 'GET', body, {
+        service: 'NotificationChannelService',
+        method: 'Get',
+      }) as Promise<notifyservicev1_NotificationChannel>;
+    },
+    Create(request) {
+      const path = `/admin/v1/notification-channels`;
+      const body = JSON.stringify(request);
+      return transport.unary(path, 'POST', body, {
+        service: 'NotificationChannelService',
+        method: 'Create',
+      }) as Promise<notifyservicev1_NotificationChannel>;
+    },
+    Update(request) {
+      if (request.id === undefined || request.id === null) {
+        throw new Error('missing required field request.id');
+      }
+      const path = `/admin/v1/notification-channels/${request.id}`;
+      const bodyMap = { ...request } as Record<string, unknown>;
+      delete bodyMap["id"];
+      const body = JSON.stringify(bodyMap);
+      return transport.unary(path, 'PUT', body, {
+        service: 'NotificationChannelService',
+        method: 'Update',
+      }) as Promise<notifyservicev1_NotificationChannel>;
+    },
+    Delete(request) {
+      if (request.id === undefined || request.id === null) {
+        throw new Error('missing required field request.id');
+      }
+      const path = `/admin/v1/notification-channels/${request.id}`;
+      const body = null;
+      return transport.unary(path, 'DELETE', body, {
+        service: 'NotificationChannelService',
+        method: 'Delete',
+      }) as Promise<wellKnownEmpty>;
+    },
+    SendTestEmail(request) {
+      if (request.id === undefined || request.id === null) {
+        throw new Error('missing required field request.id');
+      }
+      const path = `/admin/v1/notification-channels/${request.id}/send-test-email`;
+      const bodyMap = { ...request } as Record<string, unknown>;
+      delete bodyMap["id"];
+      const body = JSON.stringify(bodyMap);
+      return transport.unary(path, 'POST', body, {
+        service: 'NotificationChannelService',
+        method: 'SendTestEmail',
+      }) as Promise<notifyservicev1_SendTestEmailResponse>;
+    },
+    ListChannelSchemas(_request) {
+      const path = `/admin/v1/notification-channel-schemas`;
+      const body = null;
+      return transport.unary(path, 'GET', body, {
+        service: 'NotificationChannelService',
+        method: 'ListChannelSchemas',
+      }) as Promise<notifyservicev1_ListChannelSchemasResponse>;
+    },
+  };
+}
+// 查询通知渠道列表 - 回应
+export type notifyservicev1_ListNotificationChannelResponse = {
+  items: notifyservicev1_NotificationChannel[] | undefined;
+  total: number | undefined;
+};
+
+// 通知渠道
+export type notifyservicev1_NotificationChannel = {
+  createdAt?: wellKnownTimestamp;
+  createdBy?: number;
+  enabled?: boolean;
+  // 密码不回传：仅创建/更新时写入；hasPassword 标识是否已配置
+  hasPassword?: boolean;
+  hasSmsAccessSecret?: boolean;
+  // 密钥不回传：与 password 同一条约定，仅写入时接收
+  hasWebhookSecret?: boolean;
+  id?: number;
+  name?: string;
+  remark?: string;
+  // 扩展渠道配置整包（JSON；读回显是脱敏后的 JSON 串，sensitive 字段恒为空串——留空 = 不修改）
+  settings?: string;
+  smsAccessKeyId?: string;
+  smsAppId?: string;
+  // ---- SMS 渠道五列（Type=SMS 专用；验证码正文出自服务商侧审核模板，系统无自由文本通道）----
+  smsProvider?: notifyservicev1_NotificationChannel_SmsProvider;
+  smsRegion?: string;
+  smsSignName?: string;
+  smsTemplateCode?: string;
+  smtpFrom?: string;
+  smtpFromName?: string;
+  smtpHost?: string;
+  smtpPort?: number;
+  smtpTls?: notifyservicev1_NotificationChannel_TlsMode;
+  smtpUsername?: string;
+  type?: notifyservicev1_NotificationChannel_Type;
+  updatedAt?: wellKnownTimestamp;
+  updatedBy?: number;
+  // 可用占位符：{{title}} {{content}} {{event_type}} {{timestamp}} {{sign}} {{nonce}}
+  // {{recipient_user_id}} {{related_id}} {{delivered_at}}；替换按 JSON 字符串转义进行，
+  // 渲染结果必须是合法 JSON。CUSTOM 风格下 {{sign}} 不可用（它要盖住正文本身）。
+  webhookPayloadTemplate?: string;
+  webhookSignStyle?: notifyservicev1_SignStyle;
+  webhookUrl?: string;
+};
+
+// 渠道类型（成员名与 ent 列值逐字相同）
+export type notifyservicev1_NotificationChannel_Type =
+  | 'BARK'
+  | 'DATADOG'
+  | 'DINGTALK_APP'
+  | 'DISCORD'
+  | 'EMAIL'
+  | 'FEISHU_APP'
+  | 'GCHAT'
+  | 'GETUI'
+  | 'GOTIFY'
+  | 'HOMEASSISTANT'
+  | 'HUAWEISMS'
+  | 'IFTTT'
+  | 'JOIN'
+  | 'JPUSH'
+  | 'LINE'
+  | 'MAILGUN'
+  | 'MATRIX'
+  | 'MATTERMOST'
+  | 'NTFY'
+  | 'OPSGENIE'
+  | 'PAGERDUTY'
+  | 'POSTMARK'
+  | 'PUSHBULLET'
+  | 'PUSHDEER'
+  | 'PUSHOVER'
+  | 'ROCKETCHAT'
+  | 'SENDGRID'
+  | 'SERVERCHAN'
+  | 'SLACK'
+  | 'SMS'
+  | 'TEAMS'
+  | 'TELEGRAM'
+  | 'TWILIO'
+  | 'VONAGE'
+  | 'WEBEX'
+  | 'WEBHOOK'
+  | 'WECHAT'
+  | 'WECOM_APP'
+  | 'WHATSAPP'
+  | 'WXPUSHER'
+  | 'YUNPIAN'
+  | 'ZULIP';
+// SMTP 加密方式
+export type notifyservicev1_NotificationChannel_TlsMode =
+  | 'NONE'
+  | 'SSL'
+  | 'START_TLS';
+// Webhook 出站风格：一条 webhook 请求有三个地方各家长得不一样——签名怎么算、签名放哪、
+// 以及"对端到底收下了没有"用什么判。这一格把三件事捆在一起选，因为它们是同一次决策的产物
+// （钉钉把签名放 URL query 且只看 body 的 errcode，飞书把签名放 body 里且看 code）。
+// 正文形状不在这一格里：它由 webhook_payload_template 决定，留空时回落到本风格的内置默认模板。
+//
+// 为什么在包顶层而不在 NotificationChannel 里：proto3 的顶层枚举成员名属于包作用域，
+// 嵌进消息会和 TlsMode.NONE 撞同一作用域。成员名必须与 ent 列值逐字相同：
+// repo 的 EnumTypeConverter 按名字字符串配对，加前缀等于字段静默丢失。
+export type notifyservicev1_SignStyle =
+  | 'CUSTOM'
+  | 'DINGTALK'
+  | 'FEISHU'
+  | 'NONE'
+  | 'WECOM';
+// 短信服务商
+export type notifyservicev1_NotificationChannel_SmsProvider =
+  | 'ALIYUN'
+  | 'TENCENT';
+// 查询通知渠道详情 - 请求
+export type notifyservicev1_GetNotificationChannelRequest = {
+  id: number | undefined;
+};
+
+// 创建通知渠道 - 请求
+export type notifyservicev1_CreateNotificationChannelRequest = {
+  data: notifyservicev1_NotificationChannel | undefined;
+  // 明文密码（服务端加密存储，不落日志）
+  password?: string;
+  // 扩展渠道配置明文 JSON（服务端按 schema 校验必填并加密 sensitive 字段落库）
+  settings?: string;
+  // SMS 访问密钥明文（服务端加密存储，不落日志）
+  smsAccessSecret?: string;
+  // 明文签名密钥（服务端加密存储，不落日志；留空 = 不签名）
+  webhookSecret?: string;
+};
+
+// 更新通知渠道 - 请求
+export type notifyservicev1_UpdateNotificationChannelRequest = {
+  data: notifyservicev1_NotificationChannel | undefined;
+  id: number | undefined;
+  // 明文密码；留空表示不修改已存密码
+  password?: string;
+  // 扩展渠道配置明文 JSON；sensitive 字段留空 = 保留已存值
+  settings?: string;
+  // SMS 访问密钥明文；留空表示不修改已存密钥
+  smsAccessSecret?: string;
+  updateMask: undefined | wellKnownFieldMask;
+  // 明文签名密钥；留空表示不修改已存密钥
+  webhookSecret?: string;
+};
+
+// 删除通知渠道 - 请求
+export type notifyservicev1_DeleteNotificationChannelRequest = {
+  id: number | undefined;
+};
+
+// 发送测试邮件 - 请求
+export type notifyservicev1_SendTestEmailRequest = {
+  id: number | undefined;
+  recipient: string | undefined;
+};
+
+// 发送测试邮件 - 回应
+export type notifyservicev1_SendTestEmailResponse = {
+  error: string | undefined;
+  success: boolean | undefined;
+};
+
+// 扩展渠道 schema 清单 - 回应
+export type notifyservicev1_ListChannelSchemasResponse = {
+  items: notifyservicev1_ChannelSchema[] | undefined;
+};
+
+// 扩展渠道 schema 声明
+export type notifyservicev1_ChannelSchema = {
+  fields: notifyservicev1_ChannelField[] | undefined;
+  group: string | undefined;
+  label: string | undefined;
+  needsTarget: boolean | undefined;
+  targetLabel: string | undefined;
+  type: string | undefined;
+};
+
+// 扩展渠道 settings 字段声明
+export type notifyservicev1_ChannelField = {
+  hint: string | undefined;
+  label: string | undefined;
+  name: string | undefined;
+  options: string[] | undefined;
+  placeholder: string | undefined;
+  required: boolean | undefined;
+  sensitive: boolean | undefined;
+  type: string | undefined;
+};
+
+// 用户通知偏好服务（自助：读写的都是当前操作人自己的偏好，无管理面）。
+export interface NotificationPreferenceService {
+  // 获取当前用户的通知偏好；从未配置过时返回默认值（未启用静音、无退订）。
+  GetMyNotificationPreference(
+    request: wellKnownEmpty,
+  ): Promise<notifyservicev1_NotificationPreference>;
+  // 更新当前用户的通知偏好，返回保存后的完整状态。
+  UpdateMyNotificationPreference(
+    request: notifyservicev1_UpdateNotificationPreferenceRequest,
+  ): Promise<notifyservicev1_NotificationPreference>;
+  // 当前用户可退订的启用分类清单（本租户内）。
+  ListMyNotificationCategories(
+    request: wellKnownEmpty,
+  ): Promise<notifyservicev1_ListMyNotificationCategoriesResponse>;
+}
+
+export function createNotificationPreferenceServiceClient(
+  transport: ClientTransport,
+): NotificationPreferenceService {
+  return {
+    GetMyNotificationPreference(_request) {
+      const path = `/admin/v1/notification-preference`;
+      const body = null;
+      return transport.unary(path, 'GET', body, {
+        service: 'NotificationPreferenceService',
+        method: 'GetMyNotificationPreference',
+      }) as Promise<notifyservicev1_NotificationPreference>;
+    },
+    UpdateMyNotificationPreference(request) {
+      const path = `/admin/v1/notification-preference`;
+      const body = JSON.stringify(request);
+      return transport.unary(path, 'POST', body, {
+        service: 'NotificationPreferenceService',
+        method: 'UpdateMyNotificationPreference',
+      }) as Promise<notifyservicev1_NotificationPreference>;
+    },
+    ListMyNotificationCategories(_request) {
+      const path = `/admin/v1/notification-preference/categories`;
+      const body = null;
+      return transport.unary(path, 'GET', body, {
+        service: 'NotificationPreferenceService',
+        method: 'ListMyNotificationCategories',
+      }) as Promise<notifyservicev1_ListMyNotificationCategoriesResponse>;
+    },
+  };
+}
+// 用户通知偏好（每用户一行）。
+// 服务端从操作人钉定 user_id，客户端传入的 user_id 一律忽略。
+// 刻意无租户维度：偏好跟人走，全链 fail-open（读不到偏好 = 不静音不退订）。
+export type notifyservicev1_NotificationPreference = {
+  // 退订的站内信分类 ID 列表（预留：CMS v1 无全员广播，无执行点，仅落库）
+  mutedCategoryIds: number[] | undefined;
+  // 是否启用实时推送静音时段：只抑制 SSE 实时推送（角标即时性），
+  // 收件行照常落库，用户打开收件箱仍能看到全部消息。
+  quietEnabled?: boolean;
+  // 静音结束：自当日 00:00 起的分钟数（0-1439），默认 480（08:00）。
+  // 跨零点窗口（start > end，如 22:00→08:00）合法；start == end 且启用视为无效配置。
+  quietEndMinute?: number;
+  // 静音开始：自当日 00:00 起的分钟数（0-1439），默认 1320（22:00）。
+  quietStartMinute?: number;
+  updatedAt?: wellKnownTimestamp;
+  userId?: number;
+};
+
+// 更新自己的通知偏好（字段全量提交；未登录不可用）。
+export type notifyservicev1_UpdateNotificationPreferenceRequest = {
+  mutedCategoryIds: number[] | undefined;
+  quietEnabled?: boolean;
+  quietEndMinute?: number;
+  quietStartMinute?: number;
+};
+
+// 当前用户可见的启用分类清单。
+export type notifyservicev1_ListMyNotificationCategoriesResponse = {
+  items: notifyservicev1_NotificationCategoryItem[] | undefined;
+};
+
+// 可退订分类的精简项（只取 id + 名称，避免拖整个分类实体）。
+export type notifyservicev1_NotificationCategoryItem = {
+  id?: number;
+  name?: string;
+};
+
+// 通知路由规则管理服务（平台级配置，菜单 authority 为 sys:platform_admin）。
+export interface NotificationRuleService {
+  // 查询路由规则列表
+  List(
+    request: pagination_PagingRequest,
+  ): Promise<notifyservicev1_ListNotificationRuleResponse>;
+  // 查询路由规则详情
+  Get(
+    request: notifyservicev1_GetNotificationRuleRequest,
+  ): Promise<notifyservicev1_NotificationRule>;
+  // 创建路由规则
+  Create(
+    request: notifyservicev1_CreateNotificationRuleRequest,
+  ): Promise<notifyservicev1_NotificationRule>;
+  // 更新路由规则
+  Update(
+    request: notifyservicev1_UpdateNotificationRuleRequest,
+  ): Promise<notifyservicev1_NotificationRule>;
+  // 删除路由规则
+  Delete(
+    request: notifyservicev1_DeleteNotificationRuleRequest,
+  ): Promise<wellKnownEmpty>;
+  // 测试投递：按这条规则当场走一遍完整投递链
+  TestDispatch(
+    request: notifyservicev1_TestDispatchNotificationRequest,
+  ): Promise<notifyservicev1_TestDispatchNotificationResponse>;
+}
+
+export function createNotificationRuleServiceClient(
+  transport: ClientTransport,
+): NotificationRuleService {
+  return {
+    List(request) {
+      const path = `/admin/v1/notification-rules`;
+      const body = null;
+      const queryParams: string[] = [];
+      if (request.page) {
         queryParams.push(
-          `sorting.direction=${encodeURIComponent(request.sorting.direction.toString())}`,
+          `page=${encodeURIComponent(request.page.toString())}`,
+        );
+      }
+      if (request.pageSize) {
+        queryParams.push(
+          `pageSize=${encodeURIComponent(request.pageSize.toString())}`,
+        );
+      }
+      if (request.offset) {
+        queryParams.push(
+          `offset=${encodeURIComponent(request.offset.toString())}`,
+        );
+      }
+      if (request.limit) {
+        queryParams.push(
+          `limit=${encodeURIComponent(request.limit.toString())}`,
+        );
+      }
+      if (request.token) {
+        queryParams.push(
+          `token=${encodeURIComponent(request.token.toString())}`,
+        );
+      }
+      if (request.noPaging) {
+        queryParams.push(
+          `noPaging=${encodeURIComponent(request.noPaging.toString())}`,
+        );
+      }
+      if (request.query) {
+        queryParams.push(
+          `query=${encodeURIComponent(request.query.toString())}`,
+        );
+      }
+      if (request.filter) {
+        queryParams.push(
+          `filter=${encodeURIComponent(request.filter.toString())}`,
+        );
+      }
+      if (request.filterExpr?.type) {
+        queryParams.push(
+          `filterExpr.type=${encodeURIComponent(request.filterExpr.type.toString())}`,
+        );
+      }
+      if (request.orderBy) {
+        queryParams.push(
+          `orderBy=${encodeURIComponent(request.orderBy.toString())}`,
+        );
+      }
+      if (request.fieldMask) {
+        queryParams.push(
+          `fieldMask=${encodeURIComponent(request.fieldMask.toString())}`,
+        );
+      }
+      let uri = path;
+      if (queryParams.length > 0) {
+        uri += `?${queryParams.join('&')}`;
+      }
+      return transport.unary(uri, 'GET', body, {
+        service: 'NotificationRuleService',
+        method: 'List',
+      }) as Promise<notifyservicev1_ListNotificationRuleResponse>;
+    },
+    Get(request) {
+      if (request.id === undefined || request.id === null) {
+        throw new Error('missing required field request.id');
+      }
+      const path = `/admin/v1/notification-rules/${request.id}`;
+      const body = null;
+      return transport.unary(path, 'GET', body, {
+        service: 'NotificationRuleService',
+        method: 'Get',
+      }) as Promise<notifyservicev1_NotificationRule>;
+    },
+    Create(request) {
+      const path = `/admin/v1/notification-rules`;
+      const body = JSON.stringify(request);
+      return transport.unary(path, 'POST', body, {
+        service: 'NotificationRuleService',
+        method: 'Create',
+      }) as Promise<notifyservicev1_NotificationRule>;
+    },
+    Update(request) {
+      if (request.id === undefined || request.id === null) {
+        throw new Error('missing required field request.id');
+      }
+      const path = `/admin/v1/notification-rules/${request.id}`;
+      const bodyMap = { ...request } as Record<string, unknown>;
+      delete bodyMap["id"];
+      const body = JSON.stringify(bodyMap);
+      return transport.unary(path, 'PUT', body, {
+        service: 'NotificationRuleService',
+        method: 'Update',
+      }) as Promise<notifyservicev1_NotificationRule>;
+    },
+    Delete(request) {
+      if (request.id === undefined || request.id === null) {
+        throw new Error('missing required field request.id');
+      }
+      const path = `/admin/v1/notification-rules/${request.id}`;
+      const body = null;
+      return transport.unary(path, 'DELETE', body, {
+        service: 'NotificationRuleService',
+        method: 'Delete',
+      }) as Promise<wellKnownEmpty>;
+    },
+    TestDispatch(request) {
+      if (request.id === undefined || request.id === null) {
+        throw new Error('missing required field request.id');
+      }
+      const path = `/admin/v1/notification-rules/${request.id}/test-dispatch`;
+      const bodyMap = { ...request } as Record<string, unknown>;
+      delete bodyMap["id"];
+      const body = JSON.stringify(bodyMap);
+      return transport.unary(path, 'POST', body, {
+        service: 'NotificationRuleService',
+        method: 'TestDispatch',
+      }) as Promise<notifyservicev1_TestDispatchNotificationResponse>;
+    },
+  };
+}
+// 查询路由规则列表 - 回应
+export type notifyservicev1_ListNotificationRuleResponse = {
+  items: notifyservicev1_NotificationRule[] | undefined;
+  total: number | undefined;
+};
+
+// 一条业务事件类型 → 一行规则（event_type 唯一）
+export type notifyservicev1_NotificationRule = {
+  channel?: notifyservicev1_Channel;
+  createdAt?: wellKnownTimestamp;
+  createdBy?: number;
+  eventType?: notifyservicev1_EventType;
+  id?: number;
+  // 异步 = 入队 asynq、请求立刻拿到 SENDING；同步 = 当场拨号并回写结论。
+  // 判据是"调用方需不需要这次投递的结论"，与渠道无关。
+  isAsync?: boolean;
+  isEnabled?: boolean;
+  remark?: string;
+  updatedAt?: wellKnownTimestamp;
+  updatedBy?: number;
+};
+
+// 查询路由规则详情 - 请求
+export type notifyservicev1_GetNotificationRuleRequest = {
+  id: number | undefined;
+};
+
+// 创建路由规则 - 请求
+export type notifyservicev1_CreateNotificationRuleRequest = {
+  data: notifyservicev1_NotificationRule | undefined;
+};
+
+// 更新路由规则 - 请求
+export type notifyservicev1_UpdateNotificationRuleRequest = {
+  data: notifyservicev1_NotificationRule | undefined;
+  id: number | undefined;
+  updateMask: undefined | wellKnownFieldMask;
+};
+
+// 删除路由规则 - 请求
+export type notifyservicev1_DeleteNotificationRuleRequest = {
+  id: number | undefined;
+};
+
+// 测试投递 - 请求。
+//
+// target/title/content 全可空，缺省即"这条规则本来会发什么"：
+// target 对 EMAIL 是必填的投递目标，对 WEBHOOK 留空则取第一个启用的 WEBHOOK 渠道配置的 webhook_url；
+// title/content 留空由服务端渲染一封测试文案。
+// INTERNAL 规则拒绝测试（站内信投递由业务动作驱动，无"测试文案"语义）。
+export type notifyservicev1_TestDispatchNotificationRequest = {
+  content?: string;
+  id: number | undefined;
+  target?: string;
+  title?: string;
+};
+
+// 测试投递 - 回应。台账行号一并回传：报错时拿它去投递记录页查这一条。
+export type notifyservicev1_TestDispatchNotificationResponse = {
+  deliveryId: number | undefined;
+  status: notifyservicev1_DeliveryStatus | undefined;
+};
+
+// 通知模板管理服务（平台管理员；租户侧由 notification_platform_guard 拒绝）
+export interface NotificationTemplateService {
+  // 模板列表（分页，contains 搜索）
+  List(
+    request: pagination_PagingRequest,
+  ): Promise<notifyservicev1_ListNotificationTemplateResponse>;
+  // 模板详情
+  Get(
+    request: notifyservicev1_GetNotificationTemplateRequest,
+  ): Promise<notifyservicev1_NotificationTemplate>;
+  // 新建模板
+  Create(
+    request: notifyservicev1_CreateNotificationTemplateRequest,
+  ): Promise<notifyservicev1_NotificationTemplate>;
+  // 更新模板（CRUD 请求体必须包 {data:{...}}，见仓铁律）
+  Update(
+    request: notifyservicev1_UpdateNotificationTemplateRequest,
+  ): Promise<notifyservicev1_NotificationTemplate>;
+  // 删除模板
+  Delete(
+    request: notifyservicev1_DeleteNotificationTemplateRequest,
+  ): Promise<wellKnownEmpty>;
+  // 试渲染：按变量集渲染指定模板，返回标题与正文（管理页预览用，不产生投递）
+  Render(
+    request: notifyservicev1_RenderNotificationTemplateRequest,
+  ): Promise<notifyservicev1_RenderNotificationTemplateResponse>;
+}
+
+export function createNotificationTemplateServiceClient(
+  transport: ClientTransport,
+): NotificationTemplateService {
+  return {
+    List(request) {
+      const path = `/admin/v1/notification-templates`;
+      const body = null;
+      const queryParams: string[] = [];
+      if (request.page) {
+        queryParams.push(
+          `page=${encodeURIComponent(request.page.toString())}`,
+        );
+      }
+      if (request.pageSize) {
+        queryParams.push(
+          `pageSize=${encodeURIComponent(request.pageSize.toString())}`,
+        );
+      }
+      if (request.offset) {
+        queryParams.push(
+          `offset=${encodeURIComponent(request.offset.toString())}`,
+        );
+      }
+      if (request.limit) {
+        queryParams.push(
+          `limit=${encodeURIComponent(request.limit.toString())}`,
+        );
+      }
+      if (request.token) {
+        queryParams.push(
+          `token=${encodeURIComponent(request.token.toString())}`,
+        );
+      }
+      if (request.noPaging) {
+        queryParams.push(
+          `noPaging=${encodeURIComponent(request.noPaging.toString())}`,
+        );
+      }
+      if (request.query) {
+        queryParams.push(
+          `query=${encodeURIComponent(request.query.toString())}`,
+        );
+      }
+      if (request.filter) {
+        queryParams.push(
+          `filter=${encodeURIComponent(request.filter.toString())}`,
+        );
+      }
+      if (request.filterExpr?.type) {
+        queryParams.push(
+          `filterExpr.type=${encodeURIComponent(request.filterExpr.type.toString())}`,
+        );
+      }
+      if (request.orderBy) {
+        queryParams.push(
+          `orderBy=${encodeURIComponent(request.orderBy.toString())}`,
+        );
+      }
+      if (request.fieldMask) {
+        queryParams.push(
+          `fieldMask=${encodeURIComponent(request.fieldMask.toString())}`,
+        );
+      }
+      let uri = path;
+      if (queryParams.length > 0) {
+        uri += `?${queryParams.join('&')}`;
+      }
+      return transport.unary(uri, 'GET', body, {
+        service: 'NotificationTemplateService',
+        method: 'List',
+      }) as Promise<notifyservicev1_ListNotificationTemplateResponse>;
+    },
+    Get(request) {
+      if (request.id === undefined || request.id === null) {
+        throw new Error('missing required field request.id');
+      }
+      const path = `/admin/v1/notification-templates/${request.id}`;
+      const body = null;
+      return transport.unary(path, 'GET', body, {
+        service: 'NotificationTemplateService',
+        method: 'Get',
+      }) as Promise<notifyservicev1_NotificationTemplate>;
+    },
+    Create(request) {
+      const path = `/admin/v1/notification-templates`;
+      const body = JSON.stringify(request);
+      return transport.unary(path, 'POST', body, {
+        service: 'NotificationTemplateService',
+        method: 'Create',
+      }) as Promise<notifyservicev1_NotificationTemplate>;
+    },
+    Update(request) {
+      if (request.id === undefined || request.id === null) {
+        throw new Error('missing required field request.id');
+      }
+      const path = `/admin/v1/notification-templates/${request.id}`;
+      const bodyMap = { ...request } as Record<string, unknown>;
+      delete bodyMap["id"];
+      const body = JSON.stringify(bodyMap);
+      return transport.unary(path, 'PUT', body, {
+        service: 'NotificationTemplateService',
+        method: 'Update',
+      }) as Promise<notifyservicev1_NotificationTemplate>;
+    },
+    Delete(request) {
+      if (request.id === undefined || request.id === null) {
+        throw new Error('missing required field request.id');
+      }
+      const path = `/admin/v1/notification-templates/${request.id}`;
+      const body = null;
+      return transport.unary(path, 'DELETE', body, {
+        service: 'NotificationTemplateService',
+        method: 'Delete',
+      }) as Promise<wellKnownEmpty>;
+    },
+    Render(request) {
+      if (request.id === undefined || request.id === null) {
+        throw new Error('missing required field request.id');
+      }
+      const path = `/admin/v1/notification-templates/${request.id}/render`;
+      const bodyMap = { ...request } as Record<string, unknown>;
+      delete bodyMap["id"];
+      const body = JSON.stringify(bodyMap);
+      return transport.unary(path, 'POST', body, {
+        service: 'NotificationTemplateService',
+        method: 'Render',
+      }) as Promise<notifyservicev1_RenderNotificationTemplateResponse>;
+    },
+  };
+}
+export type notifyservicev1_ListNotificationTemplateResponse = {
+  items: notifyservicev1_NotificationTemplate[] | undefined;
+  total: number | undefined;
+};
+
+// 通知模板：可复用的标题/正文占位模板（{{var}}），平台全局、code 全局唯一。
+export type notifyservicev1_NotificationTemplate = {
+  // 模板编码，发送方以 template_code 引用；全局唯一，仅限字母数字与下划线/连字符
+  code?: string;
+  // 正文模板，支持 {{var}} 占位符
+  contentTemplate?: string;
+  createdAt?: wellKnownTimestamp;
+  id?: number;
+  isEnabled?: boolean;
+  name?: string;
+  remark?: string;
+  // 标题模板，支持 {{var}} 占位符；未识别占位符在渲染时报错
+  titleTemplate?: string;
+  updatedAt?: wellKnownTimestamp;
+};
+
+export type notifyservicev1_GetNotificationTemplateRequest = {
+  id: number | undefined;
+};
+
+export type notifyservicev1_CreateNotificationTemplateRequest = {
+  data: notifyservicev1_NotificationTemplate | undefined;
+};
+
+export type notifyservicev1_UpdateNotificationTemplateRequest = {
+  data: notifyservicev1_NotificationTemplate | undefined;
+  id: number | undefined;
+  // 字段掩码：留空更新全部字段
+  updateMask?: wellKnownFieldMask;
+};
+
+export type notifyservicev1_DeleteNotificationTemplateRequest = {
+  id: number | undefined;
+};
+
+// 按变量集试渲染（管理页预览；发送不经过这里）
+export type notifyservicev1_RenderNotificationTemplateRequest = {
+  // 被渲染的模板 ID
+  id: number | undefined;
+  // 变量集：占位符名 → 值；模板引用了变量集里没有的占位符时整个渲染报错
+  variables: { [key: string]: string } | undefined;
+};
+
+export type notifyservicev1_RenderNotificationTemplateResponse = {
+  content: string | undefined;
+  title: string | undefined;
+};
+
+// 在线会话管理服务（平台管理员：全量列表 + 强制下线；当前用户：本人会话）。
+export interface OnlineSessionService {
+  // 查询在线会话列表
+  ListOnlineSession(
+    request: online_sessionservicev1_ListOnlineSessionRequest,
+  ): Promise<online_sessionservicev1_ListOnlineSessionResponse>;
+  // 强制下线指定会话
+  ForceLogoutSession(
+    request: online_sessionservicev1_ForceLogoutSessionRequest,
+  ): Promise<online_sessionservicev1_ForceLogoutSessionResponse>;
+  // 查询当前登录用户的在线会话
+  ListMyOnlineSession(
+    request: online_sessionservicev1_ListMyOnlineSessionRequest,
+  ): Promise<online_sessionservicev1_ListOnlineSessionResponse>;
+  // 当前用户强制下线自己的指定会话
+  RevokeMyOnlineSession(
+    request: online_sessionservicev1_RevokeMyOnlineSessionRequest,
+  ): Promise<online_sessionservicev1_RevokeMyOnlineSessionResponse>;
+}
+
+export function createOnlineSessionServiceClient(
+  transport: ClientTransport,
+): OnlineSessionService {
+  return {
+    ListOnlineSession(request) {
+      const path = `/admin/v1/online-session/sessions`;
+      const body = null;
+      const queryParams: string[] = [];
+      if (request.keyword) {
+        queryParams.push(
+          `keyword=${encodeURIComponent(request.keyword.toString())}`,
+        );
+      }
+      if (request.page) {
+        queryParams.push(
+          `page=${encodeURIComponent(request.page.toString())}`,
+        );
+      }
+      if (request.pageSize) {
+        queryParams.push(
+          `pageSize=${encodeURIComponent(request.pageSize.toString())}`,
+        );
+      }
+      let uri = path;
+      if (queryParams.length > 0) {
+        uri += `?${queryParams.join('&')}`;
+      }
+      return transport.unary(uri, 'GET', body, {
+        service: 'OnlineSessionService',
+        method: 'ListOnlineSession',
+      }) as Promise<online_sessionservicev1_ListOnlineSessionResponse>;
+    },
+    ForceLogoutSession(request) {
+      const path = `/admin/v1/online-session/force-logout`;
+      const body = JSON.stringify(request);
+      return transport.unary(path, 'POST', body, {
+        service: 'OnlineSessionService',
+        method: 'ForceLogoutSession',
+      }) as Promise<online_sessionservicev1_ForceLogoutSessionResponse>;
+    },
+    ListMyOnlineSession(request) {
+      const path = `/admin/v1/online-session/my-sessions`;
+      const body = null;
+      const queryParams: string[] = [];
+      if (request.userId) {
+        queryParams.push(
+          `userId=${encodeURIComponent(request.userId.toString())}`,
+        );
+      }
+      if (request.currentJti) {
+        queryParams.push(
+          `currentJti=${encodeURIComponent(request.currentJti.toString())}`,
+        );
+      }
+      let uri = path;
+      if (queryParams.length > 0) {
+        uri += `?${queryParams.join('&')}`;
+      }
+      return transport.unary(uri, 'GET', body, {
+        service: 'OnlineSessionService',
+        method: 'ListMyOnlineSession',
+      }) as Promise<online_sessionservicev1_ListOnlineSessionResponse>;
+    },
+    RevokeMyOnlineSession(request) {
+      const path = `/admin/v1/online-session/my-sessions/revoke`;
+      const body = JSON.stringify(request);
+      return transport.unary(path, 'POST', body, {
+        service: 'OnlineSessionService',
+        method: 'RevokeMyOnlineSession',
+      }) as Promise<online_sessionservicev1_RevokeMyOnlineSessionResponse>;
+    },
+  };
+}
+// 查询在线会话列表 - 请求
+export type online_sessionservicev1_ListOnlineSessionRequest = {
+  // 关键词过滤（模糊匹配用户名 / IP），留空返回全部
+  keyword?: string;
+  // 页码（从 1 开始）
+  page?: number;
+  // 每页数量
+  pageSize?: number;
+};
+
+// 查询在线会话列表 - 回应
+export type online_sessionservicev1_ListOnlineSessionResponse = {
+  items: online_sessionservicev1_OnlineSession[] | undefined;
+  total: number | undefined;
+};
+
+// 在线会话
+export type online_sessionservicev1_OnlineSession = {
+  clientType?: authenticationservicev1_ClientType;
+  // 是否为当前请求所属会话（仅 ListMy 场景有意义，由 BFF 按操作者 jti 标记）
+  current?: boolean;
+  ipAddress?: string;
+  // 会话令牌对 ID（JWT jti，唯一标识一次令牌签发）
+  jti?: string;
+  loginAt?: wellKnownTimestamp;
+  tenantId?: number;
+  userAgent?: string;
+  userId?: number;
+  username?: string;
+};
+
+// 强制下线指定会话 - 请求
+export type online_sessionservicev1_ForceLogoutSessionRequest = {
+  clientType?: authenticationservicev1_ClientType;
+  jti?: string;
+  userId?: number;
+};
+
+// 强制下线指定会话 - 回应
+export type online_sessionservicev1_ForceLogoutSessionResponse = {
+};
+
+// 查询当前登录用户的在线会话 - 请求。
+// 与上游不同：CMS 的用户身份不跨服务透传，admin BFF 从认证上下文取出
+// user_id 与当前 jti 显式传入（current_jti 用于标记"当前会话"）。
+export type online_sessionservicev1_ListMyOnlineSessionRequest = {
+  currentJti?: string;
+  userId?: number;
+};
+
+// 当前用户强制下线自己的指定会话 - 请求
+export type online_sessionservicev1_RevokeMyOnlineSessionRequest = {
+  clientType?: authenticationservicev1_ClientType;
+  jti?: string;
+  userId?: number;
+};
+
+// 当前用户强制下线自己的指定会话 - 回应
+export type online_sessionservicev1_RevokeMyOnlineSessionResponse = {
+};
+
+// 操作审计日志管理服务
+export interface OperationAuditLogService {
+  // 查询操作审计日志列表
+  List(
+    request: pagination_PagingRequest,
+  ): Promise<auditservicev1_ListOperationAuditLogResponse>;
+  // 查询操作审计日志详情
+  Get(
+    request: auditservicev1_GetOperationAuditLogRequest,
+  ): Promise<auditservicev1_OperationAuditLog>;
+}
+
+export function createOperationAuditLogServiceClient(
+  transport: ClientTransport,
+): OperationAuditLogService {
+  return {
+    List(request) {
+      const path = `/admin/v1/operation-audit-logs`;
+      const body = null;
+      const queryParams: string[] = [];
+      if (request.page) {
+        queryParams.push(
+          `page=${encodeURIComponent(request.page.toString())}`,
+        );
+      }
+      if (request.pageSize) {
+        queryParams.push(
+          `pageSize=${encodeURIComponent(request.pageSize.toString())}`,
+        );
+      }
+      if (request.offset) {
+        queryParams.push(
+          `offset=${encodeURIComponent(request.offset.toString())}`,
+        );
+      }
+      if (request.limit) {
+        queryParams.push(
+          `limit=${encodeURIComponent(request.limit.toString())}`,
+        );
+      }
+      if (request.token) {
+        queryParams.push(
+          `token=${encodeURIComponent(request.token.toString())}`,
+        );
+      }
+      if (request.noPaging) {
+        queryParams.push(
+          `noPaging=${encodeURIComponent(request.noPaging.toString())}`,
+        );
+      }
+      if (request.query) {
+        queryParams.push(
+          `query=${encodeURIComponent(request.query.toString())}`,
+        );
+      }
+      if (request.filter) {
+        queryParams.push(
+          `filter=${encodeURIComponent(request.filter.toString())}`,
+        );
+      }
+      if (request.filterExpr?.type) {
+        queryParams.push(
+          `filterExpr.type=${encodeURIComponent(request.filterExpr.type.toString())}`,
+        );
+      }
+      if (request.orderBy) {
+        queryParams.push(
+          `orderBy=${encodeURIComponent(request.orderBy.toString())}`,
         );
       }
       if (request.fieldMask) {
@@ -6015,7 +10275,7 @@ export function createOperationAuditLogServiceClient(
       if (request.id === undefined || request.id === null) {
         throw new Error('missing required field request.id');
       }
-      const path = `admin/v1/operation-audit-logs/${request.id}`;
+      const path = `/admin/v1/operation-audit-logs/${request.id}`;
       const body = null;
       const queryParams: string[] = [];
       if (request.viewMask) {
@@ -6111,7 +10371,7 @@ export function createOrgUnitServiceClient(
 ): OrgUnitService {
   return {
     List(request) {
-      const path = `admin/v1/org-units`;
+      const path = `/admin/v1/org-units`;
       const body = null;
       const queryParams: string[] = [];
       if (request.page) {
@@ -6159,56 +10419,9 @@ export function createOrgUnitServiceClient(
           `filterExpr.type=${encodeURIComponent(request.filterExpr.type.toString())}`,
         );
       }
-      if (request.filterExpr?.conditions?.field) {
-        queryParams.push(
-          `filterExpr.conditions.field=${encodeURIComponent(request.filterExpr.conditions.field.toString())}`,
-        );
-      }
-      if (request.filterExpr?.conditions?.op) {
-        queryParams.push(
-          `filterExpr.conditions.op=${encodeURIComponent(request.filterExpr.conditions.op.toString())}`,
-        );
-      }
-      if (request.filterExpr?.conditions?.value) {
-        queryParams.push(
-          `filterExpr.conditions.value=${encodeURIComponent(request.filterExpr.conditions.value.toString())}`,
-        );
-      }
-      if (request.filterExpr?.conditions?.jsonValue) {
-        queryParams.push(
-          `filterExpr.conditions.jsonValue=${encodeURIComponent(request.filterExpr.conditions.jsonValue.toString())}`,
-        );
-      }
-      if (request.filterExpr?.conditions?.values) {
-        request.filterExpr.conditions.values.forEach((x) => {
-          queryParams.push(
-            `filterExpr.conditions.values=${encodeURIComponent(x.toString())}`,
-          );
-        });
-      }
-      if (request.filterExpr?.conditions?.datePart) {
-        queryParams.push(
-          `filterExpr.conditions.datePart=${encodeURIComponent(request.filterExpr.conditions.datePart.toString())}`,
-        );
-      }
-      if (request.filterExpr?.conditions?.jsonPath) {
-        queryParams.push(
-          `filterExpr.conditions.jsonPath=${encodeURIComponent(request.filterExpr.conditions.jsonPath.toString())}`,
-        );
-      }
       if (request.orderBy) {
         queryParams.push(
           `orderBy=${encodeURIComponent(request.orderBy.toString())}`,
-        );
-      }
-      if (request.sorting?.field) {
-        queryParams.push(
-          `sorting.field=${encodeURIComponent(request.sorting.field.toString())}`,
-        );
-      }
-      if (request.sorting?.direction) {
-        queryParams.push(
-          `sorting.direction=${encodeURIComponent(request.sorting.direction.toString())}`,
         );
       }
       if (request.fieldMask) {
@@ -6229,7 +10442,7 @@ export function createOrgUnitServiceClient(
       if (request.id === undefined || request.id === null) {
         throw new Error('missing required field request.id');
       }
-      const path = `admin/v1/org-units/${request.id}`;
+      const path = `/admin/v1/org-units/${request.id}`;
       const body = null;
       const queryParams: string[] = [];
       if (request.viewMask) {
@@ -6247,7 +10460,7 @@ export function createOrgUnitServiceClient(
       }) as Promise<identityservicev1_OrgUnit>;
     },
     Create(request) {
-      const path = `admin/v1/org-units`;
+      const path = `/admin/v1/org-units`;
       const body = JSON.stringify(request);
       return transport.unary(path, 'POST', body, {
         service: 'OrgUnitService',
@@ -6258,8 +10471,10 @@ export function createOrgUnitServiceClient(
       if (request.id === undefined || request.id === null) {
         throw new Error('missing required field request.id');
       }
-      const path = `admin/v1/org-units/${request.id}`;
-      const body = JSON.stringify(request);
+      const path = `/admin/v1/org-units/${request.id}`;
+      const bodyMap = { ...request } as Record<string, unknown>;
+      delete bodyMap["id"];
+      const body = JSON.stringify(bodyMap);
       return transport.unary(path, 'PUT', body, {
         service: 'OrgUnitService',
         method: 'Update',
@@ -6269,7 +10484,7 @@ export function createOrgUnitServiceClient(
       if (request.id === undefined || request.id === null) {
         throw new Error('missing required field request.id');
       }
-      const path = `admin/v1/org-units/${request.id}`;
+      const path = `/admin/v1/org-units/${request.id}`;
       const body = null;
       return transport.unary(path, 'DELETE', body, {
         service: 'OrgUnitService',
@@ -6390,6 +10605,30 @@ export interface PageService {
   Delete(
     request: contentservicev1_DeletePageRequest,
   ): Promise<wellKnownEmpty>;
+  // 列出页面版本（按版本号倒序）
+  ListVersions(
+    request: contentservicev1_ListPageVersionsRequest,
+  ): Promise<contentservicev1_ListPageVersionsResponse>;
+  // 获取页面版本详情
+  GetVersion(
+    request: contentservicev1_GetPageVersionRequest,
+  ): Promise<contentservicev1_PageVersion>;
+  // 恢复页面到指定版本（恢复动作本身会生成一个新版本）
+  RestoreVersion(
+    request: contentservicev1_RestorePageVersionRequest,
+  ): Promise<contentservicev1_Page>;
+  // 提交页面审核：DRAFT → 审核中
+  SubmitReview(
+    request: contentservicev1_SubmitPageReviewRequest,
+  ): Promise<contentservicev1_Page>;
+  // 审核页面通过：审核中 → 已发布（角色经接口管理绑定到该端点即完成卡点）
+  ApproveReview(
+    request: contentservicev1_ReviewPageRequest,
+  ): Promise<contentservicev1_Page>;
+  // 页面审核驳回：审核中 → 草稿（带理由通知作者）
+  RejectReview(
+    request: contentservicev1_RejectPageReviewRequest,
+  ): Promise<contentservicev1_Page>;
 }
 
 export function createPageServiceClient(
@@ -6397,7 +10636,7 @@ export function createPageServiceClient(
 ): PageService {
   return {
     List(request) {
-      const path = `admin/v1/pages`;
+      const path = `/admin/v1/pages`;
       const body = null;
       const queryParams: string[] = [];
       if (request.page) {
@@ -6445,56 +10684,9 @@ export function createPageServiceClient(
           `filterExpr.type=${encodeURIComponent(request.filterExpr.type.toString())}`,
         );
       }
-      if (request.filterExpr?.conditions?.field) {
-        queryParams.push(
-          `filterExpr.conditions.field=${encodeURIComponent(request.filterExpr.conditions.field.toString())}`,
-        );
-      }
-      if (request.filterExpr?.conditions?.op) {
-        queryParams.push(
-          `filterExpr.conditions.op=${encodeURIComponent(request.filterExpr.conditions.op.toString())}`,
-        );
-      }
-      if (request.filterExpr?.conditions?.value) {
-        queryParams.push(
-          `filterExpr.conditions.value=${encodeURIComponent(request.filterExpr.conditions.value.toString())}`,
-        );
-      }
-      if (request.filterExpr?.conditions?.jsonValue) {
-        queryParams.push(
-          `filterExpr.conditions.jsonValue=${encodeURIComponent(request.filterExpr.conditions.jsonValue.toString())}`,
-        );
-      }
-      if (request.filterExpr?.conditions?.values) {
-        request.filterExpr.conditions.values.forEach((x) => {
-          queryParams.push(
-            `filterExpr.conditions.values=${encodeURIComponent(x.toString())}`,
-          );
-        });
-      }
-      if (request.filterExpr?.conditions?.datePart) {
-        queryParams.push(
-          `filterExpr.conditions.datePart=${encodeURIComponent(request.filterExpr.conditions.datePart.toString())}`,
-        );
-      }
-      if (request.filterExpr?.conditions?.jsonPath) {
-        queryParams.push(
-          `filterExpr.conditions.jsonPath=${encodeURIComponent(request.filterExpr.conditions.jsonPath.toString())}`,
-        );
-      }
       if (request.orderBy) {
         queryParams.push(
           `orderBy=${encodeURIComponent(request.orderBy.toString())}`,
-        );
-      }
-      if (request.sorting?.field) {
-        queryParams.push(
-          `sorting.field=${encodeURIComponent(request.sorting.field.toString())}`,
-        );
-      }
-      if (request.sorting?.direction) {
-        queryParams.push(
-          `sorting.direction=${encodeURIComponent(request.sorting.direction.toString())}`,
         );
       }
       if (request.fieldMask) {
@@ -6515,7 +10707,7 @@ export function createPageServiceClient(
       if (request.id === undefined || request.id === null) {
         throw new Error('missing required field request.id');
       }
-      const path = `admin/v1/pages/${request.id}`;
+      const path = `/admin/v1/pages/${request.id}`;
       const body = null;
       const queryParams: string[] = [];
       if (request.slug) {
@@ -6543,7 +10735,7 @@ export function createPageServiceClient(
       }) as Promise<contentservicev1_Page>;
     },
     Create(request) {
-      const path = `admin/v1/pages`;
+      const path = `/admin/v1/pages`;
       const body = JSON.stringify(request);
       return transport.unary(path, 'POST', body, {
         service: 'PageService',
@@ -6554,8 +10746,10 @@ export function createPageServiceClient(
       if (request.id === undefined || request.id === null) {
         throw new Error('missing required field request.id');
       }
-      const path = `admin/v1/pages/${request.id}`;
-      const body = JSON.stringify(request);
+      const path = `/admin/v1/pages/${request.id}`;
+      const bodyMap = { ...request } as Record<string, unknown>;
+      delete bodyMap["id"];
+      const body = JSON.stringify(bodyMap);
       return transport.unary(path, 'PUT', body, {
         service: 'PageService',
         method: 'Update',
@@ -6565,12 +10759,90 @@ export function createPageServiceClient(
       if (request.id === undefined || request.id === null) {
         throw new Error('missing required field request.id');
       }
-      const path = `admin/v1/pages/${request.id}`;
+      const path = `/admin/v1/pages/${request.id}`;
       const body = null;
       return transport.unary(path, 'DELETE', body, {
         service: 'PageService',
         method: 'Delete',
       }) as Promise<wellKnownEmpty>;
+    },
+    ListVersions(request) {
+      if (request.pageId === undefined || request.pageId === null) {
+        throw new Error('missing required field request.page_id');
+      }
+      const path = `/admin/v1/pages/${request.pageId}/versions`;
+      const body = null;
+      return transport.unary(path, 'GET', body, {
+        service: 'PageService',
+        method: 'ListVersions',
+      }) as Promise<contentservicev1_ListPageVersionsResponse>;
+    },
+    GetVersion(request) {
+      if (request.id === undefined || request.id === null) {
+        throw new Error('missing required field request.id');
+      }
+      const path = `/admin/v1/pages/versions/${request.id}`;
+      const body = null;
+      return transport.unary(path, 'GET', body, {
+        service: 'PageService',
+        method: 'GetVersion',
+      }) as Promise<contentservicev1_PageVersion>;
+    },
+    RestoreVersion(request) {
+      if (request.pageId === undefined || request.pageId === null) {
+        throw new Error('missing required field request.page_id');
+      }
+      if (request.versionId === undefined || request.versionId === null) {
+        throw new Error('missing required field request.version_id');
+      }
+      const path = `/admin/v1/pages/${request.pageId}/versions/${request.versionId}/restore`;
+      const bodyMap = { ...request } as Record<string, unknown>;
+      delete bodyMap["pageId"];
+      delete bodyMap["versionId"];
+      const body = JSON.stringify(bodyMap);
+      return transport.unary(path, 'POST', body, {
+        service: 'PageService',
+        method: 'RestoreVersion',
+      }) as Promise<contentservicev1_Page>;
+    },
+    SubmitReview(request) {
+      if (request.pageId === undefined || request.pageId === null) {
+        throw new Error('missing required field request.page_id');
+      }
+      const path = `/admin/v1/pages/${request.pageId}/review/submit`;
+      const bodyMap = { ...request } as Record<string, unknown>;
+      delete bodyMap["pageId"];
+      const body = JSON.stringify(bodyMap);
+      return transport.unary(path, 'POST', body, {
+        service: 'PageService',
+        method: 'SubmitReview',
+      }) as Promise<contentservicev1_Page>;
+    },
+    ApproveReview(request) {
+      if (request.pageId === undefined || request.pageId === null) {
+        throw new Error('missing required field request.page_id');
+      }
+      const path = `/admin/v1/pages/${request.pageId}/review/approve`;
+      const bodyMap = { ...request } as Record<string, unknown>;
+      delete bodyMap["pageId"];
+      const body = JSON.stringify(bodyMap);
+      return transport.unary(path, 'POST', body, {
+        service: 'PageService',
+        method: 'ApproveReview',
+      }) as Promise<contentservicev1_Page>;
+    },
+    RejectReview(request) {
+      if (request.pageId === undefined || request.pageId === null) {
+        throw new Error('missing required field request.page_id');
+      }
+      const path = `/admin/v1/pages/${request.pageId}/review/reject`;
+      const bodyMap = { ...request } as Record<string, unknown>;
+      delete bodyMap["pageId"];
+      const body = JSON.stringify(bodyMap);
+      return transport.unary(path, 'POST', body, {
+        service: 'PageService',
+        method: 'RejectReview',
+      }) as Promise<contentservicev1_Page>;
     },
   };
 }
@@ -6596,6 +10868,7 @@ export type contentservicev1_Page = {
   disallowComment?: boolean;
   editorType?: contentservicev1_EditorType;
   id?: number;
+  inProgress?: boolean;
   isCustomTemplate?: boolean;
   parentId?: number;
   path?: string;
@@ -6732,6 +11005,55 @@ export type contentservicev1_DeletePageRequest = {
   id?: number;
 };
 
+// 请求 - 列出页面版本
+export type contentservicev1_ListPageVersionsRequest = {
+  pageId: number | undefined;
+};
+
+// 回应 - 页面版本列表（按版本号倒序）
+export type contentservicev1_ListPageVersionsResponse = {
+  items: contentservicev1_PageVersion[] | undefined;
+  total: number | undefined;
+};
+
+// 页面版本（内容快照）
+export type contentservicev1_PageVersion = {
+  comment?: string;
+  content?: string;
+  createdAt?: wellKnownTimestamp;
+  createdBy?: number;
+  id?: number;
+  pageId?: number;
+  versionNumber?: number;
+};
+
+// 请求 - 页面版本详情
+export type contentservicev1_GetPageVersionRequest = {
+  id: number | undefined;
+};
+
+// 请求 - 恢复页面版本
+export type contentservicev1_RestorePageVersionRequest = {
+  pageId: number | undefined;
+  versionId: number | undefined;
+};
+
+// 请求 - 提交页面审核
+export type contentservicev1_SubmitPageReviewRequest = {
+  pageId: number | undefined;
+};
+
+// 请求 - 页面审核通过/驳回的公共载体
+export type contentservicev1_ReviewPageRequest = {
+  pageId: number | undefined;
+};
+
+// 请求 - 页面审核驳回（带理由）
+export type contentservicev1_RejectPageReviewRequest = {
+  pageId: number | undefined;
+  reason: string | undefined;
+};
+
 // 权限点管理服务
 export interface PermissionService {
   // 查询权限点列表
@@ -6765,7 +11087,7 @@ export function createPermissionServiceClient(
 ): PermissionService {
   return {
     List(request) {
-      const path = `admin/v1/permissions`;
+      const path = `/admin/v1/permissions`;
       const body = null;
       const queryParams: string[] = [];
       if (request.page) {
@@ -6813,56 +11135,9 @@ export function createPermissionServiceClient(
           `filterExpr.type=${encodeURIComponent(request.filterExpr.type.toString())}`,
         );
       }
-      if (request.filterExpr?.conditions?.field) {
-        queryParams.push(
-          `filterExpr.conditions.field=${encodeURIComponent(request.filterExpr.conditions.field.toString())}`,
-        );
-      }
-      if (request.filterExpr?.conditions?.op) {
-        queryParams.push(
-          `filterExpr.conditions.op=${encodeURIComponent(request.filterExpr.conditions.op.toString())}`,
-        );
-      }
-      if (request.filterExpr?.conditions?.value) {
-        queryParams.push(
-          `filterExpr.conditions.value=${encodeURIComponent(request.filterExpr.conditions.value.toString())}`,
-        );
-      }
-      if (request.filterExpr?.conditions?.jsonValue) {
-        queryParams.push(
-          `filterExpr.conditions.jsonValue=${encodeURIComponent(request.filterExpr.conditions.jsonValue.toString())}`,
-        );
-      }
-      if (request.filterExpr?.conditions?.values) {
-        request.filterExpr.conditions.values.forEach((x) => {
-          queryParams.push(
-            `filterExpr.conditions.values=${encodeURIComponent(x.toString())}`,
-          );
-        });
-      }
-      if (request.filterExpr?.conditions?.datePart) {
-        queryParams.push(
-          `filterExpr.conditions.datePart=${encodeURIComponent(request.filterExpr.conditions.datePart.toString())}`,
-        );
-      }
-      if (request.filterExpr?.conditions?.jsonPath) {
-        queryParams.push(
-          `filterExpr.conditions.jsonPath=${encodeURIComponent(request.filterExpr.conditions.jsonPath.toString())}`,
-        );
-      }
       if (request.orderBy) {
         queryParams.push(
           `orderBy=${encodeURIComponent(request.orderBy.toString())}`,
-        );
-      }
-      if (request.sorting?.field) {
-        queryParams.push(
-          `sorting.field=${encodeURIComponent(request.sorting.field.toString())}`,
-        );
-      }
-      if (request.sorting?.direction) {
-        queryParams.push(
-          `sorting.direction=${encodeURIComponent(request.sorting.direction.toString())}`,
         );
       }
       if (request.fieldMask) {
@@ -6883,7 +11158,7 @@ export function createPermissionServiceClient(
       if (request.id === undefined || request.id === null) {
         throw new Error('missing required field request.id');
       }
-      const path = `admin/v1/permissions/${request.id}`;
+      const path = `/admin/v1/permissions/${request.id}`;
       const body = null;
       const queryParams: string[] = [];
       if (request.code) {
@@ -6906,7 +11181,7 @@ export function createPermissionServiceClient(
       }) as Promise<permissionservicev1_Permission>;
     },
     Create(request) {
-      const path = `admin/v1/permissions`;
+      const path = `/admin/v1/permissions`;
       const body = JSON.stringify(request);
       return transport.unary(path, 'POST', body, {
         service: 'PermissionService',
@@ -6917,8 +11192,10 @@ export function createPermissionServiceClient(
       if (request.id === undefined || request.id === null) {
         throw new Error('missing required field request.id');
       }
-      const path = `admin/v1/permissions/${request.id}`;
-      const body = JSON.stringify(request);
+      const path = `/admin/v1/permissions/${request.id}`;
+      const bodyMap = { ...request } as Record<string, unknown>;
+      delete bodyMap["id"];
+      const body = JSON.stringify(bodyMap);
       return transport.unary(path, 'PUT', body, {
         service: 'PermissionService',
         method: 'Update',
@@ -6928,7 +11205,7 @@ export function createPermissionServiceClient(
       if (request.id === undefined || request.id === null) {
         throw new Error('missing required field request.id');
       }
-      const path = `admin/v1/permissions/${request.id}`;
+      const path = `/admin/v1/permissions/${request.id}`;
       const body = null;
       const queryParams: string[] = [];
       if (request.code) {
@@ -6951,7 +11228,7 @@ export function createPermissionServiceClient(
       }) as Promise<wellKnownEmpty>;
     },
     SyncPermissions(request) {
-      const path = `admin/v1/permissions/sync:perms`;
+      const path = `/admin/v1/permissions/sync:perms`;
       const body = JSON.stringify(request);
       return transport.unary(path, 'POST', body, {
         service: 'PermissionService',
@@ -7033,7 +11310,7 @@ export function createPermissionAuditLogServiceClient(
 ): PermissionAuditLogService {
   return {
     List(request) {
-      const path = `admin/v1/permission-audit-logs`;
+      const path = `/admin/v1/permission-audit-logs`;
       const body = null;
       const queryParams: string[] = [];
       if (request.page) {
@@ -7081,56 +11358,9 @@ export function createPermissionAuditLogServiceClient(
           `filterExpr.type=${encodeURIComponent(request.filterExpr.type.toString())}`,
         );
       }
-      if (request.filterExpr?.conditions?.field) {
-        queryParams.push(
-          `filterExpr.conditions.field=${encodeURIComponent(request.filterExpr.conditions.field.toString())}`,
-        );
-      }
-      if (request.filterExpr?.conditions?.op) {
-        queryParams.push(
-          `filterExpr.conditions.op=${encodeURIComponent(request.filterExpr.conditions.op.toString())}`,
-        );
-      }
-      if (request.filterExpr?.conditions?.value) {
-        queryParams.push(
-          `filterExpr.conditions.value=${encodeURIComponent(request.filterExpr.conditions.value.toString())}`,
-        );
-      }
-      if (request.filterExpr?.conditions?.jsonValue) {
-        queryParams.push(
-          `filterExpr.conditions.jsonValue=${encodeURIComponent(request.filterExpr.conditions.jsonValue.toString())}`,
-        );
-      }
-      if (request.filterExpr?.conditions?.values) {
-        request.filterExpr.conditions.values.forEach((x) => {
-          queryParams.push(
-            `filterExpr.conditions.values=${encodeURIComponent(x.toString())}`,
-          );
-        });
-      }
-      if (request.filterExpr?.conditions?.datePart) {
-        queryParams.push(
-          `filterExpr.conditions.datePart=${encodeURIComponent(request.filterExpr.conditions.datePart.toString())}`,
-        );
-      }
-      if (request.filterExpr?.conditions?.jsonPath) {
-        queryParams.push(
-          `filterExpr.conditions.jsonPath=${encodeURIComponent(request.filterExpr.conditions.jsonPath.toString())}`,
-        );
-      }
       if (request.orderBy) {
         queryParams.push(
           `orderBy=${encodeURIComponent(request.orderBy.toString())}`,
-        );
-      }
-      if (request.sorting?.field) {
-        queryParams.push(
-          `sorting.field=${encodeURIComponent(request.sorting.field.toString())}`,
-        );
-      }
-      if (request.sorting?.direction) {
-        queryParams.push(
-          `sorting.direction=${encodeURIComponent(request.sorting.direction.toString())}`,
         );
       }
       if (request.fieldMask) {
@@ -7151,7 +11381,7 @@ export function createPermissionAuditLogServiceClient(
       if (request.id === undefined || request.id === null) {
         throw new Error('missing required field request.id');
       }
-      const path = `admin/v1/permission-audit-logs/${request.id}`;
+      const path = `/admin/v1/permission-audit-logs/${request.id}`;
       const body = null;
       const queryParams: string[] = [];
       if (request.viewMask) {
@@ -7249,7 +11479,7 @@ export function createPermissionGroupServiceClient(
 ): PermissionGroupService {
   return {
     List(request) {
-      const path = `admin/v1/permission-groups`;
+      const path = `/admin/v1/permission-groups`;
       const body = null;
       const queryParams: string[] = [];
       if (request.page) {
@@ -7297,56 +11527,9 @@ export function createPermissionGroupServiceClient(
           `filterExpr.type=${encodeURIComponent(request.filterExpr.type.toString())}`,
         );
       }
-      if (request.filterExpr?.conditions?.field) {
-        queryParams.push(
-          `filterExpr.conditions.field=${encodeURIComponent(request.filterExpr.conditions.field.toString())}`,
-        );
-      }
-      if (request.filterExpr?.conditions?.op) {
-        queryParams.push(
-          `filterExpr.conditions.op=${encodeURIComponent(request.filterExpr.conditions.op.toString())}`,
-        );
-      }
-      if (request.filterExpr?.conditions?.value) {
-        queryParams.push(
-          `filterExpr.conditions.value=${encodeURIComponent(request.filterExpr.conditions.value.toString())}`,
-        );
-      }
-      if (request.filterExpr?.conditions?.jsonValue) {
-        queryParams.push(
-          `filterExpr.conditions.jsonValue=${encodeURIComponent(request.filterExpr.conditions.jsonValue.toString())}`,
-        );
-      }
-      if (request.filterExpr?.conditions?.values) {
-        request.filterExpr.conditions.values.forEach((x) => {
-          queryParams.push(
-            `filterExpr.conditions.values=${encodeURIComponent(x.toString())}`,
-          );
-        });
-      }
-      if (request.filterExpr?.conditions?.datePart) {
-        queryParams.push(
-          `filterExpr.conditions.datePart=${encodeURIComponent(request.filterExpr.conditions.datePart.toString())}`,
-        );
-      }
-      if (request.filterExpr?.conditions?.jsonPath) {
-        queryParams.push(
-          `filterExpr.conditions.jsonPath=${encodeURIComponent(request.filterExpr.conditions.jsonPath.toString())}`,
-        );
-      }
       if (request.orderBy) {
         queryParams.push(
           `orderBy=${encodeURIComponent(request.orderBy.toString())}`,
-        );
-      }
-      if (request.sorting?.field) {
-        queryParams.push(
-          `sorting.field=${encodeURIComponent(request.sorting.field.toString())}`,
-        );
-      }
-      if (request.sorting?.direction) {
-        queryParams.push(
-          `sorting.direction=${encodeURIComponent(request.sorting.direction.toString())}`,
         );
       }
       if (request.fieldMask) {
@@ -7367,7 +11550,7 @@ export function createPermissionGroupServiceClient(
       if (request.id === undefined || request.id === null) {
         throw new Error('missing required field request.id');
       }
-      const path = `admin/v1/permission-groups/${request.id}`;
+      const path = `/admin/v1/permission-groups/${request.id}`;
       const body = null;
       const queryParams: string[] = [];
       if (request.viewMask) {
@@ -7385,7 +11568,7 @@ export function createPermissionGroupServiceClient(
       }) as Promise<permissionservicev1_PermissionGroup>;
     },
     Create(request) {
-      const path = `admin/v1/permission-groups`;
+      const path = `/admin/v1/permission-groups`;
       const body = JSON.stringify(request);
       return transport.unary(path, 'POST', body, {
         service: 'PermissionGroupService',
@@ -7396,8 +11579,10 @@ export function createPermissionGroupServiceClient(
       if (request.id === undefined || request.id === null) {
         throw new Error('missing required field request.id');
       }
-      const path = `admin/v1/permission-groups/${request.id}`;
-      const body = JSON.stringify(request);
+      const path = `/admin/v1/permission-groups/${request.id}`;
+      const bodyMap = { ...request } as Record<string, unknown>;
+      delete bodyMap["id"];
+      const body = JSON.stringify(bodyMap);
       return transport.unary(path, 'PUT', body, {
         service: 'PermissionGroupService',
         method: 'Update',
@@ -7407,7 +11592,7 @@ export function createPermissionGroupServiceClient(
       if (request.id === undefined || request.id === null) {
         throw new Error('missing required field request.id');
       }
-      const path = `admin/v1/permission-groups/${request.id}`;
+      const path = `/admin/v1/permission-groups/${request.id}`;
       const body = null;
       return transport.unary(path, 'DELETE', body, {
         service: 'PermissionGroupService',
@@ -7486,7 +11671,7 @@ export function createPolicyEvaluationLogServiceClient(
 ): PolicyEvaluationLogService {
   return {
     List(request) {
-      const path = `admin/v1/policy-evaluation-logs`;
+      const path = `/admin/v1/policy-evaluation-logs`;
       const body = null;
       const queryParams: string[] = [];
       if (request.page) {
@@ -7534,56 +11719,9 @@ export function createPolicyEvaluationLogServiceClient(
           `filterExpr.type=${encodeURIComponent(request.filterExpr.type.toString())}`,
         );
       }
-      if (request.filterExpr?.conditions?.field) {
-        queryParams.push(
-          `filterExpr.conditions.field=${encodeURIComponent(request.filterExpr.conditions.field.toString())}`,
-        );
-      }
-      if (request.filterExpr?.conditions?.op) {
-        queryParams.push(
-          `filterExpr.conditions.op=${encodeURIComponent(request.filterExpr.conditions.op.toString())}`,
-        );
-      }
-      if (request.filterExpr?.conditions?.value) {
-        queryParams.push(
-          `filterExpr.conditions.value=${encodeURIComponent(request.filterExpr.conditions.value.toString())}`,
-        );
-      }
-      if (request.filterExpr?.conditions?.jsonValue) {
-        queryParams.push(
-          `filterExpr.conditions.jsonValue=${encodeURIComponent(request.filterExpr.conditions.jsonValue.toString())}`,
-        );
-      }
-      if (request.filterExpr?.conditions?.values) {
-        request.filterExpr.conditions.values.forEach((x) => {
-          queryParams.push(
-            `filterExpr.conditions.values=${encodeURIComponent(x.toString())}`,
-          );
-        });
-      }
-      if (request.filterExpr?.conditions?.datePart) {
-        queryParams.push(
-          `filterExpr.conditions.datePart=${encodeURIComponent(request.filterExpr.conditions.datePart.toString())}`,
-        );
-      }
-      if (request.filterExpr?.conditions?.jsonPath) {
-        queryParams.push(
-          `filterExpr.conditions.jsonPath=${encodeURIComponent(request.filterExpr.conditions.jsonPath.toString())}`,
-        );
-      }
       if (request.orderBy) {
         queryParams.push(
           `orderBy=${encodeURIComponent(request.orderBy.toString())}`,
-        );
-      }
-      if (request.sorting?.field) {
-        queryParams.push(
-          `sorting.field=${encodeURIComponent(request.sorting.field.toString())}`,
-        );
-      }
-      if (request.sorting?.direction) {
-        queryParams.push(
-          `sorting.direction=${encodeURIComponent(request.sorting.direction.toString())}`,
         );
       }
       if (request.fieldMask) {
@@ -7604,7 +11742,7 @@ export function createPolicyEvaluationLogServiceClient(
       if (request.id === undefined || request.id === null) {
         throw new Error('missing required field request.id');
       }
-      const path = `admin/v1/policy-evaluation-logs/${request.id}`;
+      const path = `/admin/v1/policy-evaluation-logs/${request.id}`;
       const body = null;
       const queryParams: string[] = [];
       if (request.viewMask) {
@@ -7685,7 +11823,7 @@ export function createPositionServiceClient(
 ): PositionService {
   return {
     List(request) {
-      const path = `admin/v1/positions`;
+      const path = `/admin/v1/positions`;
       const body = null;
       const queryParams: string[] = [];
       if (request.page) {
@@ -7733,56 +11871,9 @@ export function createPositionServiceClient(
           `filterExpr.type=${encodeURIComponent(request.filterExpr.type.toString())}`,
         );
       }
-      if (request.filterExpr?.conditions?.field) {
-        queryParams.push(
-          `filterExpr.conditions.field=${encodeURIComponent(request.filterExpr.conditions.field.toString())}`,
-        );
-      }
-      if (request.filterExpr?.conditions?.op) {
-        queryParams.push(
-          `filterExpr.conditions.op=${encodeURIComponent(request.filterExpr.conditions.op.toString())}`,
-        );
-      }
-      if (request.filterExpr?.conditions?.value) {
-        queryParams.push(
-          `filterExpr.conditions.value=${encodeURIComponent(request.filterExpr.conditions.value.toString())}`,
-        );
-      }
-      if (request.filterExpr?.conditions?.jsonValue) {
-        queryParams.push(
-          `filterExpr.conditions.jsonValue=${encodeURIComponent(request.filterExpr.conditions.jsonValue.toString())}`,
-        );
-      }
-      if (request.filterExpr?.conditions?.values) {
-        request.filterExpr.conditions.values.forEach((x) => {
-          queryParams.push(
-            `filterExpr.conditions.values=${encodeURIComponent(x.toString())}`,
-          );
-        });
-      }
-      if (request.filterExpr?.conditions?.datePart) {
-        queryParams.push(
-          `filterExpr.conditions.datePart=${encodeURIComponent(request.filterExpr.conditions.datePart.toString())}`,
-        );
-      }
-      if (request.filterExpr?.conditions?.jsonPath) {
-        queryParams.push(
-          `filterExpr.conditions.jsonPath=${encodeURIComponent(request.filterExpr.conditions.jsonPath.toString())}`,
-        );
-      }
       if (request.orderBy) {
         queryParams.push(
           `orderBy=${encodeURIComponent(request.orderBy.toString())}`,
-        );
-      }
-      if (request.sorting?.field) {
-        queryParams.push(
-          `sorting.field=${encodeURIComponent(request.sorting.field.toString())}`,
-        );
-      }
-      if (request.sorting?.direction) {
-        queryParams.push(
-          `sorting.direction=${encodeURIComponent(request.sorting.direction.toString())}`,
         );
       }
       if (request.fieldMask) {
@@ -7803,7 +11894,7 @@ export function createPositionServiceClient(
       if (request.id === undefined || request.id === null) {
         throw new Error('missing required field request.id');
       }
-      const path = `admin/v1/positions/${request.id}`;
+      const path = `/admin/v1/positions/${request.id}`;
       const body = null;
       const queryParams: string[] = [];
       if (request.name) {
@@ -7831,7 +11922,7 @@ export function createPositionServiceClient(
       }) as Promise<identityservicev1_Position>;
     },
     Create(request) {
-      const path = `admin/v1/positions`;
+      const path = `/admin/v1/positions`;
       const body = JSON.stringify(request);
       return transport.unary(path, 'POST', body, {
         service: 'PositionService',
@@ -7842,8 +11933,10 @@ export function createPositionServiceClient(
       if (request.id === undefined || request.id === null) {
         throw new Error('missing required field request.id');
       }
-      const path = `admin/v1/positions/${request.id}`;
-      const body = JSON.stringify(request);
+      const path = `/admin/v1/positions/${request.id}`;
+      const bodyMap = { ...request } as Record<string, unknown>;
+      delete bodyMap["id"];
+      const body = JSON.stringify(bodyMap);
       return transport.unary(path, 'PUT', body, {
         service: 'PositionService',
         method: 'Update',
@@ -7853,7 +11946,7 @@ export function createPositionServiceClient(
       if (request.id === undefined || request.id === null) {
         throw new Error('missing required field request.id');
       }
-      const path = `admin/v1/positions/${request.id}`;
+      const path = `/admin/v1/positions/${request.id}`;
       const body = null;
       return transport.unary(path, 'DELETE', body, {
         service: 'PositionService',
@@ -7963,6 +12056,30 @@ export interface PostService {
   TranslationExists(
     request: contentservicev1_PostTranslationExistsRequest,
   ): Promise<contentservicev1_PostTranslationExistsResponse>;
+  // 列出帖子版本（按版本号倒序）
+  ListVersions(
+    request: contentservicev1_ListPostVersionsRequest,
+  ): Promise<contentservicev1_ListPostVersionsResponse>;
+  // 获取帖子版本详情
+  GetVersion(
+    request: contentservicev1_GetPostVersionRequest,
+  ): Promise<contentservicev1_PostVersion>;
+  // 恢复帖子到指定版本（恢复动作本身会生成一个新版本）
+  RestoreVersion(
+    request: contentservicev1_RestorePostVersionRequest,
+  ): Promise<contentservicev1_Post>;
+  // 提交审核：DRAFT → 审核中
+  SubmitReview(
+    request: contentservicev1_SubmitPostReviewRequest,
+  ): Promise<contentservicev1_Post>;
+  // 审核通过：审核中 → 已发布（角色经接口管理绑定到该端点即完成卡点）
+  ApproveReview(
+    request: contentservicev1_ReviewPostRequest,
+  ): Promise<contentservicev1_Post>;
+  // 审核驳回：审核中 → 草稿（带理由通知作者）
+  RejectReview(
+    request: contentservicev1_RejectPostReviewRequest,
+  ): Promise<contentservicev1_Post>;
 }
 
 export function createPostServiceClient(
@@ -7970,7 +12087,7 @@ export function createPostServiceClient(
 ): PostService {
   return {
     List(request) {
-      const path = `admin/v1/posts`;
+      const path = `/admin/v1/posts`;
       const body = null;
       const queryParams: string[] = [];
       if (request.page) {
@@ -8018,56 +12135,9 @@ export function createPostServiceClient(
           `filterExpr.type=${encodeURIComponent(request.filterExpr.type.toString())}`,
         );
       }
-      if (request.filterExpr?.conditions?.field) {
-        queryParams.push(
-          `filterExpr.conditions.field=${encodeURIComponent(request.filterExpr.conditions.field.toString())}`,
-        );
-      }
-      if (request.filterExpr?.conditions?.op) {
-        queryParams.push(
-          `filterExpr.conditions.op=${encodeURIComponent(request.filterExpr.conditions.op.toString())}`,
-        );
-      }
-      if (request.filterExpr?.conditions?.value) {
-        queryParams.push(
-          `filterExpr.conditions.value=${encodeURIComponent(request.filterExpr.conditions.value.toString())}`,
-        );
-      }
-      if (request.filterExpr?.conditions?.jsonValue) {
-        queryParams.push(
-          `filterExpr.conditions.jsonValue=${encodeURIComponent(request.filterExpr.conditions.jsonValue.toString())}`,
-        );
-      }
-      if (request.filterExpr?.conditions?.values) {
-        request.filterExpr.conditions.values.forEach((x) => {
-          queryParams.push(
-            `filterExpr.conditions.values=${encodeURIComponent(x.toString())}`,
-          );
-        });
-      }
-      if (request.filterExpr?.conditions?.datePart) {
-        queryParams.push(
-          `filterExpr.conditions.datePart=${encodeURIComponent(request.filterExpr.conditions.datePart.toString())}`,
-        );
-      }
-      if (request.filterExpr?.conditions?.jsonPath) {
-        queryParams.push(
-          `filterExpr.conditions.jsonPath=${encodeURIComponent(request.filterExpr.conditions.jsonPath.toString())}`,
-        );
-      }
       if (request.orderBy) {
         queryParams.push(
           `orderBy=${encodeURIComponent(request.orderBy.toString())}`,
-        );
-      }
-      if (request.sorting?.field) {
-        queryParams.push(
-          `sorting.field=${encodeURIComponent(request.sorting.field.toString())}`,
-        );
-      }
-      if (request.sorting?.direction) {
-        queryParams.push(
-          `sorting.direction=${encodeURIComponent(request.sorting.direction.toString())}`,
         );
       }
       if (request.fieldMask) {
@@ -8088,7 +12158,7 @@ export function createPostServiceClient(
       if (request.id === undefined || request.id === null) {
         throw new Error('missing required field request.id');
       }
-      const path = `admin/v1/posts/${request.id}`;
+      const path = `/admin/v1/posts/${request.id}`;
       const body = null;
       const queryParams: string[] = [];
       if (request.code) {
@@ -8116,7 +12186,7 @@ export function createPostServiceClient(
       }) as Promise<contentservicev1_Post>;
     },
     Create(request) {
-      const path = `admin/v1/posts`;
+      const path = `/admin/v1/posts`;
       const body = JSON.stringify(request);
       return transport.unary(path, 'POST', body, {
         service: 'PostService',
@@ -8127,8 +12197,10 @@ export function createPostServiceClient(
       if (request.id === undefined || request.id === null) {
         throw new Error('missing required field request.id');
       }
-      const path = `admin/v1/posts/${request.id}`;
-      const body = JSON.stringify(request);
+      const path = `/admin/v1/posts/${request.id}`;
+      const bodyMap = { ...request } as Record<string, unknown>;
+      delete bodyMap["id"];
+      const body = JSON.stringify(bodyMap);
       return transport.unary(path, 'PUT', body, {
         service: 'PostService',
         method: 'Update',
@@ -8138,7 +12210,7 @@ export function createPostServiceClient(
       if (request.id === undefined || request.id === null) {
         throw new Error('missing required field request.id');
       }
-      const path = `admin/v1/posts/${request.id}`;
+      const path = `/admin/v1/posts/${request.id}`;
       const body = null;
       return transport.unary(path, 'DELETE', body, {
         service: 'PostService',
@@ -8152,12 +12224,90 @@ export function createPostServiceClient(
       if (request.languageCode === undefined || request.languageCode === null) {
         throw new Error('missing required field request.language_code');
       }
-      const path = `admin/v1/posts/${request.postId}/translations/${request.languageCode}`;
+      const path = `/admin/v1/posts/${request.postId}/translations/${request.languageCode}`;
       const body = null;
       return transport.unary(path, 'GET', body, {
         service: 'PostService',
         method: 'TranslationExists',
       }) as Promise<contentservicev1_PostTranslationExistsResponse>;
+    },
+    ListVersions(request) {
+      if (request.postId === undefined || request.postId === null) {
+        throw new Error('missing required field request.post_id');
+      }
+      const path = `/admin/v1/posts/${request.postId}/versions`;
+      const body = null;
+      return transport.unary(path, 'GET', body, {
+        service: 'PostService',
+        method: 'ListVersions',
+      }) as Promise<contentservicev1_ListPostVersionsResponse>;
+    },
+    GetVersion(request) {
+      if (request.id === undefined || request.id === null) {
+        throw new Error('missing required field request.id');
+      }
+      const path = `/admin/v1/posts/versions/${request.id}`;
+      const body = null;
+      return transport.unary(path, 'GET', body, {
+        service: 'PostService',
+        method: 'GetVersion',
+      }) as Promise<contentservicev1_PostVersion>;
+    },
+    RestoreVersion(request) {
+      if (request.postId === undefined || request.postId === null) {
+        throw new Error('missing required field request.post_id');
+      }
+      if (request.versionId === undefined || request.versionId === null) {
+        throw new Error('missing required field request.version_id');
+      }
+      const path = `/admin/v1/posts/${request.postId}/versions/${request.versionId}/restore`;
+      const bodyMap = { ...request } as Record<string, unknown>;
+      delete bodyMap["postId"];
+      delete bodyMap["versionId"];
+      const body = JSON.stringify(bodyMap);
+      return transport.unary(path, 'POST', body, {
+        service: 'PostService',
+        method: 'RestoreVersion',
+      }) as Promise<contentservicev1_Post>;
+    },
+    SubmitReview(request) {
+      if (request.postId === undefined || request.postId === null) {
+        throw new Error('missing required field request.post_id');
+      }
+      const path = `/admin/v1/posts/${request.postId}/review/submit`;
+      const bodyMap = { ...request } as Record<string, unknown>;
+      delete bodyMap["postId"];
+      const body = JSON.stringify(bodyMap);
+      return transport.unary(path, 'POST', body, {
+        service: 'PostService',
+        method: 'SubmitReview',
+      }) as Promise<contentservicev1_Post>;
+    },
+    ApproveReview(request) {
+      if (request.postId === undefined || request.postId === null) {
+        throw new Error('missing required field request.post_id');
+      }
+      const path = `/admin/v1/posts/${request.postId}/review/approve`;
+      const bodyMap = { ...request } as Record<string, unknown>;
+      delete bodyMap["postId"];
+      const body = JSON.stringify(bodyMap);
+      return transport.unary(path, 'POST', body, {
+        service: 'PostService',
+        method: 'ApproveReview',
+      }) as Promise<contentservicev1_Post>;
+    },
+    RejectReview(request) {
+      if (request.postId === undefined || request.postId === null) {
+        throw new Error('missing required field request.post_id');
+      }
+      const path = `/admin/v1/posts/${request.postId}/review/reject`;
+      const bodyMap = { ...request } as Record<string, unknown>;
+      delete bodyMap["postId"];
+      const body = JSON.stringify(bodyMap);
+      return transport.unary(path, 'POST', body, {
+        service: 'PostService',
+        method: 'RejectReview',
+      }) as Promise<contentservicev1_Post>;
     },
   };
 }
@@ -8259,36 +12409,146 @@ export type contentservicev1_PostTranslationExistsResponse = {
   exists: boolean | undefined;
 };
 
-// 角色管理服务
-export interface RoleService {
-  // 查询角色列表
+// 请求 - 列出帖子版本
+export type contentservicev1_ListPostVersionsRequest = {
+  postId: number | undefined;
+};
+
+// 回应 - 帖子版本列表（按版本号倒序）
+export type contentservicev1_ListPostVersionsResponse = {
+  items: contentservicev1_PostVersion[] | undefined;
+  total: number | undefined;
+};
+
+// 帖子版本（内容快照）
+export type contentservicev1_PostVersion = {
+  comment?: string;
+  content?: string;
+  createdAt?: wellKnownTimestamp;
+  createdBy?: number;
+  id?: number;
+  postId?: number;
+  versionNumber?: number;
+};
+
+// 请求 - 帖子版本详情
+export type contentservicev1_GetPostVersionRequest = {
+  id: number | undefined;
+};
+
+// 请求 - 恢复帖子版本
+export type contentservicev1_RestorePostVersionRequest = {
+  postId: number | undefined;
+  versionId: number | undefined;
+};
+
+// 请求 - 提交审核
+export type contentservicev1_SubmitPostReviewRequest = {
+  postId: number | undefined;
+};
+
+// 请求 - 审核通过/驳回的公共载体
+export type contentservicev1_ReviewPostRequest = {
+  postId: number | undefined;
+};
+
+// 请求 - 审核驳回（带理由）
+export type contentservicev1_RejectPostReviewRequest = {
+  postId: number | undefined;
+  reason: string | undefined;
+};
+
+// 请求 - 签发帖子预览令牌
+export type CreatePostPreviewTokenRequest = {
+  id: number | undefined;
+};
+
+// 请求 - 签发页面预览令牌
+export type CreatePagePreviewTokenRequest = {
+  id: number | undefined;
+};
+
+// 预览令牌
+export type PreviewToken = {
+  expiresAt?: wellKnownTimestamp;
+  token?: string;
+};
+
+// 草稿预览服务：为后台编辑中的内容签发短时效预览令牌。
+// C 端公开 BFF 校验该令牌后放行非已发布内容（无状态 HMAC，无服务端存储）。
+export interface PreviewService {
+  // 签发帖子预览令牌
+  CreatePostPreviewToken(
+    request: CreatePostPreviewTokenRequest,
+  ): Promise<PreviewToken>;
+  // 签发页面预览令牌
+  CreatePagePreviewToken(
+    request: CreatePagePreviewTokenRequest,
+  ): Promise<PreviewToken>;
+}
+
+export function createPreviewServiceClient(
+  transport: ClientTransport,
+): PreviewService {
+  return {
+    CreatePostPreviewToken(request) {
+      if (request.id === undefined || request.id === null) {
+        throw new Error('missing required field request.id');
+      }
+      const path = `/admin/v1/preview/posts/${request.id}`;
+      const bodyMap = { ...request } as Record<string, unknown>;
+      delete bodyMap["id"];
+      const body = JSON.stringify(bodyMap);
+      return transport.unary(path, 'POST', body, {
+        service: 'PreviewService',
+        method: 'CreatePostPreviewToken',
+      }) as Promise<PreviewToken>;
+    },
+    CreatePagePreviewToken(request) {
+      if (request.id === undefined || request.id === null) {
+        throw new Error('missing required field request.id');
+      }
+      const path = `/admin/v1/preview/pages/${request.id}`;
+      const bodyMap = { ...request } as Record<string, unknown>;
+      delete bodyMap["id"];
+      const body = JSON.stringify(bodyMap);
+      return transport.unary(path, 'POST', body, {
+        service: 'PreviewService',
+        method: 'CreatePagePreviewToken',
+      }) as Promise<PreviewToken>;
+    },
+  };
+}
+// URL 重定向管理服务
+export interface RedirectService {
+  // 获取重定向列表
   List(
     request: pagination_PagingRequest,
-  ): Promise<permissionservicev1_ListRoleResponse>;
-  // 查询角色详情
+  ): Promise<contentservicev1_ListRedirectsResponse>;
+  // 获取重定向数据
   Get(
-    request: permissionservicev1_GetRoleRequest,
-  ): Promise<permissionservicev1_Role>;
-  // 创建角色
+    request: contentservicev1_GetRedirectRequest,
+  ): Promise<contentservicev1_Redirect>;
+  // 创建重定向
   Create(
-    request: permissionservicev1_CreateRoleRequest,
-  ): Promise<wellKnownEmpty>;
-  // 更新角色
+    request: contentservicev1_CreateRedirectRequest,
+  ): Promise<contentservicev1_Redirect>;
+  // 更新重定向
   Update(
-    request: permissionservicev1_UpdateRoleRequest,
-  ): Promise<wellKnownEmpty>;
-  // 删除角色
+    request: contentservicev1_UpdateRedirectRequest,
+  ): Promise<contentservicev1_Redirect>;
+  // 删除重定向
   Delete(
-    request: permissionservicev1_DeleteRoleRequest,
+    request: contentservicev1_DeleteRedirectRequest,
   ): Promise<wellKnownEmpty>;
 }
 
-export function createRoleServiceClient(
+export function createRedirectServiceClient(
   transport: ClientTransport,
-): RoleService {
+): RedirectService {
   return {
     List(request) {
-      const path = `admin/v1/roles`;
+      const path = `/admin/v1/redirects`;
       const body = null;
       const queryParams: string[] = [];
       if (request.page) {
@@ -8336,56 +12596,261 @@ export function createRoleServiceClient(
           `filterExpr.type=${encodeURIComponent(request.filterExpr.type.toString())}`,
         );
       }
-      if (request.filterExpr?.conditions?.field) {
-        queryParams.push(
-          `filterExpr.conditions.field=${encodeURIComponent(request.filterExpr.conditions.field.toString())}`,
-        );
-      }
-      if (request.filterExpr?.conditions?.op) {
-        queryParams.push(
-          `filterExpr.conditions.op=${encodeURIComponent(request.filterExpr.conditions.op.toString())}`,
-        );
-      }
-      if (request.filterExpr?.conditions?.value) {
-        queryParams.push(
-          `filterExpr.conditions.value=${encodeURIComponent(request.filterExpr.conditions.value.toString())}`,
-        );
-      }
-      if (request.filterExpr?.conditions?.jsonValue) {
-        queryParams.push(
-          `filterExpr.conditions.jsonValue=${encodeURIComponent(request.filterExpr.conditions.jsonValue.toString())}`,
-        );
-      }
-      if (request.filterExpr?.conditions?.values) {
-        request.filterExpr.conditions.values.forEach((x) => {
-          queryParams.push(
-            `filterExpr.conditions.values=${encodeURIComponent(x.toString())}`,
-          );
-        });
-      }
-      if (request.filterExpr?.conditions?.datePart) {
-        queryParams.push(
-          `filterExpr.conditions.datePart=${encodeURIComponent(request.filterExpr.conditions.datePart.toString())}`,
-        );
-      }
-      if (request.filterExpr?.conditions?.jsonPath) {
-        queryParams.push(
-          `filterExpr.conditions.jsonPath=${encodeURIComponent(request.filterExpr.conditions.jsonPath.toString())}`,
-        );
-      }
       if (request.orderBy) {
         queryParams.push(
           `orderBy=${encodeURIComponent(request.orderBy.toString())}`,
         );
       }
-      if (request.sorting?.field) {
+      if (request.fieldMask) {
         queryParams.push(
-          `sorting.field=${encodeURIComponent(request.sorting.field.toString())}`,
+          `fieldMask=${encodeURIComponent(request.fieldMask.toString())}`,
         );
       }
-      if (request.sorting?.direction) {
+      let uri = path;
+      if (queryParams.length > 0) {
+        uri += `?${queryParams.join('&')}`;
+      }
+      return transport.unary(uri, 'GET', body, {
+        service: 'RedirectService',
+        method: 'List',
+      }) as Promise<contentservicev1_ListRedirectsResponse>;
+    },
+    Get(request) {
+      if (request.id === undefined || request.id === null) {
+        throw new Error('missing required field request.id');
+      }
+      const path = `/admin/v1/redirects/${request.id}`;
+      const body = null;
+      return transport.unary(path, 'GET', body, {
+        service: 'RedirectService',
+        method: 'Get',
+      }) as Promise<contentservicev1_Redirect>;
+    },
+    Create(request) {
+      const path = `/admin/v1/redirects`;
+      const body = JSON.stringify(request);
+      return transport.unary(path, 'POST', body, {
+        service: 'RedirectService',
+        method: 'Create',
+      }) as Promise<contentservicev1_Redirect>;
+    },
+    Update(request) {
+      if (request.id === undefined || request.id === null) {
+        throw new Error('missing required field request.id');
+      }
+      const path = `/admin/v1/redirects/${request.id}`;
+      const bodyMap = { ...request } as Record<string, unknown>;
+      delete bodyMap["id"];
+      const body = JSON.stringify(bodyMap);
+      return transport.unary(path, 'PUT', body, {
+        service: 'RedirectService',
+        method: 'Update',
+      }) as Promise<contentservicev1_Redirect>;
+    },
+    Delete(request) {
+      if (request.id === undefined || request.id === null) {
+        throw new Error('missing required field request.id');
+      }
+      const path = `/admin/v1/redirects/${request.id}`;
+      const body = null;
+      return transport.unary(path, 'DELETE', body, {
+        service: 'RedirectService',
+        method: 'Delete',
+      }) as Promise<wellKnownEmpty>;
+    },
+  };
+}
+// 回应 - 重定向列表
+export type contentservicev1_ListRedirectsResponse = {
+  items: contentservicev1_Redirect[] | undefined;
+  total: number | undefined;
+};
+
+// URL 重定向
+export type contentservicev1_Redirect = {
+  createdAt?: wellKnownTimestamp;
+  createdBy?: number;
+  description?: string;
+  enabled?: boolean;
+  fromPath?: string;
+  id?: number;
+  statusCode?: number;
+  toUrl?: string;
+  updatedAt?: wellKnownTimestamp;
+  updatedBy?: number;
+};
+
+// 请求 - 重定向数据
+export type contentservicev1_GetRedirectRequest = {
+  id: number | undefined;
+};
+
+// 请求 - 创建重定向
+export type contentservicev1_CreateRedirectRequest = {
+  data: contentservicev1_Redirect | undefined;
+};
+
+// 请求 - 更新重定向
+export type contentservicev1_UpdateRedirectRequest = {
+  allowMissing?: boolean;
+  data: contentservicev1_Redirect | undefined;
+  id: number | undefined;
+  updateMask: undefined | wellKnownFieldMask;
+};
+
+// 请求 - 删除重定向
+export type contentservicev1_DeleteRedirectRequest = {
+  id: number | undefined;
+};
+
+// 发布审批留痕（BFF 面：代理 core ReviewLogService）
+export interface ReviewLogService {
+  // 按实体查询审批记录
+  List(
+    request: contentservicev1_ListReviewLogsRequest,
+  ): Promise<contentservicev1_ListReviewLogsResponse>;
+}
+
+export function createReviewLogServiceClient(
+  transport: ClientTransport,
+): ReviewLogService {
+  return {
+    List(request) {
+      const path = `/admin/v1/review-logs`;
+      const body = null;
+      const queryParams: string[] = [];
+      if (request.entityType) {
         queryParams.push(
-          `sorting.direction=${encodeURIComponent(request.sorting.direction.toString())}`,
+          `entityType=${encodeURIComponent(request.entityType.toString())}`,
+        );
+      }
+      if (request.entityId) {
+        queryParams.push(
+          `entityId=${encodeURIComponent(request.entityId.toString())}`,
+        );
+      }
+      let uri = path;
+      if (queryParams.length > 0) {
+        uri += `?${queryParams.join('&')}`;
+      }
+      return transport.unary(uri, 'GET', body, {
+        service: 'ReviewLogService',
+        method: 'List',
+      }) as Promise<contentservicev1_ListReviewLogsResponse>;
+    },
+  };
+}
+// 查询审批记录 - 请求
+export type contentservicev1_ListReviewLogsRequest = {
+  // 实体 ID
+  entityId: number | undefined;
+  // 实体类型（post/page）
+  entityType: string | undefined;
+};
+
+// 查询审批记录 - 回应
+export type contentservicev1_ListReviewLogsResponse = {
+  items: contentservicev1_ReviewLog[] | undefined;
+};
+
+// 审批留痕条目
+export type contentservicev1_ReviewLog = {
+  // 动作
+  action: string | undefined;
+  createdAt?: wellKnownTimestamp;
+  // 实体 ID
+  entityId: number | undefined;
+  // 实体类型（post/page）
+  entityType: string | undefined;
+  id?: number;
+  // 审批级别（submit=0；第 N 次 approve=N）
+  level: number | undefined;
+  // 意见（驳回理由/批准备注）
+  note?: string;
+  // 操作人 ID
+  operatorId?: number;
+};
+
+// 角色管理服务
+export interface RoleService {
+  // 查询角色列表
+  List(
+    request: pagination_PagingRequest,
+  ): Promise<permissionservicev1_ListRoleResponse>;
+  // 查询角色详情
+  Get(
+    request: permissionservicev1_GetRoleRequest,
+  ): Promise<permissionservicev1_Role>;
+  // 创建角色
+  Create(
+    request: permissionservicev1_CreateRoleRequest,
+  ): Promise<wellKnownEmpty>;
+  // 更新角色
+  Update(
+    request: permissionservicev1_UpdateRoleRequest,
+  ): Promise<wellKnownEmpty>;
+  // 删除角色
+  Delete(
+    request: permissionservicev1_DeleteRoleRequest,
+  ): Promise<wellKnownEmpty>;
+}
+
+export function createRoleServiceClient(
+  transport: ClientTransport,
+): RoleService {
+  return {
+    List(request) {
+      const path = `/admin/v1/roles`;
+      const body = null;
+      const queryParams: string[] = [];
+      if (request.page) {
+        queryParams.push(
+          `page=${encodeURIComponent(request.page.toString())}`,
+        );
+      }
+      if (request.pageSize) {
+        queryParams.push(
+          `pageSize=${encodeURIComponent(request.pageSize.toString())}`,
+        );
+      }
+      if (request.offset) {
+        queryParams.push(
+          `offset=${encodeURIComponent(request.offset.toString())}`,
+        );
+      }
+      if (request.limit) {
+        queryParams.push(
+          `limit=${encodeURIComponent(request.limit.toString())}`,
+        );
+      }
+      if (request.token) {
+        queryParams.push(
+          `token=${encodeURIComponent(request.token.toString())}`,
+        );
+      }
+      if (request.noPaging) {
+        queryParams.push(
+          `noPaging=${encodeURIComponent(request.noPaging.toString())}`,
+        );
+      }
+      if (request.query) {
+        queryParams.push(
+          `query=${encodeURIComponent(request.query.toString())}`,
+        );
+      }
+      if (request.filter) {
+        queryParams.push(
+          `filter=${encodeURIComponent(request.filter.toString())}`,
+        );
+      }
+      if (request.filterExpr?.type) {
+        queryParams.push(
+          `filterExpr.type=${encodeURIComponent(request.filterExpr.type.toString())}`,
+        );
+      }
+      if (request.orderBy) {
+        queryParams.push(
+          `orderBy=${encodeURIComponent(request.orderBy.toString())}`,
         );
       }
       if (request.fieldMask) {
@@ -8406,7 +12871,7 @@ export function createRoleServiceClient(
       if (request.id === undefined || request.id === null) {
         throw new Error('missing required field request.id');
       }
-      const path = `admin/v1/roles/${request.id}`;
+      const path = `/admin/v1/roles/${request.id}`;
       const body = null;
       const queryParams: string[] = [];
       if (request.name) {
@@ -8434,7 +12899,7 @@ export function createRoleServiceClient(
       }) as Promise<permissionservicev1_Role>;
     },
     Create(request) {
-      const path = `admin/v1/roles`;
+      const path = `/admin/v1/roles`;
       const body = JSON.stringify(request);
       return transport.unary(path, 'POST', body, {
         service: 'RoleService',
@@ -8445,8 +12910,10 @@ export function createRoleServiceClient(
       if (request.id === undefined || request.id === null) {
         throw new Error('missing required field request.id');
       }
-      const path = `admin/v1/roles/${request.id}`;
-      const body = JSON.stringify(request);
+      const path = `/admin/v1/roles/${request.id}`;
+      const bodyMap = { ...request } as Record<string, unknown>;
+      delete bodyMap["id"];
+      const body = JSON.stringify(bodyMap);
       return transport.unary(path, 'PUT', body, {
         service: 'RoleService',
         method: 'Update',
@@ -8456,7 +12923,7 @@ export function createRoleServiceClient(
       if (request.id === undefined || request.id === null) {
         throw new Error('missing required field request.id');
       }
-      const path = `admin/v1/roles/${request.id}`;
+      const path = `/admin/v1/roles/${request.id}`;
       const body = null;
       const queryParams: string[] = [];
       if (request.code) {
@@ -8494,6 +12961,8 @@ export type permissionservicev1_Role = {
   deletedAt?: wellKnownTimestamp;
   deletedBy?: number;
   description?: string;
+  // 字段权限配置（读回显；写侧走 Create/Update 的 data.field_permissions）
+  fieldPermissions: permissionservicev1_RoleFieldPermission[] | undefined;
   id?: number;
   isProtected?: boolean;
   name?: string;
@@ -8516,6 +12985,14 @@ export type permissionservicev1_Role_Type =
   | 'SYSTEM'
   | 'TEMPLATE'
   | 'TENANT';
+// 创建角色 - 请求
+// 角色字段权限条目：角色在某资源上隐藏的字段集（黑名单语义）。
+// 资源名为 proto 消息名（如 User），字段为 proto 字段 json_name（如 email）。
+export type permissionservicev1_RoleFieldPermission = {
+  hiddenFields: string[] | undefined;
+  resource: string | undefined;
+};
+
 // 角色数据 - 请求
 export type permissionservicev1_GetRoleRequest = {
   code?: string;
@@ -8524,7 +13001,6 @@ export type permissionservicev1_GetRoleRequest = {
   viewMask?: wellKnownFieldMask;
 };
 
-// 创建角色 - 请求
 export type permissionservicev1_CreateRoleRequest = {
   data: permissionservicev1_Role | undefined;
 };
@@ -8542,6 +13018,80 @@ export type permissionservicev1_DeleteRoleRequest = {
   code?: string;
   id?: number;
   tenantId?: number;
+};
+
+// 搜索同义词管理（BFF 面：代理 core SearchSynonymService）
+export interface SearchSynonymService {
+  // 同义词列表
+  List(
+    request: wellKnownEmpty,
+  ): Promise<contentservicev1_ListSearchSynonymsResponse>;
+  // 创建同义词
+  Create(
+    request: contentservicev1_CreateSearchSynonymRequest,
+  ): Promise<contentservicev1_SearchSynonym>;
+  // 删除同义词
+  Delete(
+    request: contentservicev1_DeleteSearchSynonymRequest,
+  ): Promise<wellKnownEmpty>;
+}
+
+export function createSearchSynonymServiceClient(
+  transport: ClientTransport,
+): SearchSynonymService {
+  return {
+    List(_request) {
+      const path = `/admin/v1/search-synonyms`;
+      const body = null;
+      return transport.unary(path, 'GET', body, {
+        service: 'SearchSynonymService',
+        method: 'List',
+      }) as Promise<contentservicev1_ListSearchSynonymsResponse>;
+    },
+    Create(request) {
+      const path = `/admin/v1/search-synonyms`;
+      const body = JSON.stringify(request);
+      return transport.unary(path, 'POST', body, {
+        service: 'SearchSynonymService',
+        method: 'Create',
+      }) as Promise<contentservicev1_SearchSynonym>;
+    },
+    Delete(request) {
+      if (request.id === undefined || request.id === null) {
+        throw new Error('missing required field request.id');
+      }
+      const path = `/admin/v1/search-synonyms/${request.id}`;
+      const body = null;
+      return transport.unary(path, 'DELETE', body, {
+        service: 'SearchSynonymService',
+        method: 'Delete',
+      }) as Promise<wellKnownEmpty>;
+    },
+  };
+}
+// 列出同义词 - 回应
+export type contentservicev1_ListSearchSynonymsResponse = {
+  items: contentservicev1_SearchSynonym[] | undefined;
+};
+
+// 搜索同义词条目
+export type contentservicev1_SearchSynonym = {
+  enabled?: boolean;
+  id?: number;
+  // 扩展词列表（与触发词一起以 OR 参与检索）
+  synonyms: string[] | undefined;
+  // 触发词（搜索词命中即扩展）
+  term: string | undefined;
+};
+
+// 创建同义词 - 请求
+export type contentservicev1_CreateSearchSynonymRequest = {
+  data: contentservicev1_SearchSynonym | undefined;
+};
+
+// 删除同义词 - 请求
+export type contentservicev1_DeleteSearchSynonymRequest = {
+  id: number | undefined;
 };
 
 // 站点服务
@@ -8573,7 +13123,7 @@ export function createSiteServiceClient(
 ): SiteService {
   return {
     List(request) {
-      const path = `admin/v1/sites`;
+      const path = `/admin/v1/sites`;
       const body = null;
       const queryParams: string[] = [];
       if (request.page) {
@@ -8621,56 +13171,9 @@ export function createSiteServiceClient(
           `filterExpr.type=${encodeURIComponent(request.filterExpr.type.toString())}`,
         );
       }
-      if (request.filterExpr?.conditions?.field) {
-        queryParams.push(
-          `filterExpr.conditions.field=${encodeURIComponent(request.filterExpr.conditions.field.toString())}`,
-        );
-      }
-      if (request.filterExpr?.conditions?.op) {
-        queryParams.push(
-          `filterExpr.conditions.op=${encodeURIComponent(request.filterExpr.conditions.op.toString())}`,
-        );
-      }
-      if (request.filterExpr?.conditions?.value) {
-        queryParams.push(
-          `filterExpr.conditions.value=${encodeURIComponent(request.filterExpr.conditions.value.toString())}`,
-        );
-      }
-      if (request.filterExpr?.conditions?.jsonValue) {
-        queryParams.push(
-          `filterExpr.conditions.jsonValue=${encodeURIComponent(request.filterExpr.conditions.jsonValue.toString())}`,
-        );
-      }
-      if (request.filterExpr?.conditions?.values) {
-        request.filterExpr.conditions.values.forEach((x) => {
-          queryParams.push(
-            `filterExpr.conditions.values=${encodeURIComponent(x.toString())}`,
-          );
-        });
-      }
-      if (request.filterExpr?.conditions?.datePart) {
-        queryParams.push(
-          `filterExpr.conditions.datePart=${encodeURIComponent(request.filterExpr.conditions.datePart.toString())}`,
-        );
-      }
-      if (request.filterExpr?.conditions?.jsonPath) {
-        queryParams.push(
-          `filterExpr.conditions.jsonPath=${encodeURIComponent(request.filterExpr.conditions.jsonPath.toString())}`,
-        );
-      }
       if (request.orderBy) {
         queryParams.push(
           `orderBy=${encodeURIComponent(request.orderBy.toString())}`,
-        );
-      }
-      if (request.sorting?.field) {
-        queryParams.push(
-          `sorting.field=${encodeURIComponent(request.sorting.field.toString())}`,
-        );
-      }
-      if (request.sorting?.direction) {
-        queryParams.push(
-          `sorting.direction=${encodeURIComponent(request.sorting.direction.toString())}`,
         );
       }
       if (request.fieldMask) {
@@ -8691,7 +13194,7 @@ export function createSiteServiceClient(
       if (request.id === undefined || request.id === null) {
         throw new Error('missing required field request.id');
       }
-      const path = `admin/v1/sites/${request.id}`;
+      const path = `/admin/v1/sites/${request.id}`;
       const body = null;
       const queryParams: string[] = [];
       if (request.viewMask) {
@@ -8709,7 +13212,7 @@ export function createSiteServiceClient(
       }) as Promise<siteservicev1_Site>;
     },
     Create(request) {
-      const path = `admin/v1/sites`;
+      const path = `/admin/v1/sites`;
       const body = JSON.stringify(request);
       return transport.unary(path, 'POST', body, {
         service: 'SiteService',
@@ -8720,8 +13223,10 @@ export function createSiteServiceClient(
       if (request.id === undefined || request.id === null) {
         throw new Error('missing required field request.id');
       }
-      const path = `admin/v1/sites/${request.id}`;
-      const body = JSON.stringify(request);
+      const path = `/admin/v1/sites/${request.id}`;
+      const bodyMap = { ...request } as Record<string, unknown>;
+      delete bodyMap["id"];
+      const body = JSON.stringify(bodyMap);
       return transport.unary(path, 'PUT', body, {
         service: 'SiteService',
         method: 'Update',
@@ -8731,7 +13236,7 @@ export function createSiteServiceClient(
       if (request.id === undefined || request.id === null) {
         throw new Error('missing required field request.id');
       }
-      const path = `admin/v1/sites/${request.id}`;
+      const path = `/admin/v1/sites/${request.id}`;
       const body = null;
       return transport.unary(path, 'DELETE', body, {
         service: 'SiteService',
@@ -8826,7 +13331,7 @@ export function createSiteSettingServiceClient(
 ): SiteSettingService {
   return {
     List(request) {
-      const path = `admin/v1/site-settings`;
+      const path = `/admin/v1/site-settings`;
       const body = null;
       const queryParams: string[] = [];
       if (request.page) {
@@ -8874,56 +13379,9 @@ export function createSiteSettingServiceClient(
           `filterExpr.type=${encodeURIComponent(request.filterExpr.type.toString())}`,
         );
       }
-      if (request.filterExpr?.conditions?.field) {
-        queryParams.push(
-          `filterExpr.conditions.field=${encodeURIComponent(request.filterExpr.conditions.field.toString())}`,
-        );
-      }
-      if (request.filterExpr?.conditions?.op) {
-        queryParams.push(
-          `filterExpr.conditions.op=${encodeURIComponent(request.filterExpr.conditions.op.toString())}`,
-        );
-      }
-      if (request.filterExpr?.conditions?.value) {
-        queryParams.push(
-          `filterExpr.conditions.value=${encodeURIComponent(request.filterExpr.conditions.value.toString())}`,
-        );
-      }
-      if (request.filterExpr?.conditions?.jsonValue) {
-        queryParams.push(
-          `filterExpr.conditions.jsonValue=${encodeURIComponent(request.filterExpr.conditions.jsonValue.toString())}`,
-        );
-      }
-      if (request.filterExpr?.conditions?.values) {
-        request.filterExpr.conditions.values.forEach((x) => {
-          queryParams.push(
-            `filterExpr.conditions.values=${encodeURIComponent(x.toString())}`,
-          );
-        });
-      }
-      if (request.filterExpr?.conditions?.datePart) {
-        queryParams.push(
-          `filterExpr.conditions.datePart=${encodeURIComponent(request.filterExpr.conditions.datePart.toString())}`,
-        );
-      }
-      if (request.filterExpr?.conditions?.jsonPath) {
-        queryParams.push(
-          `filterExpr.conditions.jsonPath=${encodeURIComponent(request.filterExpr.conditions.jsonPath.toString())}`,
-        );
-      }
       if (request.orderBy) {
         queryParams.push(
           `orderBy=${encodeURIComponent(request.orderBy.toString())}`,
-        );
-      }
-      if (request.sorting?.field) {
-        queryParams.push(
-          `sorting.field=${encodeURIComponent(request.sorting.field.toString())}`,
-        );
-      }
-      if (request.sorting?.direction) {
-        queryParams.push(
-          `sorting.direction=${encodeURIComponent(request.sorting.direction.toString())}`,
         );
       }
       if (request.fieldMask) {
@@ -8944,7 +13402,7 @@ export function createSiteSettingServiceClient(
       if (request.id === undefined || request.id === null) {
         throw new Error('missing required field request.id');
       }
-      const path = `admin/v1/site-settings/${request.id}`;
+      const path = `/admin/v1/site-settings/${request.id}`;
       const body = null;
       const queryParams: string[] = [];
       if (request.viewMask) {
@@ -8962,7 +13420,7 @@ export function createSiteSettingServiceClient(
       }) as Promise<siteservicev1_SiteSetting>;
     },
     Create(request) {
-      const path = `admin/v1/site-settings`;
+      const path = `/admin/v1/site-settings`;
       const body = JSON.stringify(request);
       return transport.unary(path, 'POST', body, {
         service: 'SiteSettingService',
@@ -8973,8 +13431,10 @@ export function createSiteSettingServiceClient(
       if (request.id === undefined || request.id === null) {
         throw new Error('missing required field request.id');
       }
-      const path = `admin/v1/site-settings/${request.id}`;
-      const body = JSON.stringify(request);
+      const path = `/admin/v1/site-settings/${request.id}`;
+      const bodyMap = { ...request } as Record<string, unknown>;
+      delete bodyMap["id"];
+      const body = JSON.stringify(bodyMap);
       return transport.unary(path, 'PUT', body, {
         service: 'SiteSettingService',
         method: 'Update',
@@ -8984,7 +13444,7 @@ export function createSiteSettingServiceClient(
       if (request.id === undefined || request.id === null) {
         throw new Error('missing required field request.id');
       }
-      const path = `admin/v1/site-settings/${request.id}`;
+      const path = `/admin/v1/site-settings/${request.id}`;
       const body = null;
       return transport.unary(path, 'DELETE', body, {
         service: 'SiteSettingService',
@@ -9058,185 +13518,84 @@ export type siteservicev1_DeleteSiteSettingRequest = {
   id?: number;
 };
 
-// 统计服务（后台分析页 BFF 转发）。仅转发至 core StatsService，
-// 供 admin 分析页读取概览卡片与图表数据，全部为只读查询。
-// 租户范围由鉴权上下文透传的 viewer 决定。
-export interface StatsService {
-  // 分析页概览卡片数据
-  GetDashboardOverview(
-    request: statsservicev1_GetDashboardOverviewRequest,
-  ): Promise<statsservicev1_GetDashboardOverviewResponse>;
-  // 内容增长趋势（近 N 天按天聚合）
-  GetContentTrend(
-    request: statsservicev1_GetContentTrendRequest,
-  ): Promise<statsservicev1_GetContentTrendResponse>;
-  // 互动统计（点赞 TOP N + 类型分布）
-  GetInteractionStats(
-    request: statsservicev1_GetInteractionStatsRequest,
-  ): Promise<statsservicev1_GetInteractionStatsResponse>;
-  // 登录活跃趋势（近 N 天成功/失败按天聚合）
-  GetLoginActivity(
-    request: statsservicev1_GetLoginActivityRequest,
-  ): Promise<statsservicev1_GetLoginActivityResponse>;
-}
-
-export function createStatsServiceClient(
-  transport: ClientTransport,
-): StatsService {
-  return {
-    GetDashboardOverview(_request) {
-      const path = `admin/v1/stats/overview`;
-      const body = null;
-      return transport.unary(path, 'GET', body, {
-        service: 'StatsService',
-        method: 'GetDashboardOverview',
-      }) as Promise<statsservicev1_GetDashboardOverviewResponse>;
-    },
-    GetContentTrend(request) {
-      const path = `admin/v1/stats/content-trend`;
-      const body = null;
-      const queryParams: string[] = [];
-      if (request.days) {
-        queryParams.push(
-          `days=${encodeURIComponent(request.days.toString())}`,
-        );
-      }
-      let uri = path;
-      if (queryParams.length > 0) {
-        uri += `?${queryParams.join('&')}`;
-      }
-      return transport.unary(uri, 'GET', body, {
-        service: 'StatsService',
-        method: 'GetContentTrend',
-      }) as Promise<statsservicev1_GetContentTrendResponse>;
-    },
-    GetInteractionStats(request) {
-      const path = `admin/v1/stats/interactions`;
-      const body = null;
-      const queryParams: string[] = [];
-      if (request.topN) {
-        queryParams.push(
-          `topN=${encodeURIComponent(request.topN.toString())}`,
-        );
-      }
-      let uri = path;
-      if (queryParams.length > 0) {
-        uri += `?${queryParams.join('&')}`;
-      }
-      return transport.unary(uri, 'GET', body, {
-        service: 'StatsService',
-        method: 'GetInteractionStats',
-      }) as Promise<statsservicev1_GetInteractionStatsResponse>;
-    },
-    GetLoginActivity(request) {
-      const path = `admin/v1/stats/login-activity`;
-      const body = null;
-      const queryParams: string[] = [];
-      if (request.days) {
-        queryParams.push(
-          `days=${encodeURIComponent(request.days.toString())}`,
-        );
-      }
-      let uri = path;
-      if (queryParams.length > 0) {
-        uri += `?${queryParams.join('&')}`;
-      }
-      return transport.unary(uri, 'GET', body, {
-        service: 'StatsService',
-        method: 'GetLoginActivity',
-      }) as Promise<statsservicev1_GetLoginActivityResponse>;
-    },
-  };
-}
-export type statsservicev1_GetDashboardOverviewRequest = {
-};
-
-export type statsservicev1_GetDashboardOverviewResponse = {
-  commentCount: number | undefined;
-  interactionCount: number | undefined;
-  newCommentCountWeek: number | undefined;
-  newLikeCountWeek: number | undefined;
-  newPostCountWeek: number | undefined;
-  newUserCountWeek: number | undefined;
-  postCount: number | undefined;
-  userCount: number | undefined;
-};
-
-// 天数参数。服务端 clamp：缺省/非正数取 30，上限 90。
-export type statsservicev1_GetContentTrendRequest = {
-  days: number | undefined;
-};
-
-export type statsservicev1_GetContentTrendResponse = {
-  comments: statsservicev1_DailyCount[] | undefined;
-  posts: statsservicev1_DailyCount[] | undefined;
-  users: statsservicev1_DailyCount[] | undefined;
-};
-
-// 单日计数点。date 为 YYYY-MM-DD（数据库本地时区）。
-export type statsservicev1_DailyCount = {
-  date: string | undefined;
-  value: number | undefined;
-};
-
-// TOP N 参数。服务端 clamp：缺省/非正数取 10，上限 50。
-export type statsservicev1_GetInteractionStatsRequest = {
-  topN: number | undefined;
-};
-
-export type statsservicev1_GetInteractionStatsResponse = {
-  topLikedPosts: statsservicev1_InteractionTopItem[] | undefined;
-  totalLikes: number | undefined;
-  totalWatches: number | undefined;
-};
-
-// 点赞 TOP 榜条目。已删除的帖子不出现在榜单中。
-export type statsservicev1_InteractionTopItem = {
-  likeCount: number | undefined;
-  targetId: number | undefined;
-  title: string | undefined;
-};
-
-// 天数参数。服务端 clamp：缺省/非正数取 30，上限 90。
-export type statsservicev1_GetLoginActivityRequest = {
-  days: number | undefined;
-};
-
-export type statsservicev1_GetLoginActivityResponse = {
-  failed: statsservicev1_DailyCount[] | undefined;
-  success: statsservicev1_DailyCount[] | undefined;
-};
-
-// 标签服务
-export interface TagService {
-  // 获取标签列表
-  List(
+// 社交分发服务（管理面）
+export interface SocialService {
+  // 获取社交账号列表
+  ListSocialAccounts(
     request: pagination_PagingRequest,
-  ): Promise<contentservicev1_ListTagResponse>;
-  // 获取标签数据
-  Get(
-    request: contentservicev1_GetTagRequest,
-  ): Promise<contentservicev1_Tag>;
-  // 创建标签
-  Create(
-    request: contentservicev1_CreateTagRequest,
-  ): Promise<contentservicev1_Tag>;
-  // 更新标签
-  Update(
-    request: contentservicev1_UpdateTagRequest,
-  ): Promise<contentservicev1_Tag>;
-  // 删除标签
-  Delete(
-    request: contentservicev1_DeleteTagRequest,
+  ): Promise<socialservicev1_ListSocialAccountsResponse>;
+  // 获取社交账号数据
+  GetSocialAccount(
+    request: socialservicev1_GetSocialAccountRequest,
+  ): Promise<socialservicev1_SocialAccount>;
+  // 创建社交账号（服务端验证凭据并加密落库）
+  CreateSocialAccount(
+    request: socialservicev1_CreateSocialAccountRequest,
+  ): Promise<socialservicev1_SocialAccount>;
+  // 更新社交账号
+  UpdateSocialAccount(
+    request: socialservicev1_UpdateSocialAccountRequest,
+  ): Promise<socialservicev1_SocialAccount>;
+  // 删除社交账号
+  DeleteSocialAccount(
+    request: socialservicev1_DeleteSocialAccountRequest,
+  ): Promise<wellKnownEmpty>;
+  // 获取分发记录列表
+  ListSocialDistributions(
+    request: pagination_PagingRequest,
+  ): Promise<socialservicev1_ListSocialDistributionsResponse>;
+  // 获取分发记录数据
+  GetSocialDistribution(
+    request: socialservicev1_GetSocialDistributionRequest,
+  ): Promise<socialservicev1_SocialDistribution>;
+  // 创建分发记录（排期或立即发布）
+  CreateSocialDistribution(
+    request: socialservicev1_CreateSocialDistributionRequest,
+  ): Promise<socialservicev1_SocialDistribution>;
+  // 更新分发记录
+  UpdateSocialDistribution(
+    request: socialservicev1_UpdateSocialDistributionRequest,
+  ): Promise<socialservicev1_SocialDistribution>;
+  // 删除分发记录
+  DeleteSocialDistribution(
+    request: socialservicev1_DeleteSocialDistributionRequest,
+  ): Promise<wellKnownEmpty>;
+  // 立即发布分发记录
+  PublishSocialDistribution(
+    request: socialservicev1_PublishSocialDistributionRequest,
+  ): Promise<socialservicev1_SocialDistribution>;
+  // 回拉分发记录的平台互动统计
+  RefreshSocialDistributionStats(
+    request: socialservicev1_RefreshSocialDistributionStatsRequest,
+  ): Promise<socialservicev1_SocialDistribution>;
+  // 获取分发记录的互动统计历史（趋势图数据）
+  ListSocialDistributionStatsHistory(
+    request: socialservicev1_ListSocialDistributionStatsHistoryRequest,
+  ): Promise<socialservicev1_ListSocialDistributionStatsHistoryResponse>;
+  // 获取当前租户的分发汇总指标（KPI 卡片）
+  GetSocialDistributionSummary(
+    request: wellKnownEmpty,
+  ): Promise<socialservicev1_SocialDistributionSummary>;
+  // 移动分发状态（看板拖拽）
+  MoveSocialDistribution(
+    request: socialservicev1_MoveSocialDistributionRequest,
+  ): Promise<socialservicev1_SocialDistribution>;
+  // 获取社交收件箱（平台回复/提及回拉）
+  ListSocialInbox(
+    request: socialservicev1_ListSocialInboxRequest,
+  ): Promise<socialservicev1_ListSocialInboxResponse>;
+  // 标记收件项已读
+  MarkSocialInboxRead(
+    request: socialservicev1_MarkSocialInboxReadRequest,
   ): Promise<wellKnownEmpty>;
 }
 
-export function createTagServiceClient(
+export function createSocialServiceClient(
   transport: ClientTransport,
-): TagService {
+): SocialService {
   return {
-    List(request) {
-      const path = `admin/v1/tags`;
+    ListSocialAccounts(request) {
+      const path = `/admin/v1/social/accounts`;
       const body = null;
       const queryParams: string[] = [];
       if (request.page) {
@@ -9284,41 +13643,125 @@ export function createTagServiceClient(
           `filterExpr.type=${encodeURIComponent(request.filterExpr.type.toString())}`,
         );
       }
-      if (request.filterExpr?.conditions?.field) {
+      if (request.orderBy) {
         queryParams.push(
-          `filterExpr.conditions.field=${encodeURIComponent(request.filterExpr.conditions.field.toString())}`,
+          `orderBy=${encodeURIComponent(request.orderBy.toString())}`,
         );
       }
-      if (request.filterExpr?.conditions?.op) {
+      if (request.fieldMask) {
         queryParams.push(
-          `filterExpr.conditions.op=${encodeURIComponent(request.filterExpr.conditions.op.toString())}`,
+          `fieldMask=${encodeURIComponent(request.fieldMask.toString())}`,
         );
       }
-      if (request.filterExpr?.conditions?.value) {
+      let uri = path;
+      if (queryParams.length > 0) {
+        uri += `?${queryParams.join('&')}`;
+      }
+      return transport.unary(uri, 'GET', body, {
+        service: 'SocialService',
+        method: 'ListSocialAccounts',
+      }) as Promise<socialservicev1_ListSocialAccountsResponse>;
+    },
+    GetSocialAccount(request) {
+      if (request.id === undefined || request.id === null) {
+        throw new Error('missing required field request.id');
+      }
+      const path = `/admin/v1/social/accounts/${request.id}`;
+      const body = null;
+      const queryParams: string[] = [];
+      if (request.viewMask) {
         queryParams.push(
-          `filterExpr.conditions.value=${encodeURIComponent(request.filterExpr.conditions.value.toString())}`,
+          `viewMask=${encodeURIComponent(request.viewMask.toString())}`,
         );
       }
-      if (request.filterExpr?.conditions?.jsonValue) {
+      let uri = path;
+      if (queryParams.length > 0) {
+        uri += `?${queryParams.join('&')}`;
+      }
+      return transport.unary(uri, 'GET', body, {
+        service: 'SocialService',
+        method: 'GetSocialAccount',
+      }) as Promise<socialservicev1_SocialAccount>;
+    },
+    CreateSocialAccount(request) {
+      const path = `/admin/v1/social/accounts`;
+      const body = JSON.stringify(request);
+      return transport.unary(path, 'POST', body, {
+        service: 'SocialService',
+        method: 'CreateSocialAccount',
+      }) as Promise<socialservicev1_SocialAccount>;
+    },
+    UpdateSocialAccount(request) {
+      if (request.id === undefined || request.id === null) {
+        throw new Error('missing required field request.id');
+      }
+      const path = `/admin/v1/social/accounts/${request.id}`;
+      const bodyMap = { ...request } as Record<string, unknown>;
+      delete bodyMap["id"];
+      const body = JSON.stringify(bodyMap);
+      return transport.unary(path, 'PUT', body, {
+        service: 'SocialService',
+        method: 'UpdateSocialAccount',
+      }) as Promise<socialservicev1_SocialAccount>;
+    },
+    DeleteSocialAccount(request) {
+      if (request.id === undefined || request.id === null) {
+        throw new Error('missing required field request.id');
+      }
+      const path = `/admin/v1/social/accounts/${request.id}`;
+      const body = null;
+      return transport.unary(path, 'DELETE', body, {
+        service: 'SocialService',
+        method: 'DeleteSocialAccount',
+      }) as Promise<wellKnownEmpty>;
+    },
+    ListSocialDistributions(request) {
+      const path = `/admin/v1/social/distributions`;
+      const body = null;
+      const queryParams: string[] = [];
+      if (request.page) {
         queryParams.push(
-          `filterExpr.conditions.jsonValue=${encodeURIComponent(request.filterExpr.conditions.jsonValue.toString())}`,
+          `page=${encodeURIComponent(request.page.toString())}`,
         );
       }
-      if (request.filterExpr?.conditions?.values) {
-        request.filterExpr.conditions.values.forEach((x) => {
-          queryParams.push(
-            `filterExpr.conditions.values=${encodeURIComponent(x.toString())}`,
-          );
-        });
-      }
-      if (request.filterExpr?.conditions?.datePart) {
+      if (request.pageSize) {
         queryParams.push(
-          `filterExpr.conditions.datePart=${encodeURIComponent(request.filterExpr.conditions.datePart.toString())}`,
+          `pageSize=${encodeURIComponent(request.pageSize.toString())}`,
         );
       }
-      if (request.filterExpr?.conditions?.jsonPath) {
+      if (request.offset) {
         queryParams.push(
-          `filterExpr.conditions.jsonPath=${encodeURIComponent(request.filterExpr.conditions.jsonPath.toString())}`,
+          `offset=${encodeURIComponent(request.offset.toString())}`,
+        );
+      }
+      if (request.limit) {
+        queryParams.push(
+          `limit=${encodeURIComponent(request.limit.toString())}`,
+        );
+      }
+      if (request.token) {
+        queryParams.push(
+          `token=${encodeURIComponent(request.token.toString())}`,
+        );
+      }
+      if (request.noPaging) {
+        queryParams.push(
+          `noPaging=${encodeURIComponent(request.noPaging.toString())}`,
+        );
+      }
+      if (request.query) {
+        queryParams.push(
+          `query=${encodeURIComponent(request.query.toString())}`,
+        );
+      }
+      if (request.filter) {
+        queryParams.push(
+          `filter=${encodeURIComponent(request.filter.toString())}`,
+        );
+      }
+      if (request.filterExpr?.type) {
+        queryParams.push(
+          `filterExpr.type=${encodeURIComponent(request.filterExpr.type.toString())}`,
         );
       }
       if (request.orderBy) {
@@ -9326,14 +13769,755 @@ export function createTagServiceClient(
           `orderBy=${encodeURIComponent(request.orderBy.toString())}`,
         );
       }
-      if (request.sorting?.field) {
+      if (request.fieldMask) {
         queryParams.push(
-          `sorting.field=${encodeURIComponent(request.sorting.field.toString())}`,
+          `fieldMask=${encodeURIComponent(request.fieldMask.toString())}`,
         );
       }
-      if (request.sorting?.direction) {
+      let uri = path;
+      if (queryParams.length > 0) {
+        uri += `?${queryParams.join('&')}`;
+      }
+      return transport.unary(uri, 'GET', body, {
+        service: 'SocialService',
+        method: 'ListSocialDistributions',
+      }) as Promise<socialservicev1_ListSocialDistributionsResponse>;
+    },
+    GetSocialDistribution(request) {
+      if (request.id === undefined || request.id === null) {
+        throw new Error('missing required field request.id');
+      }
+      const path = `/admin/v1/social/distributions/${request.id}`;
+      const body = null;
+      const queryParams: string[] = [];
+      if (request.viewMask) {
         queryParams.push(
-          `sorting.direction=${encodeURIComponent(request.sorting.direction.toString())}`,
+          `viewMask=${encodeURIComponent(request.viewMask.toString())}`,
+        );
+      }
+      let uri = path;
+      if (queryParams.length > 0) {
+        uri += `?${queryParams.join('&')}`;
+      }
+      return transport.unary(uri, 'GET', body, {
+        service: 'SocialService',
+        method: 'GetSocialDistribution',
+      }) as Promise<socialservicev1_SocialDistribution>;
+    },
+    CreateSocialDistribution(request) {
+      const path = `/admin/v1/social/distributions`;
+      const body = JSON.stringify(request);
+      return transport.unary(path, 'POST', body, {
+        service: 'SocialService',
+        method: 'CreateSocialDistribution',
+      }) as Promise<socialservicev1_SocialDistribution>;
+    },
+    UpdateSocialDistribution(request) {
+      if (request.id === undefined || request.id === null) {
+        throw new Error('missing required field request.id');
+      }
+      const path = `/admin/v1/social/distributions/${request.id}`;
+      const bodyMap = { ...request } as Record<string, unknown>;
+      delete bodyMap["id"];
+      const body = JSON.stringify(bodyMap);
+      return transport.unary(path, 'PUT', body, {
+        service: 'SocialService',
+        method: 'UpdateSocialDistribution',
+      }) as Promise<socialservicev1_SocialDistribution>;
+    },
+    DeleteSocialDistribution(request) {
+      if (request.id === undefined || request.id === null) {
+        throw new Error('missing required field request.id');
+      }
+      const path = `/admin/v1/social/distributions/${request.id}`;
+      const body = null;
+      return transport.unary(path, 'DELETE', body, {
+        service: 'SocialService',
+        method: 'DeleteSocialDistribution',
+      }) as Promise<wellKnownEmpty>;
+    },
+    PublishSocialDistribution(request) {
+      if (request.id === undefined || request.id === null) {
+        throw new Error('missing required field request.id');
+      }
+      const path = `/admin/v1/social/distributions/${request.id}/publish`;
+      const bodyMap = { ...request } as Record<string, unknown>;
+      delete bodyMap["id"];
+      const body = JSON.stringify(bodyMap);
+      return transport.unary(path, 'POST', body, {
+        service: 'SocialService',
+        method: 'PublishSocialDistribution',
+      }) as Promise<socialservicev1_SocialDistribution>;
+    },
+    RefreshSocialDistributionStats(request) {
+      if (request.id === undefined || request.id === null) {
+        throw new Error('missing required field request.id');
+      }
+      const path = `/admin/v1/social/distributions/${request.id}/stats/refresh`;
+      const bodyMap = { ...request } as Record<string, unknown>;
+      delete bodyMap["id"];
+      const body = JSON.stringify(bodyMap);
+      return transport.unary(path, 'POST', body, {
+        service: 'SocialService',
+        method: 'RefreshSocialDistributionStats',
+      }) as Promise<socialservicev1_SocialDistribution>;
+    },
+    ListSocialDistributionStatsHistory(request) {
+      if (request.id === undefined || request.id === null) {
+        throw new Error('missing required field request.id');
+      }
+      const path = `/admin/v1/social/distributions/${request.id}/stats/history`;
+      const body = null;
+      const queryParams: string[] = [];
+      if (request.limit) {
+        queryParams.push(
+          `limit=${encodeURIComponent(request.limit.toString())}`,
+        );
+      }
+      let uri = path;
+      if (queryParams.length > 0) {
+        uri += `?${queryParams.join('&')}`;
+      }
+      return transport.unary(uri, 'GET', body, {
+        service: 'SocialService',
+        method: 'ListSocialDistributionStatsHistory',
+      }) as Promise<socialservicev1_ListSocialDistributionStatsHistoryResponse>;
+    },
+    GetSocialDistributionSummary(_request) {
+      const path = `/admin/v1/social/summary`;
+      const body = null;
+      return transport.unary(path, 'GET', body, {
+        service: 'SocialService',
+        method: 'GetSocialDistributionSummary',
+      }) as Promise<socialservicev1_SocialDistributionSummary>;
+    },
+    MoveSocialDistribution(request) {
+      if (request.id === undefined || request.id === null) {
+        throw new Error('missing required field request.id');
+      }
+      const path = `/admin/v1/social/distributions/${request.id}/move`;
+      const bodyMap = { ...request } as Record<string, unknown>;
+      delete bodyMap["id"];
+      const body = JSON.stringify(bodyMap);
+      return transport.unary(path, 'POST', body, {
+        service: 'SocialService',
+        method: 'MoveSocialDistribution',
+      }) as Promise<socialservicev1_SocialDistribution>;
+    },
+    ListSocialInbox(request) {
+      const path = `/admin/v1/social/inbox`;
+      const body = null;
+      const queryParams: string[] = [];
+      if (request.accountId) {
+        queryParams.push(
+          `accountId=${encodeURIComponent(request.accountId.toString())}`,
+        );
+      }
+      if (request.unreadOnly) {
+        queryParams.push(
+          `unreadOnly=${encodeURIComponent(request.unreadOnly.toString())}`,
+        );
+      }
+      if (request.limit) {
+        queryParams.push(
+          `limit=${encodeURIComponent(request.limit.toString())}`,
+        );
+      }
+      let uri = path;
+      if (queryParams.length > 0) {
+        uri += `?${queryParams.join('&')}`;
+      }
+      return transport.unary(uri, 'GET', body, {
+        service: 'SocialService',
+        method: 'ListSocialInbox',
+      }) as Promise<socialservicev1_ListSocialInboxResponse>;
+    },
+    MarkSocialInboxRead(request) {
+      if (request.id === undefined || request.id === null) {
+        throw new Error('missing required field request.id');
+      }
+      const path = `/admin/v1/social/inbox/${request.id}/read`;
+      const bodyMap = { ...request } as Record<string, unknown>;
+      delete bodyMap["id"];
+      const body = JSON.stringify(bodyMap);
+      return transport.unary(path, 'POST', body, {
+        service: 'SocialService',
+        method: 'MarkSocialInboxRead',
+      }) as Promise<wellKnownEmpty>;
+    },
+  };
+}
+// 回应 - 社交账号列表
+export type socialservicev1_ListSocialAccountsResponse = {
+  items: socialservicev1_SocialAccount[] | undefined;
+  total: number | undefined;
+};
+
+// 社交账号
+export type socialservicev1_SocialAccount = {
+  createdAt?: wellKnownTimestamp;
+  createdBy?: number;
+  credentialHint?: string;
+  credentials?: string;
+  deletedAt?: wellKnownTimestamp;
+  deletedBy?: number;
+  handle?: string;
+  id?: number;
+  isEnabled?: boolean;
+  name?: string;
+  platform?: socialservicev1_Platform;
+  remark?: string;
+  updatedAt?: wellKnownTimestamp;
+  updatedBy?: number;
+};
+
+// 社交平台
+export type socialservicev1_Platform =
+  | 'PLATFORM_BLUESKY'
+  | 'PLATFORM_DEVTO'
+  | 'PLATFORM_LINKEDIN'
+  | 'PLATFORM_MASTODON'
+  | 'PLATFORM_METAWEBLOG'
+  | 'PLATFORM_NOSTR'
+  | 'PLATFORM_TELEGRAM'
+  | 'PLATFORM_UNSPECIFIED'
+  | 'PLATFORM_WECHAT_OA'
+  | 'PLATFORM_WEIBO'
+  | 'PLATFORM_WORDPRESS';
+// 请求 - 社交账号数据
+export type socialservicev1_GetSocialAccountRequest = {
+  id: number | undefined;
+  viewMask?: wellKnownFieldMask;
+};
+
+// 请求 - 创建社交账号
+export type socialservicev1_CreateSocialAccountRequest = {
+  data: socialservicev1_SocialAccount | undefined;
+};
+
+// 请求 - 更新社交账号
+export type socialservicev1_UpdateSocialAccountRequest = {
+  allowMissing?: boolean;
+  data: socialservicev1_SocialAccount | undefined;
+  id: number | undefined;
+  updateMask: undefined | wellKnownFieldMask;
+};
+
+// 请求 - 删除社交账号
+export type socialservicev1_DeleteSocialAccountRequest = {
+  id?: number;
+};
+
+// 回应 - 分发记录列表
+export type socialservicev1_ListSocialDistributionsResponse = {
+  items: socialservicev1_SocialDistribution[] | undefined;
+  total: number | undefined;
+};
+
+// 内容分发记录
+export type socialservicev1_SocialDistribution = {
+  accountId?: number;
+  accountName?: string;
+  createdAt?: wellKnownTimestamp;
+  createdBy?: number;
+  deletedAt?: wellKnownTimestamp;
+  deletedBy?: number;
+  errorMessage?: string;
+  externalId?: string;
+  externalUri?: string;
+  id?: number;
+  likes?: number;
+  mediaIds: number[] | undefined;
+  overrideText?: string;
+  platform?: socialservicev1_Platform;
+  postId?: number;
+  postTitle?: string;
+  publishTime?: wellKnownTimestamp;
+  publishedAt?: wellKnownTimestamp;
+  replies?: number;
+  reposts?: number;
+  statsSyncedAt?: wellKnownTimestamp;
+  status?: socialservicev1_SocialDistribution_Status;
+  title?: string;
+  updatedAt?: wellKnownTimestamp;
+  updatedBy?: number;
+};
+
+// 分发状态
+export type socialservicev1_SocialDistribution_Status =
+  | 'STATUS_DRAFT'
+  | 'STATUS_FAILED'
+  | 'STATUS_PUBLISHED'
+  | 'STATUS_PUBLISHING'
+  | 'STATUS_SCHEDULED'
+  | 'STATUS_UNSPECIFIED';
+// 请求 - 分发记录数据
+export type socialservicev1_GetSocialDistributionRequest = {
+  id: number | undefined;
+  viewMask?: wellKnownFieldMask;
+};
+
+// 请求 - 创建分发记录
+export type socialservicev1_CreateSocialDistributionRequest = {
+  data: socialservicev1_SocialDistribution | undefined;
+};
+
+// 请求 - 更新分发记录
+export type socialservicev1_UpdateSocialDistributionRequest = {
+  allowMissing?: boolean;
+  data: socialservicev1_SocialDistribution | undefined;
+  id: number | undefined;
+  updateMask: undefined | wellKnownFieldMask;
+};
+
+// 请求 - 删除分发记录
+export type socialservicev1_DeleteSocialDistributionRequest = {
+  id?: number;
+};
+
+// 请求 - 立即发布分发记录
+export type socialservicev1_PublishSocialDistributionRequest = {
+  id: number | undefined;
+};
+
+// 请求 - 回拉分发记录统计
+export type socialservicev1_RefreshSocialDistributionStatsRequest = {
+  id: number | undefined;
+};
+
+// 请求 - 统计历史
+export type socialservicev1_ListSocialDistributionStatsHistoryRequest = {
+  id: number | undefined;
+  limit?: number;
+};
+
+// 回应 - 统计历史
+export type socialservicev1_ListSocialDistributionStatsHistoryResponse = {
+  items: socialservicev1_SocialStatsHistoryPoint[] | undefined;
+};
+
+// 统计历史快照点
+export type socialservicev1_SocialStatsHistoryPoint = {
+  likes?: number;
+  recordedAt?: wellKnownTimestamp;
+  replies?: number;
+  reposts?: number;
+};
+
+// 分发汇总指标
+export type socialservicev1_SocialDistributionSummary = {
+  publishedLast7Days?: number;
+  totalLikes?: number;
+  totalPublished?: number;
+  totalReplies?: number;
+  totalReposts?: number;
+};
+
+// 请求 - 移动分发状态（看板拖拽）
+export type socialservicev1_MoveSocialDistributionRequest = {
+  id: number | undefined;
+  targetStatus: socialservicev1_SocialDistribution_Status | undefined;
+};
+
+// 请求 - 收件箱列表
+export type socialservicev1_ListSocialInboxRequest = {
+  accountId?: number;
+  limit?: number;
+  unreadOnly?: boolean;
+};
+
+// 回应 - 收件箱列表
+export type socialservicev1_ListSocialInboxResponse = {
+  items: socialservicev1_SocialInboxItem[] | undefined;
+  unreadCount: number | undefined;
+};
+
+// 社交收件箱条目（平台回复/提及回拉）
+export type socialservicev1_SocialInboxItem = {
+  accountId?: number;
+  authorHandle?: string;
+  authorName?: string;
+  content?: string;
+  createdAt?: wellKnownTimestamp;
+  createdBy?: number;
+  deletedAt?: wellKnownTimestamp;
+  deletedBy?: number;
+  externalId?: string;
+  id?: number;
+  occurredAt?: wellKnownTimestamp;
+  platform?: socialservicev1_Platform;
+  readAt?: wellKnownTimestamp;
+  type?: string;
+  updatedAt?: wellKnownTimestamp;
+  updatedBy?: number;
+  url?: string;
+};
+
+// 请求 - 标记收件项已读
+export type socialservicev1_MarkSocialInboxReadRequest = {
+  id: number | undefined;
+};
+
+// 统计服务（后台分析页 BFF 转发）。仅转发至 core StatsService，
+// 供 admin 分析页读取概览卡片与图表数据，全部为只读查询。
+// 租户范围由鉴权上下文透传的 viewer 决定。
+export interface StatsService {
+  // 分析页概览卡片数据
+  GetDashboardOverview(
+    request: statsservicev1_GetDashboardOverviewRequest,
+  ): Promise<statsservicev1_GetDashboardOverviewResponse>;
+  // 内容增长趋势（近 N 天按天聚合）
+  GetContentTrend(
+    request: statsservicev1_GetContentTrendRequest,
+  ): Promise<statsservicev1_GetContentTrendResponse>;
+  // 互动统计（点赞 TOP N + 类型分布）
+  GetInteractionStats(
+    request: statsservicev1_GetInteractionStatsRequest,
+  ): Promise<statsservicev1_GetInteractionStatsResponse>;
+  // 登录活跃趋势（近 N 天成功/失败按天聚合）
+  GetLoginActivity(
+    request: statsservicev1_GetLoginActivityRequest,
+  ): Promise<statsservicev1_GetLoginActivityResponse>;
+  // AI 用量趋势（近 N 天调用次数与 token 消耗按天聚合）
+  GetAiUsageTrend(
+    request: statsservicev1_TrendRequest,
+  ): Promise<statsservicev1_GetAiUsageTrendResponse>;
+  // API 调用量趋势（近 N 天网关请求按天聚合）
+  GetApiCallTrend(
+    request: statsservicev1_TrendRequest,
+  ): Promise<statsservicev1_GetApiCallTrendResponse>;
+  // 帖子状态分布（排除回收站）
+  GetPostStatusDistribution(
+    request: statsservicev1_GetPostStatusDistributionRequest,
+  ): Promise<statsservicev1_GetPostStatusDistributionResponse>;
+  // 评论状态分布（NULL 状态按已通过计）
+  GetCommentStatusDistribution(
+    request: statsservicev1_GetCommentStatusDistributionRequest,
+  ): Promise<statsservicev1_GetCommentStatusDistributionResponse>;
+  // 媒体类型分布（NULL 类型按其他计）
+  GetMediaAssetTypeDistribution(
+    request: statsservicev1_GetMediaAssetTypeDistributionRequest,
+  ): Promise<statsservicev1_GetMediaAssetTypeDistributionResponse>;
+}
+
+export function createStatsServiceClient(
+  transport: ClientTransport,
+): StatsService {
+  return {
+    GetDashboardOverview(_request) {
+      const path = `/admin/v1/stats/overview`;
+      const body = null;
+      return transport.unary(path, 'GET', body, {
+        service: 'StatsService',
+        method: 'GetDashboardOverview',
+      }) as Promise<statsservicev1_GetDashboardOverviewResponse>;
+    },
+    GetContentTrend(request) {
+      const path = `/admin/v1/stats/content-trend`;
+      const body = null;
+      const queryParams: string[] = [];
+      if (request.days) {
+        queryParams.push(
+          `days=${encodeURIComponent(request.days.toString())}`,
+        );
+      }
+      let uri = path;
+      if (queryParams.length > 0) {
+        uri += `?${queryParams.join('&')}`;
+      }
+      return transport.unary(uri, 'GET', body, {
+        service: 'StatsService',
+        method: 'GetContentTrend',
+      }) as Promise<statsservicev1_GetContentTrendResponse>;
+    },
+    GetInteractionStats(request) {
+      const path = `/admin/v1/stats/interactions`;
+      const body = null;
+      const queryParams: string[] = [];
+      if (request.topN) {
+        queryParams.push(
+          `topN=${encodeURIComponent(request.topN.toString())}`,
+        );
+      }
+      let uri = path;
+      if (queryParams.length > 0) {
+        uri += `?${queryParams.join('&')}`;
+      }
+      return transport.unary(uri, 'GET', body, {
+        service: 'StatsService',
+        method: 'GetInteractionStats',
+      }) as Promise<statsservicev1_GetInteractionStatsResponse>;
+    },
+    GetLoginActivity(request) {
+      const path = `/admin/v1/stats/login-activity`;
+      const body = null;
+      const queryParams: string[] = [];
+      if (request.days) {
+        queryParams.push(
+          `days=${encodeURIComponent(request.days.toString())}`,
+        );
+      }
+      let uri = path;
+      if (queryParams.length > 0) {
+        uri += `?${queryParams.join('&')}`;
+      }
+      return transport.unary(uri, 'GET', body, {
+        service: 'StatsService',
+        method: 'GetLoginActivity',
+      }) as Promise<statsservicev1_GetLoginActivityResponse>;
+    },
+    GetAiUsageTrend(request) {
+      const path = `/admin/v1/stats/ai-usage-trend`;
+      const body = null;
+      const queryParams: string[] = [];
+      if (request.days) {
+        queryParams.push(
+          `days=${encodeURIComponent(request.days.toString())}`,
+        );
+      }
+      let uri = path;
+      if (queryParams.length > 0) {
+        uri += `?${queryParams.join('&')}`;
+      }
+      return transport.unary(uri, 'GET', body, {
+        service: 'StatsService',
+        method: 'GetAiUsageTrend',
+      }) as Promise<statsservicev1_GetAiUsageTrendResponse>;
+    },
+    GetApiCallTrend(request) {
+      const path = `/admin/v1/stats/api-call-trend`;
+      const body = null;
+      const queryParams: string[] = [];
+      if (request.days) {
+        queryParams.push(
+          `days=${encodeURIComponent(request.days.toString())}`,
+        );
+      }
+      let uri = path;
+      if (queryParams.length > 0) {
+        uri += `?${queryParams.join('&')}`;
+      }
+      return transport.unary(uri, 'GET', body, {
+        service: 'StatsService',
+        method: 'GetApiCallTrend',
+      }) as Promise<statsservicev1_GetApiCallTrendResponse>;
+    },
+    GetPostStatusDistribution(_request) {
+      const path = `/admin/v1/stats/post-status-distribution`;
+      const body = null;
+      return transport.unary(path, 'GET', body, {
+        service: 'StatsService',
+        method: 'GetPostStatusDistribution',
+      }) as Promise<statsservicev1_GetPostStatusDistributionResponse>;
+    },
+    GetCommentStatusDistribution(_request) {
+      const path = `/admin/v1/stats/comment-status-distribution`;
+      const body = null;
+      return transport.unary(path, 'GET', body, {
+        service: 'StatsService',
+        method: 'GetCommentStatusDistribution',
+      }) as Promise<statsservicev1_GetCommentStatusDistributionResponse>;
+    },
+    GetMediaAssetTypeDistribution(_request) {
+      const path = `/admin/v1/stats/media-type-distribution`;
+      const body = null;
+      return transport.unary(path, 'GET', body, {
+        service: 'StatsService',
+        method: 'GetMediaAssetTypeDistribution',
+      }) as Promise<statsservicev1_GetMediaAssetTypeDistributionResponse>;
+    },
+  };
+}
+export type statsservicev1_GetDashboardOverviewRequest = {
+};
+
+export type statsservicev1_GetDashboardOverviewResponse = {
+  commentCount: number | undefined;
+  draftPostCount: number | undefined;
+  interactionCount: number | undefined;
+  mediaAssetCount: number | undefined;
+  mediaStorageBytes: number | undefined;
+  newCommentCountWeek: number | undefined;
+  newLikeCountWeek: number | undefined;
+  newMediaCountWeek: number | undefined;
+  newMediaStorageBytesWeek: number | undefined;
+  newPostCountWeek: number | undefined;
+  newUserCountWeek: number | undefined;
+  pendingCommentCount: number | undefined;
+  postCount: number | undefined;
+  scheduledPostCount: number | undefined;
+  userCount: number | undefined;
+};
+
+// 天数参数。服务端 clamp：缺省/非正数取 30，上限 90。
+export type statsservicev1_GetContentTrendRequest = {
+  days: number | undefined;
+};
+
+export type statsservicev1_GetContentTrendResponse = {
+  comments: statsservicev1_DailyCount[] | undefined;
+  posts: statsservicev1_DailyCount[] | undefined;
+  users: statsservicev1_DailyCount[] | undefined;
+};
+
+// 单日计数点。date 为 YYYY-MM-DD（数据库本地时区）。
+export type statsservicev1_DailyCount = {
+  date: string | undefined;
+  value: number | undefined;
+};
+
+// TOP N 参数。服务端 clamp：缺省/非正数取 10，上限 50。
+export type statsservicev1_GetInteractionStatsRequest = {
+  topN: number | undefined;
+};
+
+export type statsservicev1_GetInteractionStatsResponse = {
+  topLikedPosts: statsservicev1_InteractionTopItem[] | undefined;
+  topViewedPosts: statsservicev1_InteractionTopItem[] | undefined;
+  totalLikes: number | undefined;
+  totalViews: number | undefined;
+  totalWatches: number | undefined;
+};
+
+// 点赞 TOP 榜条目。已删除的帖子不出现在榜单中。
+export type statsservicev1_InteractionTopItem = {
+  likeCount: number | undefined;
+  targetId: number | undefined;
+  title: string | undefined;
+};
+
+// 天数参数。服务端 clamp：缺省/非正数取 30，上限 90。
+export type statsservicev1_GetLoginActivityRequest = {
+  days: number | undefined;
+};
+
+export type statsservicev1_GetLoginActivityResponse = {
+  activeUsers: statsservicev1_DailyCount[] | undefined;
+  failed: statsservicev1_DailyCount[] | undefined;
+  success: statsservicev1_DailyCount[] | undefined;
+};
+
+// 天数参数。服务端 clamp：缺省/非正数取 30，上限 90。
+export type statsservicev1_TrendRequest = {
+  days: number | undefined;
+};
+
+export type statsservicev1_GetAiUsageTrendResponse = {
+  calls: statsservicev1_DailyCount[] | undefined;
+  tokens: statsservicev1_DailyCount[] | undefined;
+};
+
+export type statsservicev1_GetApiCallTrendResponse = {
+  calls: statsservicev1_DailyCount[] | undefined;
+};
+
+export type statsservicev1_GetPostStatusDistributionRequest = {
+};
+
+export type statsservicev1_GetPostStatusDistributionResponse = {
+  items: statsservicev1_StatusCount[] | undefined;
+};
+
+export type statsservicev1_StatusCount = {
+  count: number | undefined;
+  status: string | undefined;
+};
+
+export type statsservicev1_GetCommentStatusDistributionRequest = {
+};
+
+export type statsservicev1_GetCommentStatusDistributionResponse = {
+  items: statsservicev1_StatusCount[] | undefined;
+};
+
+export type statsservicev1_GetMediaAssetTypeDistributionRequest = {
+};
+
+export type statsservicev1_GetMediaAssetTypeDistributionResponse = {
+  // 复用 StatusCount：status 字段此处承载媒体类型枚举值（如 ASSET_TYPE_IMAGE）。
+  items: statsservicev1_StatusCount[] | undefined;
+};
+
+// 标签服务
+export interface TagService {
+  // 获取标签列表
+  List(
+    request: pagination_PagingRequest,
+  ): Promise<contentservicev1_ListTagResponse>;
+  // 获取标签数据
+  Get(
+    request: contentservicev1_GetTagRequest,
+  ): Promise<contentservicev1_Tag>;
+  // 创建标签
+  Create(
+    request: contentservicev1_CreateTagRequest,
+  ): Promise<contentservicev1_Tag>;
+  // 更新标签
+  Update(
+    request: contentservicev1_UpdateTagRequest,
+  ): Promise<contentservicev1_Tag>;
+  // 删除标签
+  Delete(
+    request: contentservicev1_DeleteTagRequest,
+  ): Promise<wellKnownEmpty>;
+}
+
+export function createTagServiceClient(
+  transport: ClientTransport,
+): TagService {
+  return {
+    List(request) {
+      const path = `/admin/v1/tags`;
+      const body = null;
+      const queryParams: string[] = [];
+      if (request.page) {
+        queryParams.push(
+          `page=${encodeURIComponent(request.page.toString())}`,
+        );
+      }
+      if (request.pageSize) {
+        queryParams.push(
+          `pageSize=${encodeURIComponent(request.pageSize.toString())}`,
+        );
+      }
+      if (request.offset) {
+        queryParams.push(
+          `offset=${encodeURIComponent(request.offset.toString())}`,
+        );
+      }
+      if (request.limit) {
+        queryParams.push(
+          `limit=${encodeURIComponent(request.limit.toString())}`,
+        );
+      }
+      if (request.token) {
+        queryParams.push(
+          `token=${encodeURIComponent(request.token.toString())}`,
+        );
+      }
+      if (request.noPaging) {
+        queryParams.push(
+          `noPaging=${encodeURIComponent(request.noPaging.toString())}`,
+        );
+      }
+      if (request.query) {
+        queryParams.push(
+          `query=${encodeURIComponent(request.query.toString())}`,
+        );
+      }
+      if (request.filter) {
+        queryParams.push(
+          `filter=${encodeURIComponent(request.filter.toString())}`,
+        );
+      }
+      if (request.filterExpr?.type) {
+        queryParams.push(
+          `filterExpr.type=${encodeURIComponent(request.filterExpr.type.toString())}`,
+        );
+      }
+      if (request.orderBy) {
+        queryParams.push(
+          `orderBy=${encodeURIComponent(request.orderBy.toString())}`,
         );
       }
       if (request.fieldMask) {
@@ -9354,7 +14538,7 @@ export function createTagServiceClient(
       if (request.id === undefined || request.id === null) {
         throw new Error('missing required field request.id');
       }
-      const path = `admin/v1/tags/${request.id}`;
+      const path = `/admin/v1/tags/${request.id}`;
       const body = null;
       const queryParams: string[] = [];
       if (request.code) {
@@ -9382,7 +14566,7 @@ export function createTagServiceClient(
       }) as Promise<contentservicev1_Tag>;
     },
     Create(request) {
-      const path = `admin/v1/tags`;
+      const path = `/admin/v1/tags`;
       const body = JSON.stringify(request);
       return transport.unary(path, 'POST', body, {
         service: 'TagService',
@@ -9393,8 +14577,10 @@ export function createTagServiceClient(
       if (request.id === undefined || request.id === null) {
         throw new Error('missing required field request.id');
       }
-      const path = `admin/v1/tags/${request.id}`;
-      const body = JSON.stringify(request);
+      const path = `/admin/v1/tags/${request.id}`;
+      const bodyMap = { ...request } as Record<string, unknown>;
+      delete bodyMap["id"];
+      const body = JSON.stringify(bodyMap);
       return transport.unary(path, 'PUT', body, {
         service: 'TagService',
         method: 'Update',
@@ -9404,7 +14590,7 @@ export function createTagServiceClient(
       if (request.id === undefined || request.id === null) {
         throw new Error('missing required field request.id');
       }
-      const path = `admin/v1/tags/${request.id}`;
+      const path = `/admin/v1/tags/${request.id}`;
       const body = null;
       return transport.unary(path, 'DELETE', body, {
         service: 'TagService',
@@ -9501,6 +14687,10 @@ export interface TaskService {
   Get(
     request: taskservicev1_GetTaskRequest,
   ): Promise<taskservicev1_Task>;
+  /** Alternate HTTP binding #1 of Get: GET /admin/v1/tasks/type-name/{type_name} */
+  GetAlt1(
+    request: taskservicev1_GetTaskRequest,
+  ): Promise<taskservicev1_Task>;
   // 创建调度任务
   Create(
     request: taskservicev1_CreateTaskRequest,
@@ -9537,6 +14727,10 @@ export interface TaskService {
   ListTaskExecutions(
     request: taskservicev1_ListTaskExecutionsRequest,
   ): Promise<taskservicev1_ListTaskExecutionsResponse>;
+  // 一站式巡检系统级常驻任务（只读 asynq Inspector，无副作用）
+  InspectSystemTasks(
+    request: taskservicev1_InspectSystemTasksRequest,
+  ): Promise<taskservicev1_InspectSystemTasksResponse>;
 }
 
 export function createTaskServiceClient(
@@ -9544,7 +14738,7 @@ export function createTaskServiceClient(
 ): TaskService {
   return {
     List(request) {
-      const path = `admin/v1/tasks`;
+      const path = `/admin/v1/tasks`;
       const body = null;
       const queryParams: string[] = [];
       if (request.page) {
@@ -9592,56 +14786,9 @@ export function createTaskServiceClient(
           `filterExpr.type=${encodeURIComponent(request.filterExpr.type.toString())}`,
         );
       }
-      if (request.filterExpr?.conditions?.field) {
-        queryParams.push(
-          `filterExpr.conditions.field=${encodeURIComponent(request.filterExpr.conditions.field.toString())}`,
-        );
-      }
-      if (request.filterExpr?.conditions?.op) {
-        queryParams.push(
-          `filterExpr.conditions.op=${encodeURIComponent(request.filterExpr.conditions.op.toString())}`,
-        );
-      }
-      if (request.filterExpr?.conditions?.value) {
-        queryParams.push(
-          `filterExpr.conditions.value=${encodeURIComponent(request.filterExpr.conditions.value.toString())}`,
-        );
-      }
-      if (request.filterExpr?.conditions?.jsonValue) {
-        queryParams.push(
-          `filterExpr.conditions.jsonValue=${encodeURIComponent(request.filterExpr.conditions.jsonValue.toString())}`,
-        );
-      }
-      if (request.filterExpr?.conditions?.values) {
-        request.filterExpr.conditions.values.forEach((x) => {
-          queryParams.push(
-            `filterExpr.conditions.values=${encodeURIComponent(x.toString())}`,
-          );
-        });
-      }
-      if (request.filterExpr?.conditions?.datePart) {
-        queryParams.push(
-          `filterExpr.conditions.datePart=${encodeURIComponent(request.filterExpr.conditions.datePart.toString())}`,
-        );
-      }
-      if (request.filterExpr?.conditions?.jsonPath) {
-        queryParams.push(
-          `filterExpr.conditions.jsonPath=${encodeURIComponent(request.filterExpr.conditions.jsonPath.toString())}`,
-        );
-      }
       if (request.orderBy) {
         queryParams.push(
           `orderBy=${encodeURIComponent(request.orderBy.toString())}`,
-        );
-      }
-      if (request.sorting?.field) {
-        queryParams.push(
-          `sorting.field=${encodeURIComponent(request.sorting.field.toString())}`,
-        );
-      }
-      if (request.sorting?.direction) {
-        queryParams.push(
-          `sorting.direction=${encodeURIComponent(request.sorting.direction.toString())}`,
         );
       }
       if (request.fieldMask) {
@@ -9662,7 +14809,7 @@ export function createTaskServiceClient(
       if (request.id === undefined || request.id === null) {
         throw new Error('missing required field request.id');
       }
-      const path = `admin/v1/tasks/${request.id}`;
+      const path = `/admin/v1/tasks/${request.id}`;
       const body = null;
       const queryParams: string[] = [];
       if (request.typeName) {
@@ -9684,8 +14831,36 @@ export function createTaskServiceClient(
         method: 'Get',
       }) as Promise<taskservicev1_Task>;
     },
+
+    // Alternate HTTP binding #1 of Get: GET /admin/v1/tasks/type-name/{type_name}
+    GetAlt1(request) {
+      if (request.typeName === undefined || request.typeName === null) {
+        throw new Error('missing required field request.type_name');
+      }
+      const path = `/admin/v1/tasks/type-name/${request.typeName}`;
+      const body = null;
+      const queryParams: string[] = [];
+      if (request.id) {
+        queryParams.push(
+          `id=${encodeURIComponent(request.id.toString())}`,
+        );
+      }
+      if (request.viewMask) {
+        queryParams.push(
+          `viewMask=${encodeURIComponent(request.viewMask.toString())}`,
+        );
+      }
+      let uri = path;
+      if (queryParams.length > 0) {
+        uri += `?${queryParams.join('&')}`;
+      }
+      return transport.unary(uri, 'GET', body, {
+        service: 'TaskService',
+        method: 'Get',
+      }) as Promise<taskservicev1_Task>;
+    },
     Create(request) {
-      const path = `admin/v1/tasks`;
+      const path = `/admin/v1/tasks`;
       const body = JSON.stringify(request);
       return transport.unary(path, 'POST', body, {
         service: 'TaskService',
@@ -9696,8 +14871,10 @@ export function createTaskServiceClient(
       if (request.id === undefined || request.id === null) {
         throw new Error('missing required field request.id');
       }
-      const path = `admin/v1/tasks/${request.id}`;
-      const body = JSON.stringify(request);
+      const path = `/admin/v1/tasks/${request.id}`;
+      const bodyMap = { ...request } as Record<string, unknown>;
+      delete bodyMap["id"];
+      const body = JSON.stringify(bodyMap);
       return transport.unary(path, 'PUT', body, {
         service: 'TaskService',
         method: 'Update',
@@ -9707,7 +14884,7 @@ export function createTaskServiceClient(
       if (request.id === undefined || request.id === null) {
         throw new Error('missing required field request.id');
       }
-      const path = `admin/v1/tasks/${request.id}`;
+      const path = `/admin/v1/tasks/${request.id}`;
       const body = null;
       return transport.unary(path, 'DELETE', body, {
         service: 'TaskService',
@@ -9715,7 +14892,7 @@ export function createTaskServiceClient(
       }) as Promise<wellKnownEmpty>;
     },
     ListTaskTypeName(_request) {
-      const path = `admin/v1/tasks:type-names`;
+      const path = `/admin/v1/tasks:type-names`;
       const body = null;
       return transport.unary(path, 'GET', body, {
         service: 'TaskService',
@@ -9723,7 +14900,7 @@ export function createTaskServiceClient(
       }) as Promise<taskservicev1_ListTaskTypeNameResponse>;
     },
     RestartAllTask(request) {
-      const path = `admin/v1/tasks:restart`;
+      const path = `/admin/v1/tasks:restart`;
       const body = JSON.stringify(request);
       return transport.unary(path, 'POST', body, {
         service: 'TaskService',
@@ -9731,7 +14908,7 @@ export function createTaskServiceClient(
       }) as Promise<taskservicev1_RestartAllTaskResponse>;
     },
     StartAllTask(request) {
-      const path = `admin/v1/tasks:start`;
+      const path = `/admin/v1/tasks:start`;
       const body = JSON.stringify(request);
       return transport.unary(path, 'POST', body, {
         service: 'TaskService',
@@ -9739,7 +14916,7 @@ export function createTaskServiceClient(
       }) as Promise<wellKnownEmpty>;
     },
     StopAllTask(request) {
-      const path = `admin/v1/tasks:stop`;
+      const path = `/admin/v1/tasks:stop`;
       const body = JSON.stringify(request);
       return transport.unary(path, 'POST', body, {
         service: 'TaskService',
@@ -9747,7 +14924,7 @@ export function createTaskServiceClient(
       }) as Promise<wellKnownEmpty>;
     },
     ControlTask(request) {
-      const path = `admin/v1/tasks:control`;
+      const path = `/admin/v1/tasks:control`;
       const body = JSON.stringify(request);
       return transport.unary(path, 'POST', body, {
         service: 'TaskService',
@@ -9755,7 +14932,7 @@ export function createTaskServiceClient(
       }) as Promise<wellKnownEmpty>;
     },
     ListTaskExecutions(request) {
-      const path = `admin/v1/tasks:executions`;
+      const path = `/admin/v1/tasks:executions`;
       const body = null;
       const queryParams: string[] = [];
       if (request.typeName) {
@@ -9781,6 +14958,14 @@ export function createTaskServiceClient(
         service: 'TaskService',
         method: 'ListTaskExecutions',
       }) as Promise<taskservicev1_ListTaskExecutionsResponse>;
+    },
+    InspectSystemTasks(request) {
+      const path = `/admin/v1/tasks:inspect`;
+      const body = JSON.stringify(request);
+      return transport.unary(path, 'POST', body, {
+        service: 'TaskService',
+        method: 'InspectSystemTasks',
+      }) as Promise<taskservicev1_InspectSystemTasksResponse>;
     },
   };
 }
@@ -9941,6 +15126,55 @@ export type taskservicev1_TaskExecution = {
   typeName?: string;
 };
 
+// 手动触发巡检（系统级常驻任务可视化，只读 asynq，无副作用）
+export type taskservicev1_InspectSystemTasksRequest = {
+};
+
+export type taskservicev1_InspectSystemTasksResponse = {
+  // asynq 队列名（当前配置）
+  queue: string | undefined;
+  schedules: taskservicev1_SystemTaskScheduleEntry[] | undefined;
+  // 只汇总系统级常驻任务涉及的任务类型；无任何记录时不出现在结果里
+  summaries: taskservicev1_SystemTaskStateSummary[] | undefined;
+};
+
+// 系统级常驻任务的调度条目（asynq SchedulerEntries 的只读投影）。
+// Prev 为零值时间表示从未入队过（调度注册后还没到第一个触发点）。
+export type taskservicev1_SystemTaskScheduleEntry = {
+  // cron 表达式
+  cronSpec: string | undefined;
+  nextEnqueueAt: undefined | wellKnownTimestamp;
+  // 上次入队时间；从未入队为空
+  prevEnqueueAt: undefined | wellKnownTimestamp;
+  // 任务类型名（载荷里的 handler/类型，如 post.scheduled.sweep）
+  taskType: string | undefined;
+};
+
+// 单任务类型在队列里的状态摘要
+export type taskservicev1_SystemTaskStateSummary = {
+  active: number | undefined;
+  archived: number | undefined;
+  pending: number | undefined;
+  // 最近失败明细（retry + archived 合并、按失败时间倒序、截断）
+  recentFailures: taskservicev1_SystemTaskFailure[] | undefined;
+  retry: number | undefined;
+  taskType: string | undefined;
+};
+
+// 失败任务明细（retry/archived 里的单条）
+export type taskservicev1_SystemTaskFailure = {
+  lastError: string | undefined;
+  lastFailedAt: undefined | wellKnownTimestamp;
+  maxRetry: number | undefined;
+  // 下次重试时间（archived 无）
+  nextProcessAt: undefined | wellKnownTimestamp;
+  queue: string | undefined;
+  retried: number | undefined;
+  // retry 或 archived
+  state: string | undefined;
+  taskType: string | undefined;
+};
+
 // 租户管理服务
 export interface TenantService {
   // 获取租户列表
@@ -9978,7 +15212,7 @@ export function createTenantServiceClient(
 ): TenantService {
   return {
     List(request) {
-      const path = `admin/v1/tenants`;
+      const path = `/admin/v1/tenants`;
       const body = null;
       const queryParams: string[] = [];
       if (request.page) {
@@ -10026,56 +15260,9 @@ export function createTenantServiceClient(
           `filterExpr.type=${encodeURIComponent(request.filterExpr.type.toString())}`,
         );
       }
-      if (request.filterExpr?.conditions?.field) {
-        queryParams.push(
-          `filterExpr.conditions.field=${encodeURIComponent(request.filterExpr.conditions.field.toString())}`,
-        );
-      }
-      if (request.filterExpr?.conditions?.op) {
-        queryParams.push(
-          `filterExpr.conditions.op=${encodeURIComponent(request.filterExpr.conditions.op.toString())}`,
-        );
-      }
-      if (request.filterExpr?.conditions?.value) {
-        queryParams.push(
-          `filterExpr.conditions.value=${encodeURIComponent(request.filterExpr.conditions.value.toString())}`,
-        );
-      }
-      if (request.filterExpr?.conditions?.jsonValue) {
-        queryParams.push(
-          `filterExpr.conditions.jsonValue=${encodeURIComponent(request.filterExpr.conditions.jsonValue.toString())}`,
-        );
-      }
-      if (request.filterExpr?.conditions?.values) {
-        request.filterExpr.conditions.values.forEach((x) => {
-          queryParams.push(
-            `filterExpr.conditions.values=${encodeURIComponent(x.toString())}`,
-          );
-        });
-      }
-      if (request.filterExpr?.conditions?.datePart) {
-        queryParams.push(
-          `filterExpr.conditions.datePart=${encodeURIComponent(request.filterExpr.conditions.datePart.toString())}`,
-        );
-      }
-      if (request.filterExpr?.conditions?.jsonPath) {
-        queryParams.push(
-          `filterExpr.conditions.jsonPath=${encodeURIComponent(request.filterExpr.conditions.jsonPath.toString())}`,
-        );
-      }
       if (request.orderBy) {
         queryParams.push(
           `orderBy=${encodeURIComponent(request.orderBy.toString())}`,
-        );
-      }
-      if (request.sorting?.field) {
-        queryParams.push(
-          `sorting.field=${encodeURIComponent(request.sorting.field.toString())}`,
-        );
-      }
-      if (request.sorting?.direction) {
-        queryParams.push(
-          `sorting.direction=${encodeURIComponent(request.sorting.direction.toString())}`,
         );
       }
       if (request.fieldMask) {
@@ -10096,7 +15283,7 @@ export function createTenantServiceClient(
       if (request.id === undefined || request.id === null) {
         throw new Error('missing required field request.id');
       }
-      const path = `admin/v1/tenants/${request.id}`;
+      const path = `/admin/v1/tenants/${request.id}`;
       const body = null;
       const queryParams: string[] = [];
       if (request.code) {
@@ -10124,7 +15311,7 @@ export function createTenantServiceClient(
       }) as Promise<identityservicev1_Tenant>;
     },
     Create(request) {
-      const path = `admin/v1/tenants`;
+      const path = `/admin/v1/tenants`;
       const body = JSON.stringify(request);
       return transport.unary(path, 'POST', body, {
         service: 'TenantService',
@@ -10135,8 +15322,10 @@ export function createTenantServiceClient(
       if (request.id === undefined || request.id === null) {
         throw new Error('missing required field request.id');
       }
-      const path = `admin/v1/tenants/${request.id}`;
-      const body = JSON.stringify(request);
+      const path = `/admin/v1/tenants/${request.id}`;
+      const bodyMap = { ...request } as Record<string, unknown>;
+      delete bodyMap["id"];
+      const body = JSON.stringify(bodyMap);
       return transport.unary(path, 'PUT', body, {
         service: 'TenantService',
         method: 'Update',
@@ -10146,7 +15335,7 @@ export function createTenantServiceClient(
       if (request.id === undefined || request.id === null) {
         throw new Error('missing required field request.id');
       }
-      const path = `admin/v1/tenants/${request.id}`;
+      const path = `/admin/v1/tenants/${request.id}`;
       const body = null;
       const queryParams: string[] = [];
       if (request.code) {
@@ -10164,7 +15353,7 @@ export function createTenantServiceClient(
       }) as Promise<wellKnownEmpty>;
     },
     CreateTenantWithAdminUser(request) {
-      const path = `admin/v1/tenants:with-admin`;
+      const path = `/admin/v1/tenants:with-admin`;
       const body = JSON.stringify(request);
       return transport.unary(path, 'POST', body, {
         service: 'TenantService',
@@ -10172,7 +15361,7 @@ export function createTenantServiceClient(
       }) as Promise<wellKnownEmpty>;
     },
     TenantExists(request) {
-      const path = `admin/v1/tenants:exists`;
+      const path = `/admin/v1/tenants:exists`;
       const body = null;
       const queryParams: string[] = [];
       if (request.code) {
@@ -10302,6 +15491,8 @@ export type identityservicev1_User = {
   lastLoginAt?: wellKnownTimestamp;
   lastLoginIp?: string;
   likeCount?: number;
+  // 偏好语言（事务性邮件/监控告警按收件人渲染；zh-CN/en-US，空=默认中文）
+  locale?: string;
   lockedUntil?: wellKnownTimestamp;
   mobile?: string;
   nickname?: string;
@@ -10354,77 +15545,61 @@ export type identityservicev1_TenantExistsResponse = {
   exist: boolean | undefined;
 };
 
-// 翻译服务
-export interface TranslatorService {
-  // 翻译文本
-  Translate(
-    request: translatorservicev1_TranslateRequest,
-  ): Promise<translatorservicev1_TranslateResponse>;
-}
-
-export function createTranslatorServiceClient(
-  transport: ClientTransport,
-): TranslatorService {
-  return {
-    Translate(request) {
-      const path = `admin/v1/translate`;
-      const body = JSON.stringify(request);
-      return transport.unary(path, 'POST', body, {
-        service: 'TranslatorService',
-        method: 'Translate',
-      }) as Promise<translatorservicev1_TranslateResponse>;
-    },
-  };
-}
-export type translatorservicev1_TranslateRequest = {
-  content?: string;
-  sourceLanguage?: string;
-  targetLanguage?: string;
-};
-
-export type translatorservicev1_TranslateResponse = {
-  rawContent?: string;
-  translatedContent?: string;
-};
-
-// 用户管理服务
-export interface UserService {
-  // 获取用户列表
+// 租户配额管理 — BFF（平台管理员）
+export interface TenantQuotaService {
+  // 查询租户配额列表
   List(
     request: pagination_PagingRequest,
-  ): Promise<identityservicev1_ListUserResponse>;
-  // 获取用户数据
+  ): Promise<identityservicev1_ListTenantQuotaResponse>;
+  // 查询租户配额详情
   Get(
-    request: identityservicev1_GetUserRequest,
-  ): Promise<identityservicev1_User>;
-  // 创建用户
+    request: identityservicev1_GetTenantQuotaRequest,
+  ): Promise<identityservicev1_TenantQuota>;
+  // 创建租户配额
   Create(
-    request: identityservicev1_CreateUserRequest,
-  ): Promise<identityservicev1_User>;
-  // 更新用户
+    request: identityservicev1_CreateTenantQuotaRequest,
+  ): Promise<wellKnownEmpty>;
+  // 更新租户配额
   Update(
-    request: identityservicev1_UpdateUserRequest,
+    request: identityservicev1_UpdateTenantQuotaRequest,
   ): Promise<wellKnownEmpty>;
-  // 删除用户
+  // 删除租户配额
   Delete(
-    request: identityservicev1_DeleteUserRequest,
+    request: identityservicev1_DeleteTenantQuotaRequest,
   ): Promise<wellKnownEmpty>;
-  // 用户是否存在
-  UserExists(
-    request: identityservicev1_UserExistsRequest,
-  ): Promise<identityservicev1_UserExistsResponse>;
-  // 修改用户密码
-  EditUserPassword(
-    request: identityservicev1_EditUserPasswordRequest,
+  // 聚合查询指定租户的当前用量与配额上限（平台管理员视图）
+  GetUsage(
+    request: identityservicev1_GetTenantUsageRequest,
+  ): Promise<identityservicev1_TenantUsage>;
+  // 获取当前租户的用量与配额（租户自助；tenant_id 从认证上下文取，不接受客户端传值）。
+  // 配额硬限制 403 时，租户管理员可在此看到原因。
+  GetMyTenantUsage(
+    request: identityservicev1_GetMyTenantUsageRequest,
+  ): Promise<identityservicev1_TenantUsage>;
+  // 列出套餐模板
+  ListQuotaPlans(
+    request: identityservicev1_ListQuotaPlansRequest,
+  ): Promise<identityservicev1_ListQuotaPlansResponse>;
+  // 创建套餐模板
+  CreateQuotaPlan(
+    request: identityservicev1_CreateQuotaPlanRequest,
+  ): Promise<identityservicev1_QuotaPlan>;
+  // 删除套餐模板
+  DeleteQuotaPlan(
+    request: identityservicev1_DeleteQuotaPlanRequest,
   ): Promise<wellKnownEmpty>;
+  // 套用到租户（按模板逐项 upsert 该租户配额）
+  ApplyQuotaPlan(
+    request: identityservicev1_ApplyQuotaPlanRequest,
+  ): Promise<identityservicev1_ApplyQuotaPlanResponse>;
 }
 
-export function createUserServiceClient(
+export function createTenantQuotaServiceClient(
   transport: ClientTransport,
-): UserService {
+): TenantQuotaService {
   return {
     List(request) {
-      const path = `admin/v1/users`;
+      const path = `/admin/v1/tenant-quotas`;
       const body = null;
       const queryParams: string[] = [];
       if (request.page) {
@@ -10472,56 +15647,402 @@ export function createUserServiceClient(
           `filterExpr.type=${encodeURIComponent(request.filterExpr.type.toString())}`,
         );
       }
-      if (request.filterExpr?.conditions?.field) {
-        queryParams.push(
-          `filterExpr.conditions.field=${encodeURIComponent(request.filterExpr.conditions.field.toString())}`,
-        );
-      }
-      if (request.filterExpr?.conditions?.op) {
-        queryParams.push(
-          `filterExpr.conditions.op=${encodeURIComponent(request.filterExpr.conditions.op.toString())}`,
-        );
-      }
-      if (request.filterExpr?.conditions?.value) {
-        queryParams.push(
-          `filterExpr.conditions.value=${encodeURIComponent(request.filterExpr.conditions.value.toString())}`,
-        );
-      }
-      if (request.filterExpr?.conditions?.jsonValue) {
-        queryParams.push(
-          `filterExpr.conditions.jsonValue=${encodeURIComponent(request.filterExpr.conditions.jsonValue.toString())}`,
-        );
-      }
-      if (request.filterExpr?.conditions?.values) {
-        request.filterExpr.conditions.values.forEach((x) => {
-          queryParams.push(
-            `filterExpr.conditions.values=${encodeURIComponent(x.toString())}`,
-          );
-        });
-      }
-      if (request.filterExpr?.conditions?.datePart) {
-        queryParams.push(
-          `filterExpr.conditions.datePart=${encodeURIComponent(request.filterExpr.conditions.datePart.toString())}`,
-        );
-      }
-      if (request.filterExpr?.conditions?.jsonPath) {
-        queryParams.push(
-          `filterExpr.conditions.jsonPath=${encodeURIComponent(request.filterExpr.conditions.jsonPath.toString())}`,
-        );
-      }
       if (request.orderBy) {
         queryParams.push(
           `orderBy=${encodeURIComponent(request.orderBy.toString())}`,
         );
       }
-      if (request.sorting?.field) {
+      if (request.fieldMask) {
         queryParams.push(
-          `sorting.field=${encodeURIComponent(request.sorting.field.toString())}`,
+          `fieldMask=${encodeURIComponent(request.fieldMask.toString())}`,
         );
       }
-      if (request.sorting?.direction) {
+      let uri = path;
+      if (queryParams.length > 0) {
+        uri += `?${queryParams.join('&')}`;
+      }
+      return transport.unary(uri, 'GET', body, {
+        service: 'TenantQuotaService',
+        method: 'List',
+      }) as Promise<identityservicev1_ListTenantQuotaResponse>;
+    },
+    Get(request) {
+      if (request.id === undefined || request.id === null) {
+        throw new Error('missing required field request.id');
+      }
+      const path = `/admin/v1/tenant-quotas/${request.id}`;
+      const body = null;
+      const queryParams: string[] = [];
+      if (request.viewMask) {
         queryParams.push(
-          `sorting.direction=${encodeURIComponent(request.sorting.direction.toString())}`,
+          `viewMask=${encodeURIComponent(request.viewMask.toString())}`,
+        );
+      }
+      let uri = path;
+      if (queryParams.length > 0) {
+        uri += `?${queryParams.join('&')}`;
+      }
+      return transport.unary(uri, 'GET', body, {
+        service: 'TenantQuotaService',
+        method: 'Get',
+      }) as Promise<identityservicev1_TenantQuota>;
+    },
+    Create(request) {
+      const path = `/admin/v1/tenant-quotas`;
+      const body = JSON.stringify(request);
+      return transport.unary(path, 'POST', body, {
+        service: 'TenantQuotaService',
+        method: 'Create',
+      }) as Promise<wellKnownEmpty>;
+    },
+    Update(request) {
+      if (request.id === undefined || request.id === null) {
+        throw new Error('missing required field request.id');
+      }
+      const path = `/admin/v1/tenant-quotas/${request.id}`;
+      const bodyMap = { ...request } as Record<string, unknown>;
+      delete bodyMap["id"];
+      const body = JSON.stringify(bodyMap);
+      return transport.unary(path, 'PUT', body, {
+        service: 'TenantQuotaService',
+        method: 'Update',
+      }) as Promise<wellKnownEmpty>;
+    },
+    Delete(request) {
+      if (request.id === undefined || request.id === null) {
+        throw new Error('missing required field request.id');
+      }
+      const path = `/admin/v1/tenant-quotas/${request.id}`;
+      const body = null;
+      return transport.unary(path, 'DELETE', body, {
+        service: 'TenantQuotaService',
+        method: 'Delete',
+      }) as Promise<wellKnownEmpty>;
+    },
+    GetUsage(request) {
+      if (request.tenantId === undefined || request.tenantId === null) {
+        throw new Error('missing required field request.tenant_id');
+      }
+      const path = `/admin/v1/tenants/${request.tenantId}/usage`;
+      const body = null;
+      return transport.unary(path, 'GET', body, {
+        service: 'TenantQuotaService',
+        method: 'GetUsage',
+      }) as Promise<identityservicev1_TenantUsage>;
+    },
+    GetMyTenantUsage(request) {
+      const path = `/admin/v1/my-tenant-usage`;
+      const body = null;
+      const queryParams: string[] = [];
+      if (request.tenantId) {
+        queryParams.push(
+          `tenantId=${encodeURIComponent(request.tenantId.toString())}`,
+        );
+      }
+      let uri = path;
+      if (queryParams.length > 0) {
+        uri += `?${queryParams.join('&')}`;
+      }
+      return transport.unary(uri, 'GET', body, {
+        service: 'TenantQuotaService',
+        method: 'GetMyTenantUsage',
+      }) as Promise<identityservicev1_TenantUsage>;
+    },
+    ListQuotaPlans(_request) {
+      const path = `/admin/v1/quota-plans`;
+      const body = null;
+      return transport.unary(path, 'GET', body, {
+        service: 'TenantQuotaService',
+        method: 'ListQuotaPlans',
+      }) as Promise<identityservicev1_ListQuotaPlansResponse>;
+    },
+    CreateQuotaPlan(request) {
+      const path = `/admin/v1/quota-plans`;
+      const body = JSON.stringify(request);
+      return transport.unary(path, 'POST', body, {
+        service: 'TenantQuotaService',
+        method: 'CreateQuotaPlan',
+      }) as Promise<identityservicev1_QuotaPlan>;
+    },
+    DeleteQuotaPlan(request) {
+      if (request.id === undefined || request.id === null) {
+        throw new Error('missing required field request.id');
+      }
+      const path = `/admin/v1/quota-plans/${request.id}`;
+      const body = null;
+      return transport.unary(path, 'DELETE', body, {
+        service: 'TenantQuotaService',
+        method: 'DeleteQuotaPlan',
+      }) as Promise<wellKnownEmpty>;
+    },
+    ApplyQuotaPlan(request) {
+      if (request.planId === undefined || request.planId === null) {
+        throw new Error('missing required field request.plan_id');
+      }
+      const path = `/admin/v1/quota-plans/${request.planId}/apply`;
+      const bodyMap = { ...request } as Record<string, unknown>;
+      delete bodyMap["planId"];
+      const body = JSON.stringify(bodyMap);
+      return transport.unary(path, 'POST', body, {
+        service: 'TenantQuotaService',
+        method: 'ApplyQuotaPlan',
+      }) as Promise<identityservicev1_ApplyQuotaPlanResponse>;
+    },
+  };
+}
+// 租户配额列表 - 答复
+export type identityservicev1_ListTenantQuotaResponse = {
+  items: identityservicev1_TenantQuota[] | undefined;
+  total: number | undefined;
+};
+
+// 租户配额
+export type identityservicev1_TenantQuota = {
+  createdAt?: wellKnownTimestamp;
+  createdBy?: number;
+  deletedAt?: wellKnownTimestamp;
+  deletedBy?: number;
+  id?: number;
+  quotaType?: identityservicev1_TenantQuota_QuotaType;
+  quotaValue?: number;
+  tenantId?: number;
+  updatedAt?: wellKnownTimestamp;
+  updatedBy?: number;
+};
+
+// 配额类型
+export type identityservicev1_TenantQuota_QuotaType =
+  | 'AI_TOKENS'
+  | 'API_CALL'
+  | 'QUOTA_TYPE_UNSPECIFIED'
+  | 'STORAGE'
+  | 'USER_LIMIT';
+// 查询租户配额 - 请求
+export type identityservicev1_GetTenantQuotaRequest = {
+  id?: number;
+  viewMask?: wellKnownFieldMask;
+};
+
+// 创建租户配额 - 请求
+export type identityservicev1_CreateTenantQuotaRequest = {
+  data: identityservicev1_TenantQuota | undefined;
+};
+
+// 更新租户配额 - 请求
+export type identityservicev1_UpdateTenantQuotaRequest = {
+  allowMissing?: boolean;
+  data: identityservicev1_TenantQuota | undefined;
+  id: number | undefined;
+  updateMask: undefined | wellKnownFieldMask;
+};
+
+// 删除租户配额 - 请求
+export type identityservicev1_DeleteTenantQuotaRequest = {
+  id: number | undefined;
+};
+
+// 查询租户用量 - 请求
+export type identityservicev1_GetTenantUsageRequest = {
+  tenantId: number | undefined;
+};
+
+// 租户用量聚合（计量与闸门同源：同一张表、同一个查询）
+export type identityservicev1_TenantUsage = {
+  aiTokensMonth?: number;
+  apiCallCount?: number;
+  quotas: identityservicev1_QuotaUsage[] | undefined;
+  storageUsedBytes?: number;
+  subscriptionPlan?: string;
+  tenantId?: number;
+  userCount?: number;
+};
+
+// 配额用量对（上限 + 类型；用量在 TenantUsage 的计数字段上）
+export type identityservicev1_QuotaUsage = {
+  quotaType?: identityservicev1_TenantQuota_QuotaType;
+  quotaValue?: number;
+};
+
+// 自助用量 - 请求（tenant_id 由 BFF 从认证上下文注入，不接受客户端传值）
+export type identityservicev1_GetMyTenantUsageRequest = {
+  tenantId: number | undefined;
+};
+
+// 列出套餐 - 请求
+export type identityservicev1_ListQuotaPlansRequest = {
+};
+
+// 列出套餐 - 回应
+export type identityservicev1_ListQuotaPlansResponse = {
+  items: identityservicev1_QuotaPlan[] | undefined;
+};
+
+// 套餐模板
+export type identityservicev1_QuotaPlan = {
+  createdAt?: wellKnownTimestamp;
+  description?: string;
+  id?: number;
+  items: identityservicev1_QuotaPlanItem[] | undefined;
+  name: string | undefined;
+  updatedAt?: wellKnownTimestamp;
+};
+
+// 套餐模板条目
+export type identityservicev1_QuotaPlanItem = {
+  limit: number | undefined;
+  quotaType: identityservicev1_TenantQuota_QuotaType | undefined;
+};
+
+// 创建套餐 - 请求
+export type identityservicev1_CreateQuotaPlanRequest = {
+  data: identityservicev1_QuotaPlan | undefined;
+};
+
+// 删除套餐 - 请求
+export type identityservicev1_DeleteQuotaPlanRequest = {
+  id: number | undefined;
+};
+
+// 套用套餐 - 请求
+export type identityservicev1_ApplyQuotaPlanRequest = {
+  planId: number | undefined;
+  tenantId: number | undefined;
+};
+
+// 套用套餐 - 回应
+export type identityservicev1_ApplyQuotaPlanResponse = {
+  applied: number | undefined;
+};
+
+// 翻译服务
+export interface TranslatorService {
+  // 翻译文本
+  Translate(
+    request: translatorservicev1_TranslateRequest,
+  ): Promise<translatorservicev1_TranslateResponse>;
+}
+
+export function createTranslatorServiceClient(
+  transport: ClientTransport,
+): TranslatorService {
+  return {
+    Translate(request) {
+      const path = `/admin/v1/translate`;
+      const body = JSON.stringify(request);
+      return transport.unary(path, 'POST', body, {
+        service: 'TranslatorService',
+        method: 'Translate',
+      }) as Promise<translatorservicev1_TranslateResponse>;
+    },
+  };
+}
+export type translatorservicev1_TranslateRequest = {
+  content?: string;
+  sourceLanguage?: string;
+  targetLanguage?: string;
+};
+
+export type translatorservicev1_TranslateResponse = {
+  rawContent?: string;
+  translatedContent?: string;
+};
+
+// 用户管理服务
+export interface UserService {
+  // 获取用户列表
+  List(
+    request: pagination_PagingRequest,
+  ): Promise<identityservicev1_ListUserResponse>;
+  // 获取用户数据
+  Get(
+    request: identityservicev1_GetUserRequest,
+  ): Promise<identityservicev1_User>;
+  /** Alternate HTTP binding #1 of Get: GET /admin/v1/users/username/{username} */
+  GetAlt1(
+    request: identityservicev1_GetUserRequest,
+  ): Promise<identityservicev1_User>;
+  // 创建用户
+  Create(
+    request: identityservicev1_CreateUserRequest,
+  ): Promise<identityservicev1_User>;
+  // 更新用户
+  Update(
+    request: identityservicev1_UpdateUserRequest,
+  ): Promise<wellKnownEmpty>;
+  // 删除用户
+  Delete(
+    request: identityservicev1_DeleteUserRequest,
+  ): Promise<wellKnownEmpty>;
+  /** Alternate HTTP binding #1 of Delete: DELETE /admin/v1/users/username/{username} */
+  DeleteAlt1(
+    request: identityservicev1_DeleteUserRequest,
+  ): Promise<wellKnownEmpty>;
+  // 用户是否存在
+  UserExists(
+    request: identityservicev1_UserExistsRequest,
+  ): Promise<identityservicev1_UserExistsResponse>;
+  // 修改用户密码
+  EditUserPassword(
+    request: identityservicev1_EditUserPasswordRequest,
+  ): Promise<wellKnownEmpty>;
+}
+
+export function createUserServiceClient(
+  transport: ClientTransport,
+): UserService {
+  return {
+    List(request) {
+      const path = `/admin/v1/users`;
+      const body = null;
+      const queryParams: string[] = [];
+      if (request.page) {
+        queryParams.push(
+          `page=${encodeURIComponent(request.page.toString())}`,
+        );
+      }
+      if (request.pageSize) {
+        queryParams.push(
+          `pageSize=${encodeURIComponent(request.pageSize.toString())}`,
+        );
+      }
+      if (request.offset) {
+        queryParams.push(
+          `offset=${encodeURIComponent(request.offset.toString())}`,
+        );
+      }
+      if (request.limit) {
+        queryParams.push(
+          `limit=${encodeURIComponent(request.limit.toString())}`,
+        );
+      }
+      if (request.token) {
+        queryParams.push(
+          `token=${encodeURIComponent(request.token.toString())}`,
+        );
+      }
+      if (request.noPaging) {
+        queryParams.push(
+          `noPaging=${encodeURIComponent(request.noPaging.toString())}`,
+        );
+      }
+      if (request.query) {
+        queryParams.push(
+          `query=${encodeURIComponent(request.query.toString())}`,
+        );
+      }
+      if (request.filter) {
+        queryParams.push(
+          `filter=${encodeURIComponent(request.filter.toString())}`,
+        );
+      }
+      if (request.filterExpr?.type) {
+        queryParams.push(
+          `filterExpr.type=${encodeURIComponent(request.filterExpr.type.toString())}`,
+        );
+      }
+      if (request.orderBy) {
+        queryParams.push(
+          `orderBy=${encodeURIComponent(request.orderBy.toString())}`,
         );
       }
       if (request.fieldMask) {
@@ -10542,7 +16063,7 @@ export function createUserServiceClient(
       if (request.id === undefined || request.id === null) {
         throw new Error('missing required field request.id');
       }
-      const path = `admin/v1/users/${request.id}`;
+      const path = `/admin/v1/users/${request.id}`;
       const body = null;
       const queryParams: string[] = [];
       if (request.username) {
@@ -10564,8 +16085,36 @@ export function createUserServiceClient(
         method: 'Get',
       }) as Promise<identityservicev1_User>;
     },
+
+    // Alternate HTTP binding #1 of Get: GET /admin/v1/users/username/{username}
+    GetAlt1(request) {
+      if (request.username === undefined || request.username === null) {
+        throw new Error('missing required field request.username');
+      }
+      const path = `/admin/v1/users/username/${request.username}`;
+      const body = null;
+      const queryParams: string[] = [];
+      if (request.id) {
+        queryParams.push(
+          `id=${encodeURIComponent(request.id.toString())}`,
+        );
+      }
+      if (request.viewMask) {
+        queryParams.push(
+          `viewMask=${encodeURIComponent(request.viewMask.toString())}`,
+        );
+      }
+      let uri = path;
+      if (queryParams.length > 0) {
+        uri += `?${queryParams.join('&')}`;
+      }
+      return transport.unary(uri, 'GET', body, {
+        service: 'UserService',
+        method: 'Get',
+      }) as Promise<identityservicev1_User>;
+    },
     Create(request) {
-      const path = `admin/v1/users`;
+      const path = `/admin/v1/users`;
       const body = JSON.stringify(request);
       return transport.unary(path, 'POST', body, {
         service: 'UserService',
@@ -10576,8 +16125,10 @@ export function createUserServiceClient(
       if (request.id === undefined || request.id === null) {
         throw new Error('missing required field request.id');
       }
-      const path = `admin/v1/users/${request.id}`;
-      const body = JSON.stringify(request);
+      const path = `/admin/v1/users/${request.id}`;
+      const bodyMap = { ...request } as Record<string, unknown>;
+      delete bodyMap["id"];
+      const body = JSON.stringify(bodyMap);
       return transport.unary(path, 'PUT', body, {
         service: 'UserService',
         method: 'Update',
@@ -10587,7 +16138,7 @@ export function createUserServiceClient(
       if (request.id === undefined || request.id === null) {
         throw new Error('missing required field request.id');
       }
-      const path = `admin/v1/users/${request.id}`;
+      const path = `/admin/v1/users/${request.id}`;
       const body = null;
       const queryParams: string[] = [];
       if (request.username) {
@@ -10609,8 +16160,36 @@ export function createUserServiceClient(
         method: 'Delete',
       }) as Promise<wellKnownEmpty>;
     },
+
+    // Alternate HTTP binding #1 of Delete: DELETE /admin/v1/users/username/{username}
+    DeleteAlt1(request) {
+      if (request.username === undefined || request.username === null) {
+        throw new Error('missing required field request.username');
+      }
+      const path = `/admin/v1/users/username/${request.username}`;
+      const body = null;
+      const queryParams: string[] = [];
+      if (request.id) {
+        queryParams.push(
+          `id=${encodeURIComponent(request.id.toString())}`,
+        );
+      }
+      if (request.deletedBy) {
+        queryParams.push(
+          `deletedBy=${encodeURIComponent(request.deletedBy.toString())}`,
+        );
+      }
+      let uri = path;
+      if (queryParams.length > 0) {
+        uri += `?${queryParams.join('&')}`;
+      }
+      return transport.unary(uri, 'DELETE', body, {
+        service: 'UserService',
+        method: 'Delete',
+      }) as Promise<wellKnownEmpty>;
+    },
     UserExists(request) {
-      const path = `admin/v1/users:exists`;
+      const path = `/admin/v1/users:exists`;
       const body = null;
       const queryParams: string[] = [];
       if (request.id) {
@@ -10636,8 +16215,10 @@ export function createUserServiceClient(
       if (request.userId === undefined || request.userId === null) {
         throw new Error('missing required field request.user_id');
       }
-      const path = `admin/v1/users/${request.userId}/password`;
-      const body = JSON.stringify(request);
+      const path = `/admin/v1/users/${request.userId}/password`;
+      const bodyMap = { ...request } as Record<string, unknown>;
+      delete bodyMap["userId"];
+      const body = JSON.stringify(bodyMap);
       return transport.unary(path, 'POST', body, {
         service: 'UserService',
         method: 'EditUserPassword',
@@ -10728,7 +16309,7 @@ export function createUserProfileServiceClient(
 ): UserProfileService {
   return {
     GetUser(_request) {
-      const path = `admin/v1/me`;
+      const path = `/admin/v1/me`;
       const body = null;
       return transport.unary(path, 'GET', body, {
         service: 'UserProfileService',
@@ -10736,7 +16317,7 @@ export function createUserProfileServiceClient(
       }) as Promise<identityservicev1_User>;
     },
     UpdateUser(request) {
-      const path = `admin/v1/me`;
+      const path = `/admin/v1/me`;
       const body = JSON.stringify(request);
       return transport.unary(path, 'PUT', body, {
         service: 'UserProfileService',
@@ -10744,7 +16325,7 @@ export function createUserProfileServiceClient(
       }) as Promise<wellKnownEmpty>;
     },
     ChangePassword(request) {
-      const path = `admin/v1/me/password`;
+      const path = `/admin/v1/me/password`;
       const body = JSON.stringify(request);
       return transport.unary(path, 'POST', body, {
         service: 'UserProfileService',
@@ -10752,7 +16333,7 @@ export function createUserProfileServiceClient(
       }) as Promise<wellKnownEmpty>;
     },
     BindContact(request) {
-      const path = `admin/v1/me/contact`;
+      const path = `/admin/v1/me/contact`;
       const body = JSON.stringify(request);
       return transport.unary(path, 'POST', body, {
         service: 'UserProfileService',
@@ -10760,7 +16341,7 @@ export function createUserProfileServiceClient(
       }) as Promise<wellKnownEmpty>;
     },
     VerifyContact(request) {
-      const path = `admin/v1/me/contact/verify`;
+      const path = `/admin/v1/me/contact/verify`;
       const body = JSON.stringify(request);
       return transport.unary(path, 'POST', body, {
         service: 'UserProfileService',
@@ -10813,19 +16394,294 @@ export type identityservicev1_EmailVerification = {
   email: string | undefined;
 };
 
+// Webhook 服务（内容事件外发订阅管理）
+export interface WebhookService {
+  // 获取 Webhook 列表
+  List(
+    request: pagination_PagingRequest,
+  ): Promise<webhookservicev1_ListWebhookResponse>;
+  // 获取 Webhook 数据
+  Get(
+    request: webhookservicev1_GetWebhookRequest,
+  ): Promise<webhookservicev1_Webhook>;
+  // 创建 Webhook
+  Create(
+    request: webhookservicev1_CreateWebhookRequest,
+  ): Promise<webhookservicev1_Webhook>;
+  // 更新 Webhook
+  Update(
+    request: webhookservicev1_UpdateWebhookRequest,
+  ): Promise<webhookservicev1_Webhook>;
+  // 删除 Webhook
+  Delete(
+    request: webhookservicev1_DeleteWebhookRequest,
+  ): Promise<wellKnownEmpty>;
+  // 发送测试事件（ping）
+  TestPing(
+    request: webhookservicev1_TestWebhookPingRequest,
+  ): Promise<webhookservicev1_WebhookDelivery>;
+  // 列出投递记录（按时间倒序）
+  ListDeliveries(
+    request: webhookservicev1_ListWebhookDeliveriesRequest,
+  ): Promise<webhookservicev1_ListWebhookDeliveriesResponse>;
+}
+
+export function createWebhookServiceClient(
+  transport: ClientTransport,
+): WebhookService {
+  return {
+    List(request) {
+      const path = `/admin/v1/webhooks`;
+      const body = null;
+      const queryParams: string[] = [];
+      if (request.page) {
+        queryParams.push(
+          `page=${encodeURIComponent(request.page.toString())}`,
+        );
+      }
+      if (request.pageSize) {
+        queryParams.push(
+          `pageSize=${encodeURIComponent(request.pageSize.toString())}`,
+        );
+      }
+      if (request.offset) {
+        queryParams.push(
+          `offset=${encodeURIComponent(request.offset.toString())}`,
+        );
+      }
+      if (request.limit) {
+        queryParams.push(
+          `limit=${encodeURIComponent(request.limit.toString())}`,
+        );
+      }
+      if (request.token) {
+        queryParams.push(
+          `token=${encodeURIComponent(request.token.toString())}`,
+        );
+      }
+      if (request.noPaging) {
+        queryParams.push(
+          `noPaging=${encodeURIComponent(request.noPaging.toString())}`,
+        );
+      }
+      if (request.query) {
+        queryParams.push(
+          `query=${encodeURIComponent(request.query.toString())}`,
+        );
+      }
+      if (request.filter) {
+        queryParams.push(
+          `filter=${encodeURIComponent(request.filter.toString())}`,
+        );
+      }
+      if (request.filterExpr?.type) {
+        queryParams.push(
+          `filterExpr.type=${encodeURIComponent(request.filterExpr.type.toString())}`,
+        );
+      }
+      if (request.orderBy) {
+        queryParams.push(
+          `orderBy=${encodeURIComponent(request.orderBy.toString())}`,
+        );
+      }
+      if (request.fieldMask) {
+        queryParams.push(
+          `fieldMask=${encodeURIComponent(request.fieldMask.toString())}`,
+        );
+      }
+      let uri = path;
+      if (queryParams.length > 0) {
+        uri += `?${queryParams.join('&')}`;
+      }
+      return transport.unary(uri, 'GET', body, {
+        service: 'WebhookService',
+        method: 'List',
+      }) as Promise<webhookservicev1_ListWebhookResponse>;
+    },
+    Get(request) {
+      if (request.id === undefined || request.id === null) {
+        throw new Error('missing required field request.id');
+      }
+      const path = `/admin/v1/webhooks/${request.id}`;
+      const body = null;
+      return transport.unary(path, 'GET', body, {
+        service: 'WebhookService',
+        method: 'Get',
+      }) as Promise<webhookservicev1_Webhook>;
+    },
+    Create(request) {
+      const path = `/admin/v1/webhooks`;
+      const body = JSON.stringify(request);
+      return transport.unary(path, 'POST', body, {
+        service: 'WebhookService',
+        method: 'Create',
+      }) as Promise<webhookservicev1_Webhook>;
+    },
+    Update(request) {
+      if (request.id === undefined || request.id === null) {
+        throw new Error('missing required field request.id');
+      }
+      const path = `/admin/v1/webhooks/${request.id}`;
+      const bodyMap = { ...request } as Record<string, unknown>;
+      delete bodyMap["id"];
+      const body = JSON.stringify(bodyMap);
+      return transport.unary(path, 'PUT', body, {
+        service: 'WebhookService',
+        method: 'Update',
+      }) as Promise<webhookservicev1_Webhook>;
+    },
+    Delete(request) {
+      if (request.id === undefined || request.id === null) {
+        throw new Error('missing required field request.id');
+      }
+      const path = `/admin/v1/webhooks/${request.id}`;
+      const body = null;
+      return transport.unary(path, 'DELETE', body, {
+        service: 'WebhookService',
+        method: 'Delete',
+      }) as Promise<wellKnownEmpty>;
+    },
+    TestPing(request) {
+      if (request.id === undefined || request.id === null) {
+        throw new Error('missing required field request.id');
+      }
+      const path = `/admin/v1/webhooks/${request.id}/ping`;
+      const bodyMap = { ...request } as Record<string, unknown>;
+      delete bodyMap["id"];
+      const body = JSON.stringify(bodyMap);
+      return transport.unary(path, 'POST', body, {
+        service: 'WebhookService',
+        method: 'TestPing',
+      }) as Promise<webhookservicev1_WebhookDelivery>;
+    },
+    ListDeliveries(request) {
+      const path = `/admin/v1/webhooks/deliveries`;
+      const body = null;
+      const queryParams: string[] = [];
+      if (request.webhookId) {
+        queryParams.push(
+          `webhookId=${encodeURIComponent(request.webhookId.toString())}`,
+        );
+      }
+      if (request.limit) {
+        queryParams.push(
+          `limit=${encodeURIComponent(request.limit.toString())}`,
+        );
+      }
+      let uri = path;
+      if (queryParams.length > 0) {
+        uri += `?${queryParams.join('&')}`;
+      }
+      return transport.unary(uri, 'GET', body, {
+        service: 'WebhookService',
+        method: 'ListDeliveries',
+      }) as Promise<webhookservicev1_ListWebhookDeliveriesResponse>;
+    },
+  };
+}
+// 回应 - Webhook 列表
+export type webhookservicev1_ListWebhookResponse = {
+  items: undefined | webhookservicev1_Webhook[];
+  total: number | undefined;
+};
+
+// Webhook 订阅
+export type webhookservicev1_Webhook = {
+  createdAt?: wellKnownTimestamp;
+  createdBy?: number;
+  description?: string;
+  enabled?: boolean;
+  events: string[] | undefined;
+  id?: number;
+  secret?: string;
+  updatedAt?: wellKnownTimestamp;
+  updatedBy?: number;
+  url?: string;
+};
+
+// 请求 - Webhook 数据
+export type webhookservicev1_GetWebhookRequest = {
+  id: number | undefined;
+};
+
+// 请求 - 创建 Webhook
+export type webhookservicev1_CreateWebhookRequest = {
+  data: undefined | webhookservicev1_Webhook;
+};
+
+// 请求 - 更新 Webhook
+export type webhookservicev1_UpdateWebhookRequest = {
+  allowMissing?: boolean;
+  data: undefined | webhookservicev1_Webhook;
+  id: number | undefined;
+  updateMask: undefined | wellKnownFieldMask;
+};
+
+// 请求 - 删除 Webhook
+export type webhookservicev1_DeleteWebhookRequest = {
+  id: number | undefined;
+};
+
+// 请求 - 发送测试事件
+export type webhookservicev1_TestWebhookPingRequest = {
+  id: number | undefined;
+};
+
+// 投递记录（每次尝试一行）
+export type webhookservicev1_WebhookDelivery = {
+  createdAt?: wellKnownTimestamp;
+  durationMs?: number;
+  entityId?: number;
+  error?: string;
+  event?: string;
+  httpStatus?: number;
+  id?: number;
+  status?: string;
+  webhookId?: number;
+};
+
+// 请求 - 列出投递记录
+export type webhookservicev1_ListWebhookDeliveriesRequest = {
+  limit: number | undefined;
+  webhookId: number | undefined;
+};
+
+// 回应 - 投递记录列表
+export type webhookservicev1_ListWebhookDeliveriesResponse = {
+  items: undefined | webhookservicev1_WebhookDelivery[];
+  total: number | undefined;
+};
+
 export class ApiClient {
+  private _accessKeyService?: AccessKeyService;
   private _adminPortalService?: AdminPortalService;
+  private _aiAgentService?: AiAgentService;
+  private _aiChatService?: AiChatService;
+  private _aiContentService?: AiContentService;
+  private _aiConversationService?: AiConversationService;
+  private _aiKnowledgeBaseService?: AiKnowledgeBaseService;
+  private _aiMessageService?: AiMessageService;
+  private _aiProviderService?: AiProviderService;
+  private _aiQueryService?: AiQueryService;
+  private _aiUsageLogService?: AiUsageLogService;
   private _apiAuditLogService?: ApiAuditLogService;
   private _apiService?: ApiService;
   private _authenticationService?: AuthenticationService;
+  private _backupService?: BackupService;
   private _categoryService?: CategoryService;
   private _commentService?: CommentService;
+  private _componentDefinitionService?: ComponentDefinitionService;
+  private _configService?: ConfigService;
   private _contentModelService?: ContentModelService;
   private _dataAccessAuditLogService?: DataAccessAuditLogService;
   private _dictEntryService?: DictEntryService;
   private _dictTypeService?: DictTypeService;
+  private _editLockService?: EditLockService;
+  private _experimentService?: ExperimentService;
   private _fileService?: FileService;
   private _fileTransferService?: FileTransferService;
+  private _flowRuleService?: FlowRuleService;
+  private _formSubmissionService?: FormSubmissionService;
   private _interactionAdminService?: InteractionAdminService;
   private _internalMessageCategoryService?: InternalMessageCategoryService;
   private _internalMessageRecipientService?: InternalMessageRecipientService;
@@ -10833,10 +16689,18 @@ export class ApiClient {
   private _languageService?: LanguageService;
   private _loginAuditLogService?: LoginAuditLogService;
   private _loginPolicyService?: LoginPolicyService;
+  private _mFAService?: MFAService;
   private _mediaAssetService?: MediaAssetService;
   private _menuService?: MenuService;
+  private _monitorAlertService?: MonitorAlertService;
   private _navigationItemService?: NavigationItemService;
   private _navigationService?: NavigationService;
+  private _notificationChannelService?: NotificationChannelService;
+  private _notificationPreferenceService?: NotificationPreferenceService;
+  private _notificationRuleService?: NotificationRuleService;
+  private _notificationService?: NotificationService;
+  private _notificationTemplateService?: NotificationTemplateService;
+  private _onlineSessionService?: OnlineSessionService;
   private _operationAuditLogService?: OperationAuditLogService;
   private _orgUnitService?: OrgUnitService;
   private _pageService?: PageService;
@@ -10846,24 +16710,73 @@ export class ApiClient {
   private _policyEvaluationLogService?: PolicyEvaluationLogService;
   private _positionService?: PositionService;
   private _postService?: PostService;
+  private _previewService?: PreviewService;
+  private _redirectService?: RedirectService;
+  private _redisCacheMonitorService?: RedisCacheMonitorService;
+  private _reviewLogService?: ReviewLogService;
   private _roleService?: RoleService;
+  private _searchSynonymService?: SearchSynonymService;
+  private _serverMonitorService?: ServerMonitorService;
   private _siteService?: SiteService;
   private _siteSettingService?: SiteSettingService;
+  private _socialService?: SocialService;
   private _statsService?: StatsService;
   private _tagService?: TagService;
   private _taskService?: TaskService;
+  private _tenantQuotaService?: TenantQuotaService;
   private _tenantService?: TenantService;
   private _translatorService?: TranslatorService;
   private readonly _transport: ClientTransport;
   private _userProfileService?: UserProfileService;
   private _userService?: UserService;
+  private _webhookService?: WebhookService;
 
   constructor(transport: ClientTransport) {
     this._transport = transport;
   }
 
+  get accessKeyService(): AccessKeyService {
+    return this._accessKeyService ??= createAccessKeyServiceClient(this._transport);
+  }
+
   get adminPortalService(): AdminPortalService {
     return this._adminPortalService ??= createAdminPortalServiceClient(this._transport);
+  }
+
+  get aiAgentService(): AiAgentService {
+    return this._aiAgentService ??= createAiAgentServiceClient(this._transport);
+  }
+
+  get aiChatService(): AiChatService {
+    return this._aiChatService ??= createAiChatServiceClient(this._transport);
+  }
+
+  get aiContentService(): AiContentService {
+    return this._aiContentService ??= createAiContentServiceClient(this._transport);
+  }
+
+  get aiConversationService(): AiConversationService {
+    return this._aiConversationService ??= createAiConversationServiceClient(this._transport);
+  }
+
+  get aiKnowledgeBaseService(): AiKnowledgeBaseService {
+    return this._aiKnowledgeBaseService ??= createAiKnowledgeBaseServiceClient(this._transport);
+  }
+
+  get aiMessageService(): AiMessageService {
+    return this._aiMessageService ??= createAiMessageServiceClient(this._transport);
+  }
+
+  get aiProviderService(): AiProviderService {
+    return this._aiProviderService ??= createAiProviderServiceClient(this._transport);
+  }
+
+  get aiQueryService(): AiQueryService {
+    return this._aiQueryService ??= createAiQueryServiceClient(this._transport);
+  }
+
+  get aiUsageLogService(): AiUsageLogService {
+    return this._aiUsageLogService ??= createAiUsageLogServiceClient(this._transport);
   }
 
   get apiAuditLogService(): ApiAuditLogService {
@@ -10878,12 +16791,24 @@ export class ApiClient {
     return this._authenticationService ??= createAuthenticationServiceClient(this._transport);
   }
 
+  get backupService(): BackupService {
+    return this._backupService ??= createBackupServiceClient(this._transport);
+  }
+
   get categoryService(): CategoryService {
     return this._categoryService ??= createCategoryServiceClient(this._transport);
   }
 
   get commentService(): CommentService {
     return this._commentService ??= createCommentServiceClient(this._transport);
+  }
+
+  get componentDefinitionService(): ComponentDefinitionService {
+    return this._componentDefinitionService ??= createComponentDefinitionServiceClient(this._transport);
+  }
+
+  get configService(): ConfigService {
+    return this._configService ??= createConfigServiceClient(this._transport);
   }
 
   get contentModelService(): ContentModelService {
@@ -10902,12 +16827,28 @@ export class ApiClient {
     return this._dictTypeService ??= createDictTypeServiceClient(this._transport);
   }
 
+  get editLockService(): EditLockService {
+    return this._editLockService ??= createEditLockServiceClient(this._transport);
+  }
+
+  get experimentService(): ExperimentService {
+    return this._experimentService ??= createExperimentServiceClient(this._transport);
+  }
+
   get fileService(): FileService {
     return this._fileService ??= createFileServiceClient(this._transport);
   }
 
   get fileTransferService(): FileTransferService {
     return this._fileTransferService ??= createFileTransferServiceClient(this._transport);
+  }
+
+  get flowRuleService(): FlowRuleService {
+    return this._flowRuleService ??= createFlowRuleServiceClient(this._transport);
+  }
+
+  get formSubmissionService(): FormSubmissionService {
+    return this._formSubmissionService ??= createFormSubmissionServiceClient(this._transport);
   }
 
   get interactionAdminService(): InteractionAdminService {
@@ -10938,6 +16879,10 @@ export class ApiClient {
     return this._loginPolicyService ??= createLoginPolicyServiceClient(this._transport);
   }
 
+  get mFAService(): MFAService {
+    return this._mFAService ??= createMFAServiceClient(this._transport);
+  }
+
   get mediaAssetService(): MediaAssetService {
     return this._mediaAssetService ??= createMediaAssetServiceClient(this._transport);
   }
@@ -10946,12 +16891,40 @@ export class ApiClient {
     return this._menuService ??= createMenuServiceClient(this._transport);
   }
 
+  get monitorAlertService(): MonitorAlertService {
+    return this._monitorAlertService ??= createMonitorAlertServiceClient(this._transport);
+  }
+
   get navigationItemService(): NavigationItemService {
     return this._navigationItemService ??= createNavigationItemServiceClient(this._transport);
   }
 
   get navigationService(): NavigationService {
     return this._navigationService ??= createNavigationServiceClient(this._transport);
+  }
+
+  get notificationChannelService(): NotificationChannelService {
+    return this._notificationChannelService ??= createNotificationChannelServiceClient(this._transport);
+  }
+
+  get notificationPreferenceService(): NotificationPreferenceService {
+    return this._notificationPreferenceService ??= createNotificationPreferenceServiceClient(this._transport);
+  }
+
+  get notificationRuleService(): NotificationRuleService {
+    return this._notificationRuleService ??= createNotificationRuleServiceClient(this._transport);
+  }
+
+  get notificationService(): NotificationService {
+    return this._notificationService ??= createNotificationServiceClient(this._transport);
+  }
+
+  get notificationTemplateService(): NotificationTemplateService {
+    return this._notificationTemplateService ??= createNotificationTemplateServiceClient(this._transport);
+  }
+
+  get onlineSessionService(): OnlineSessionService {
+    return this._onlineSessionService ??= createOnlineSessionServiceClient(this._transport);
   }
 
   get operationAuditLogService(): OperationAuditLogService {
@@ -10990,8 +16963,32 @@ export class ApiClient {
     return this._postService ??= createPostServiceClient(this._transport);
   }
 
+  get previewService(): PreviewService {
+    return this._previewService ??= createPreviewServiceClient(this._transport);
+  }
+
+  get redirectService(): RedirectService {
+    return this._redirectService ??= createRedirectServiceClient(this._transport);
+  }
+
+  get redisCacheMonitorService(): RedisCacheMonitorService {
+    return this._redisCacheMonitorService ??= createRedisCacheMonitorServiceClient(this._transport);
+  }
+
+  get reviewLogService(): ReviewLogService {
+    return this._reviewLogService ??= createReviewLogServiceClient(this._transport);
+  }
+
   get roleService(): RoleService {
     return this._roleService ??= createRoleServiceClient(this._transport);
+  }
+
+  get searchSynonymService(): SearchSynonymService {
+    return this._searchSynonymService ??= createSearchSynonymServiceClient(this._transport);
+  }
+
+  get serverMonitorService(): ServerMonitorService {
+    return this._serverMonitorService ??= createServerMonitorServiceClient(this._transport);
   }
 
   get siteService(): SiteService {
@@ -11000,6 +16997,10 @@ export class ApiClient {
 
   get siteSettingService(): SiteSettingService {
     return this._siteSettingService ??= createSiteSettingServiceClient(this._transport);
+  }
+
+  get socialService(): SocialService {
+    return this._socialService ??= createSocialServiceClient(this._transport);
   }
 
   get statsService(): StatsService {
@@ -11012,6 +17013,10 @@ export class ApiClient {
 
   get taskService(): TaskService {
     return this._taskService ??= createTaskServiceClient(this._transport);
+  }
+
+  get tenantQuotaService(): TenantQuotaService {
+    return this._tenantQuotaService ??= createTenantQuotaServiceClient(this._transport);
   }
 
   get tenantService(): TenantService {
@@ -11028,6 +17033,10 @@ export class ApiClient {
 
   get userService(): UserService {
     return this._userService ??= createUserServiceClient(this._transport);
+  }
+
+  get webhookService(): WebhookService {
+    return this._webhookService ??= createWebhookServiceClient(this._transport);
   }
 }
 

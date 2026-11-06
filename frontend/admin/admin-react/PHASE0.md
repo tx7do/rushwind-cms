@@ -1,5 +1,7 @@
 # admin-react Phase 0 冒烟报告（2026-09-16，完整版）
 
+> 注：本报告写作时目录名为 `frontend/admin-react/`，该目录已于 2026-10-07 改名回 `frontend/admin/`，下文路径按当时名称记录。
+
 基座（go-wind-admin `frontend/admin/react`）复制为 `frontend/admin-react/`，对接 CMS 后端（127.0.0.1:6600 / SSE 6601）。
 本轮覆盖：登录（平台+租户）、动态路由/菜单、读 CRUD、写 CRUD 回环、登出、租户数据隔离、SSE 事件流，以及静态漂移全量扫描（缺失服务清单 + tsc 184 错误清单）。
 结论：**主链路全部打通**；发现的契约差异 D1–D14 全部记录在案，其中 D1/D5/D8 已修并实测验证，品牌文案已对齐，其余归入 Phase 1。

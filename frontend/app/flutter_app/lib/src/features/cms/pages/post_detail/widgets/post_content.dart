@@ -1,9 +1,9 @@
 import 'package:flutter/material.dart';
-import 'package:flutter_screenutil/flutter_screenutil.dart';
 
 import 'package:flutter_app/generated/api/app/service/v1/index.dart'
     show ContentServiceV1Post;
 import 'package:flutter_app/src/core/utils/translation_helpers.dart';
+import 'package:flutter_app/src/features/cms/pages/post_detail/widgets/custom_fields_section.dart';
 import 'package:flutter_app/src/features/cms/widgets/content_viewer.dart';
 
 typedef Post = ContentServiceV1Post;
@@ -24,9 +24,9 @@ class PostContent extends StatelessWidget {
 
     return Padding(
       padding: EdgeInsets.fromLTRB(
-        isMobile ? 20.w : 0,
+        isMobile ? 20 : 0,
         0,
-        isMobile ? 20.w : 0,
+        isMobile ? 20 : 0,
         8,
       ),
       child: Column(
@@ -34,12 +34,12 @@ class PostContent extends StatelessWidget {
         children: [
           // 摘要
           Container(
-            padding: EdgeInsets.all(isMobile ? 14.w : 14),
+            padding: EdgeInsets.all(isMobile ? 14 : 14),
             decoration: BoxDecoration(
               color: theme.colorScheme.primaryContainer.withAlpha(
                 (0.2 * 255).round(),
               ),
-              borderRadius: BorderRadius.circular(isMobile ? 12.r : 12),
+              borderRadius: BorderRadius.circular(isMobile ? 12 : 12),
               border: Border(
                 left: BorderSide(color: theme.colorScheme.primary, width: 3),
               ),
@@ -47,20 +47,27 @@ class PostContent extends StatelessWidget {
             child: Text(
               _summary,
               style: TextStyle(
-                fontSize: isMobile ? 14.sp : 14,
+                fontSize: isMobile ? 14 : 14,
                 color: theme.colorScheme.onSurface.withAlpha(180),
                 height: 1.6,
                 fontStyle: FontStyle.italic,
               ),
             ),
           ),
-          SizedBox(height: isMobile ? 16.h : 16),
+          SizedBox(height: isMobile ? 16 : 16),
           // 正文 — 使用 ContentViewer 根据 editorType 自适应渲染
           ContentViewer(
             content: _content,
             editorType: post.editorType,
             isMobile: isMobile,
           ),
+          // 自定义字段（内容建模前台读侧；无模型/无值时静默不渲染）
+          if (post.id != null)
+            CustomFieldsSection(
+              postId: post.id!,
+              customFields: post.customFields,
+              isMobile: isMobile,
+            ),
         ],
       ),
     );

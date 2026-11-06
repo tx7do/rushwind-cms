@@ -33,6 +33,14 @@
   "publishFailed": "发布失败，请稍后再试",
   "saveDraftSuccess": "保存草稿成功",
   "saveDraftFailed": "保存草稿失败，请稍后再试",
+  "discardDraft": "丢弃草稿",
+  "discardDraftTip": "清除本地暂存草稿，恢复为服务端当前内容",
+  "discardDraftConfirmTitle": "丢弃本地草稿？",
+  "discardDraftConfirmMessage": "将清除本地暂存的内容，表单恢复为服务端当前版本，且不可撤销",
+  "previewDraft": "预览草稿",
+  "draftPreviewBanner": "本地草稿预览 · 尚未保存到服务端，非真实 C 端站点样式",
+  "draftPreviewTip": "在新窗口预览当前编辑内容（仅本地渲染，不写服务端）",
+  "draftPreviewUntitled": "无标题草稿",
   "translationNotExists": "翻译内容不存在，请先进行翻译",
   "translateTitleFailed": "翻译标题失败，请稍后再试",
   "translateContentFailed": "翻译内容失败，请稍后再试",
@@ -42,7 +50,6 @@
   "deleteConfirmDesc": "确定要删除该{{moduleName}}吗？",
   "deleteSuccess": "删除成功",
   "deleteFailed": "删除失败",
-  "fetchFailed": "加载失败",
   "contentModel": "内容模型",
   "section": {
     "moduleName": "区块",
@@ -95,5 +102,39 @@
     "SECTION_TYPE_FORM": "表单",
     "SECTION_TYPE_CAROUSEL": "轮播",
     "SECTION_TYPE_CUSTOM": "自定义"
-  }
+  },
+  "versionHistory": "版本历史",
+  "versionNeedSave": "保存后可用",
+  "previewOnCend": "预览",
+  "transfer": {
+    "importJson": "导入 JSON",
+    "exportJson": "导出 JSON",
+    "exportSuccess": "已导出 {{count}} 个页面（含区块全文）",
+    "exportFailed": "导出失败",
+    "importSuccess": "已导入 {{count}} 个页面（均为草稿）",
+    "importPartial": "导入完成：成功 {{ok}} 个，失败行：{{failed}}（均未发布）",
+    "importFailed": "导入失败：文件解析错误",
+    "noPages": "文件中没有页面数据"
+  },
+  "review": {
+    "submit": "提交审核",
+    "submitTitle": "提交审核",
+    "submitted": "已提交审核",
+    "approve": "通过",
+    "approveTitle": "审核通过并发布",
+    "approved": "已通过并发布",
+    "reject": "驳回",
+    "rejectTitle": "驳回（退回草稿）",
+    "rejected": "已驳回",
+    "reasonPlaceholder": "驳回理由（将通知作者，可留空）"
+  },
+  "editLockHeld": "{{name}} 正在编辑此内容（{{since}}），同时保存可能互相覆盖",
+  "seoGroup": "SEO 设置",
+  "seoTitle": "SEO 标题",
+  "seoMetaKeywords": "SEO 关键词",
+  "seoMetaDescription": "SEO 描述",
+  "seoOgTitle": "OG 标题",
+  "seoOgDescription": "OG 描述",
+  "seoOgImage": "OG 图片",
+  "seoCanonicalUrl": "规范 URL"
 }

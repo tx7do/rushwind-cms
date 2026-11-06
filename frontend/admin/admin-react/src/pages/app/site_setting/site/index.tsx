@@ -1,8 +1,9 @@
 import { useRef, useState } from 'react';
 import type { ProColumns, ActionType } from '@ant-design/pro-components';
 import TableExportButton from '@/components/common/TableExportButton';
-import { ProTable } from '@ant-design/pro-components';
-import { Button, Popconfirm, Tag, App } from 'antd';
+import ListTable from '@/components/common/ListTable';
+import TableActions from '@/components/common/TableActions';
+import { Button, Tag, App } from 'antd';
 import { EditOutlined, DeleteOutlined, PlusOutlined } from '@ant-design/icons';
 import { useQueryClient } from '@tanstack/react-query';
 import { useTranslation } from 'react-i18next';
@@ -87,70 +88,68 @@ const SiteList = () => {
     {
       title: t('action'),
       valueType: 'option',
-      width: 90,
-      render: (_, record) => [
-        <a
-          key="edit"
-          onClick={() => {
-            setEditingSite(record);
-            setDrawerMode('edit');
-            setDrawerOpen(true);
-          }}
-        >
-          <EditOutlined />
-        </a>,
-        <Popconfirm
-          key="delete"
-          title={t('deleteConfirmTitle')}
-          description={t('deleteConfirmDesc', { moduleName: t('moduleName') })}
-          onConfirm={() => {
-            record.id && deleteMutation.mutate({ id: record.id });
-          }}
-          okText={t('common:button.ok')}
-          cancelText={t('common:button.cancel')}
-        >
-          <a style={{ color: 'var(--ant-color-error)' }}>
-            <DeleteOutlined />
-          </a>
-        </Popconfirm>,
-      ],
+      width: 150,
+      render: (_, record) => (
+        <TableActions
+          record={record}
+          actions={[
+            {
+              key: 'edit',
+              label: t('common:button.edit'),
+              icon: <EditOutlined />,
+              onClick: () => {
+                setEditingSite(record);
+                setDrawerMode('edit');
+                setDrawerOpen(true);
+              },
+            },
+            {
+              key: 'delete',
+              label: t('common:button.delete'),
+              icon: <DeleteOutlined />,
+              danger: true,
+              confirm: {
+                title: t('deleteConfirmTitle'),
+                description: t('deleteConfirmDesc', { moduleName: t('moduleName') }),
+              },
+              onClick: () => record.id && deleteMutation.mutate({ id: record.id }),
+            },
+          ]}
+        />
+      ),
     },
   ];
 
   return (
     <>
       <div ref={containerRef} className="page-container-content" style={{ padding: '0 8px', height: '100%' }}>
-        <ProTable<any>
+        <ListTable<any>
           actionRef={actionRef}
           columns={columns}
           headerTitle={t('siteList')}
           request={async (params) => {
-            try {
-              const query = new PaginationQuery({
-                paging: {
-                  page: params.current || 1,
-                  pageSize: params.pageSize || TABLE.DEFAULT_PAGE_SIZE,
-                },
-                formValues: Object.fromEntries(
-                  Object.entries(params).filter(
-                    ([key]) => !['current', 'pageSize'].includes(key),
-                  ),
+            const query = new PaginationQuery({
+              paging: {
+                page: params.current || 1,
+                pageSize: params.pageSize || TABLE.DEFAULT_PAGE_SIZE,
+              },
+              formValues: Object.fromEntries(
+                Object.entries(params).filter(
+                  ([key]) => !['current', 'pageSize'].includes(key),
                 ),
-                orderBy: ['-created_at'],
-              });
+              ),
+              orderBy: ['-created_at'],
+            });
 
-              const response = await fetchListSites(query);
+            const response = await fetchListSites(query);
 
-              return {
-                data: response.items || [],
-                total: response.total || 0,
-                success: true,
-              };
-            } catch (error: any) {
-              message.error(error.message || t('fetchFailed'));
-              return { data: [], total: 0, success: false };
-            }
-          }}
+            return {
+              data: response.items || [],
+              total: response.total || 0,
+              success: true,
+            };
+          
+}}
           rowKey="id"
           search={{
             labelWidth: 'auto',

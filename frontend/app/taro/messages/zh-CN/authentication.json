@@ -12,8 +12,8 @@
     "register_now": "立即注册",
     "login_failed": "登录失败，请检查用户名和密码",
     "login_success": "登录成功",
-    "logo_alt": "GoWind Content Hub 徽标",
-    "brand_title": "风行内容中台",
+    "logo_alt": "RushWind Content Hub 徽标",
+    "brand_title": "锐风内容中台",
     "brand_subtitle": "内容一次创作，全域高效分发",
     "feature_projects": "海量优质内容",
     "feature_isolation": "个性化推荐",
@@ -33,7 +33,9 @@
     "terms_and": "和",
     "terms_of_service": "服务条款",
     "privacy_policy": "隐私政策",
-    "back_home": "返回首页"
+    "back_home": "返回首页",
+    "submitting": "登录中…",
+    "forgot_password_tip": "请联系管理员重置密码"
   },
   "register": {
     "title": "欢迎注册账号",
@@ -70,7 +72,8 @@
     "resend_after": "后重新发送",
     "resend_after_countdown": "{count}秒后重试",
     "next_step": "下一步",
-    "back_home": "返回首页"
+    "back_home": "返回首页",
+    "password_mismatch": "两次输入的密码不一致"
   },
   "forgotPassword": {
     "title": "忘记密码",

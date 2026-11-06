@@ -34,7 +34,6 @@
   "updateFailed": "Failed to update",
   "deleteSuccess": "Deleted successfully",
   "deleteFailed": "Failed to delete",
-  "fetchFailed": "Failed to load",
   "dateRange": {
     "today": "Today",
     "yesterday": "Yesterday",

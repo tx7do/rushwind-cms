@@ -79,6 +79,32 @@ impl statsv1::stats_service_server::StatsService for StatsService {
             week_ago.format("%Y-%m-%d %H:%M:%S%:z")
         ))
         .await?;
+        // 媒体域与内容工作台的概览卡（2026-11 契约批次扩展）。
+        let media_asset_count = scalar("SELECT COUNT(*)::bigint AS n FROM media_assets").await?;
+        let media_storage_bytes =
+            scalar("SELECT COALESCE(SUM(size), 0)::bigint AS n FROM media_assets").await?;
+        let new_media_count_week = scalar(&format!(
+            "SELECT COUNT(*)::bigint AS n FROM media_assets WHERE created_at >= '{}'",
+            week_ago.format("%Y-%m-%d %H:%M:%S%:z")
+        ))
+        .await?;
+        let new_media_storage_bytes_week = scalar(&format!(
+            "SELECT COALESCE(SUM(size), 0)::bigint AS n FROM media_assets \
+             WHERE created_at >= '{}'",
+            week_ago.format("%Y-%m-%d %H:%M:%S%:z")
+        ))
+        .await?;
+        // DB 存枚举名串：comments 用短名（PENDING），posts 用全限定名
+        // （POST_STATUS_DRAFT）——两种口径各自与写入侧对齐。
+        let pending_comment_count =
+            scalar("SELECT COUNT(*)::bigint AS n FROM comments WHERE status = 'PENDING'").await?;
+        let draft_post_count =
+            scalar("SELECT COUNT(*)::bigint AS n FROM posts WHERE status = 'POST_STATUS_DRAFT'")
+                .await?;
+        let scheduled_post_count = scalar(
+            "SELECT COUNT(*)::bigint AS n FROM posts WHERE status = 'POST_STATUS_SCHEDULED'",
+        )
+        .await?;
 
         Ok(Response::new(statsv1::GetDashboardOverviewResponse {
             user_count,
@@ -89,6 +115,13 @@ impl statsv1::stats_service_server::StatsService for StatsService {
             new_post_count_week,
             new_comment_count_week,
             new_like_count_week,
+            media_asset_count,
+            media_storage_bytes,
+            new_media_count_week,
+            new_media_storage_bytes_week,
+            pending_comment_count,
+            draft_post_count,
+            scheduled_post_count,
         }))
     }
 
@@ -159,7 +192,8 @@ impl statsv1::stats_service_server::StatsService for StatsService {
                 sea_orm::DatabaseBackend::Postgres,
                 "SELECT \
                    COALESCE(SUM(count) FILTER (WHERE metric = 1), 0)::bigint AS likes, \
-                   COALESCE(SUM(count) FILTER (WHERE metric = 2), 0)::bigint AS watches \
+                   COALESCE(SUM(count) FILTER (WHERE metric = 2), 0)::bigint AS watches, \
+                   COALESCE(SUM(count) FILTER (WHERE metric = 3), 0)::bigint AS views \
                  FROM interaction_counters",
             ))
             .await
@@ -167,6 +201,8 @@ impl statsv1::stats_service_server::StatsService for StatsService {
             .ok_or_else(|| Status::internal("totals row missing"))?;
         let total_likes = totals.try_get::<i64>("", "likes").unwrap_or(0);
         let total_watches = totals.try_get::<i64>("", "watches").unwrap_or(0);
+        // 浏览口径（metric = 3 VIEW）——2026-11 契约批次扩展。
+        let total_views = totals.try_get::<i64>("", "views").unwrap_or(0);
 
         let top = db
             .query_all_raw(sea_orm::Statement::from_string(
@@ -188,10 +224,34 @@ impl statsv1::stats_service_server::StatsService for StatsService {
             })
             .collect();
 
+        // 浏览量降序 TOP N（真实 PV）——标题位与点赞榜同水位（title 列在
+        // post_translations，多语言标题回填随统计深化批次一并落地）。
+        let top_viewed = db
+            .query_all_raw(sea_orm::Statement::from_string(
+                sea_orm::DatabaseBackend::Postgres,
+                format!(
+                    "SELECT target_id::bigint AS post_id, COALESCE(SUM(count), 0)::bigint AS views \
+                     FROM interaction_counters WHERE metric = 3 \
+                     GROUP BY target_id ORDER BY views DESC LIMIT {top_n}"
+                ),
+            ))
+            .await
+            .map_err(db_status)?;
+        let top_viewed_posts: Vec<statsv1::InteractionTopItem> = top_viewed
+            .into_iter()
+            .map(|r| statsv1::InteractionTopItem {
+                target_id: r.try_get::<i64>("", "post_id").unwrap_or(0) as u32,
+                title: String::new(),
+                like_count: r.try_get::<i64>("", "views").unwrap_or(0),
+            })
+            .collect();
+
         Ok(Response::new(statsv1::GetInteractionStatsResponse {
             top_liked_posts,
             total_likes,
             total_watches,
+            top_viewed_posts,
+            total_views,
         }))
     }
 
@@ -207,7 +267,8 @@ impl statsv1::stats_service_server::StatsService for StatsService {
                 format!(
                     "SELECT created_at::date::text AS d, \
                        COUNT(*) FILTER (WHERE success)::bigint AS s, \
-                       COUNT(*) FILTER (WHERE NOT success)::bigint AS f \
+                       COUNT(*) FILTER (WHERE NOT success)::bigint AS f, \
+                       COUNT(DISTINCT user_id) FILTER (WHERE success)::bigint AS u \
                      FROM sys_login_audit_logs \
                      WHERE created_at >= now() - interval '{days} days' \
                      GROUP BY d ORDER BY d"
@@ -215,7 +276,7 @@ impl statsv1::stats_service_server::StatsService for StatsService {
             ))
             .await
             .map_err(db_status)?;
-        let (mut success, mut failed) = (Vec::new(), Vec::new());
+        let (mut success, mut failed, mut active_users) = (Vec::new(), Vec::new(), Vec::new());
         for r in rows {
             let day = r.try_get::<String>("", "d").unwrap_or_default();
             success.push(statsv1::DailyCount {
@@ -223,13 +284,19 @@ impl statsv1::stats_service_server::StatsService for StatsService {
                 value: r.try_get::<i64>("", "s").unwrap_or(0),
             });
             failed.push(statsv1::DailyCount {
-                date: day,
+                date: day.clone(),
                 value: r.try_get::<i64>("", "f").unwrap_or(0),
+            });
+            // 当日活跃用户数 = 当日成功登录的去重用户（2026-11 契约批次扩展）。
+            active_users.push(statsv1::DailyCount {
+                date: day,
+                value: r.try_get::<i64>("", "u").unwrap_or(0),
             });
         }
         Ok(Response::new(statsv1::GetLoginActivityResponse {
             success,
             failed,
+            active_users,
         }))
     }
 }

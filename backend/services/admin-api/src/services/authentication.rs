@@ -289,4 +289,56 @@ impl proto::gen_admin::services::AuthenticationServiceHandlers for Authenticatio
         let ok = crate::captcha::verify(&self.state.redis, &req.captcha_id, &req.user_input).await;
         Ok(VerifyCaptchaResponse { valid: ok })
     }
+
+    // ── 2026-11 契约批次新增——纯转发面（无 BFF 侧关注点：验证码/cookie
+    //    都不沾边，登录态/token 语义全部在 core）。
+    async fn get_oidc_authorize_url(
+        &self,
+        _ctx: Ctx,
+        req: proto::proto::authentication::service::v1::GetOidcAuthorizeUrlRequest,
+    ) -> Result<proto::proto::authentication::service::v1::GetOidcAuthorizeUrlResponse, StatusError>
+    {
+        let mut core = self.state.core.clone();
+        core.get_oidc_authorize_url(tonic::Request::new(req))
+            .await
+            .map_err(map_status)
+            .map(|r| r.into_inner())
+    }
+
+    async fn forgot_password(
+        &self,
+        _ctx: Ctx,
+        req: proto::proto::authentication::service::v1::ForgotPasswordRequest,
+    ) -> Result<Empty, StatusError> {
+        let mut core = self.state.core.clone();
+        core.forgot_password(tonic::Request::new(req))
+            .await
+            .map_err(map_status)
+            .map(|r| r.into_inner())
+    }
+
+    async fn reset_password_by_code(
+        &self,
+        _ctx: Ctx,
+        req: proto::proto::authentication::service::v1::ResetPasswordByCodeRequest,
+    ) -> Result<Empty, StatusError> {
+        let mut core = self.state.core.clone();
+        core.reset_password_by_code(tonic::Request::new(req))
+            .await
+            .map_err(map_status)
+            .map(|r| r.into_inner())
+    }
+
+    async fn get_tenant_branding(
+        &self,
+        _ctx: Ctx,
+        req: proto::proto::authentication::service::v1::GetTenantBrandingRequest,
+    ) -> Result<proto::proto::authentication::service::v1::GetTenantBrandingResponse, StatusError>
+    {
+        let mut core = self.state.core.clone();
+        core.get_tenant_branding(tonic::Request::new(req))
+            .await
+            .map_err(map_status)
+            .map(|r| r.into_inner())
+    }
 }

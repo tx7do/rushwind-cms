@@ -190,6 +190,33 @@ pub async fn verify_contact(
     Err(not_implemented("contact verification is not implemented"))
 }
 
+// ── MFA 挑战校验（2026-11 契约批次）：BFF 面把它建模为"通过即发正式
+// 令牌对"（LoginResponse），域面返回 success + 可选令牌对的包装响应
+// ——逐字段映射，TokenType 钉 bearer（镜像上游 Go BFF 的 mfa_service.go）。
+
+pub async fn mfa_verify_challenge(
+    state: &AppState,
+    ctx: &Ctx,
+    req: authenticationv1::VerifyMfaChallengeRequest,
+) -> Result<authenticationv1::LoginResponse, StatusError> {
+    let mut core =
+        authenticationv1::mfa_service_client::MfaServiceClient::new(state.core_channel.clone());
+    let resp = core
+        .verify_mfa_challenge(with_operator(ctx, req))
+        .await
+        .map_err(map_status)?
+        .into_inner();
+    Ok(authenticationv1::LoginResponse {
+        token_type: authenticationv1::TokenType::Bearer as i32,
+        access_token: resp.access_token.unwrap_or_default(),
+        expires_in: resp.expires_in.unwrap_or(0),
+        refresh_token: resp.refresh_token,
+        refresh_expires_in: resp.refresh_expires_in,
+        jti: resp.jti,
+        ..Default::default()
+    })
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

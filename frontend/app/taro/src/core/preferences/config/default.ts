@@ -1,10 +1,10 @@
-import type {Preferences} from '../types';
 import defaultAvatar from '@/assets/images/default-avatar.webp';
+import type {Preferences} from '../types';
 
 const defaultPreferences: Preferences = {
     app: {
-        name: 'RushWind CMS',
-        title: 'RushWind Content Hub',
+        name: '锐风教育',
+        title: '锐风教育',
         defaultAvatar,
         locale: 'zh-CN',
         isMobile: false,

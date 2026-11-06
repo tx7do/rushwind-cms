@@ -1,8 +1,9 @@
 import { useRef, useState } from 'react';
 import type { ProColumns, ActionType } from '@ant-design/pro-components';
 import TableExportButton from '@/components/common/TableExportButton';
-import { ProTable } from '@ant-design/pro-components';
-import { Button, Image, Popconfirm, Tag, App } from 'antd';
+import ListTable from '@/components/common/ListTable';
+import TableActions from '@/components/common/TableActions';
+import { Button, Image, Tag, App } from 'antd';
 import { EditOutlined, DeleteOutlined, PlusOutlined } from '@ant-design/icons';
 import { Icon } from '@iconify/react';
 import { useQueryClient } from '@tanstack/react-query';
@@ -143,77 +144,73 @@ const CategoryList = () => {
     {
       title: t('action'),
       valueType: 'option',
-      width: 100,
+      width: 150,
       fixed: 'right',
-      render: (_, record) => [
-        <a
-          key="edit"
-          onClick={() =>
-            navigate(`/content/categories/edit/${record.id}?lang=${i18n.language}`)
-          }
-        >
-          <EditOutlined />
-        </a>,
-        <Popconfirm
-          key="delete"
-          title={t('deleteConfirmTitle')}
-          description={t('deleteConfirmDesc', { moduleName: t('moduleName') })}
-          onConfirm={() => {
-            record.id && deleteMutation.mutate({ id: record.id });
-          }}
-          okText={t('common:button.ok')}
-          cancelText={t('common:button.cancel')}
-        >
-          <a style={{ color: 'var(--ant-color-error)' }}>
-            <DeleteOutlined />
-          </a>
-        </Popconfirm>,
-      ],
+      render: (_, record) => (
+        <TableActions
+          record={record}
+          actions={[
+            {
+              key: 'edit',
+              label: t('common:button.edit'),
+              icon: <EditOutlined />,
+              onClick: () => navigate(`/content/categories/edit/${record.id}?lang=${i18n.language}`),
+            },
+            {
+              key: 'delete',
+              label: t('common:button.delete'),
+              icon: <DeleteOutlined />,
+              danger: true,
+              confirm: {
+                title: t('deleteConfirmTitle'),
+                description: t('deleteConfirmDesc', { moduleName: t('moduleName') }),
+              },
+              onClick: () => record.id && deleteMutation.mutate({ id: record.id }),
+            },
+          ]}
+        />
+      ),
     },
   ];
 
   return (
     <div ref={containerRef} className="page-container-content" style={{ padding: '0 8px', height: '100%' }}>
-      <ProTable<any>
+      <ListTable<any>
         actionRef={actionRef}
         columns={columns}
         headerTitle={t('categoryList')}
         request={async (params) => {
-          try {
-            const query = new PaginationQuery({
-              paging: {
-                page: params.current || 1,
-                pageSize: params.pageSize || TABLE.DEFAULT_PAGE_SIZE,
-              },
-              formValues: Object.fromEntries(
-                Object.entries(params).filter(
-                  ([key]) => !['current', 'pageSize'].includes(key),
-                ),
+          const query = new PaginationQuery({
+            paging: {
+              page: params.current || 1,
+              pageSize: params.pageSize || TABLE.DEFAULT_PAGE_SIZE,
+            },
+            formValues: Object.fromEntries(
+              Object.entries(params).filter(
+                ([key]) => !['current', 'pageSize'].includes(key),
               ),
-              fieldMask: LIST_FIELD_MASK,
-            });
+            ),
+            fieldMask: LIST_FIELD_MASK,
+          });
 
-            const response = await fetchListCategories(query);
+          const response = await fetchListCategories(query);
 
-            // 树形展开受控：收集所有含 children 的父分类 id
-            const collectParentIds = (items: any[]): any[] =>
-              items.flatMap((item) =>
-                item.children?.length
-                  ? [item.id, ...collectParentIds(item.children)]
-                  : [],
-              );
-            setExpandedKeys(collectParentIds(response.items || []));
+          // 树形展开受控：收集所有含 children 的父分类 id
+          const collectParentIds = (items: any[]): any[] =>
+            items.flatMap((item) =>
+              item.children?.length
+                ? [item.id, ...collectParentIds(item.children)]
+                : [],
+            );
+          setExpandedKeys(collectParentIds(response.items || []));
 
-            return {
-              data: response.items || [],
-              total: response.total || 0,
-              success: true,
-            };
-          } catch (error: any) {
-            message.error(error.message || t('fetchFailed'));
-            return { data: [], total: 0, success: false };
-          }
-        }}
+          return {
+            data: response.items || [],
+            total: response.total || 0,
+            success: true,
+          };
+        
+}}
         rowKey="id"
         search={{
           labelWidth: 'auto',

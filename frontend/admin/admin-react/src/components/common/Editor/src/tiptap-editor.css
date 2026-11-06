@@ -6,9 +6,10 @@
   display: flex !important;
   flex-direction: column !important;
   width: 100% !important;
-  height: 100% !important;
+  /* 高度由调用方经 height prop 内联注入（默认 100%）；此处不得再写 height，
+     否则 !important 会把内联值打死，表单场景下 100% 解析不出即塌成一行 */
   overflow: hidden !important;
-  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  font-family: var(--font-sans, inherit);
   background-color: #fff;
   border: none !important;
   border-radius: 0 !important;
@@ -16,26 +17,30 @@
 }
 
 /* ============ Dark Mode Variables ============ */
+/* 暗色档对齐应用权威色板（docs/design-language.md §2.3 / DARK_PALETTE）：
+   原先是一套独立的 slate 蓝灰（#0f172a/#1e293b/#334155），编辑器嵌在 L1 卡片里
+   会显出"两种暗色"。链接/激活色保留本仓品牌蓝 #006BE6 派生档（#4d9fff/#86c0ff），
+   不跟上游主色文字档 #4d97ee（同一思路的两种取整，以本仓落地值为准）。 */
 .tiptap-editor-dark {
-  --tte-bg-primary: #0f172a !important;
-  --tte-bg-secondary: #1e293b !important;
-  --tte-bg-tertiary: #334155 !important;
-  --tte-text-primary: #f1f5f9 !important;
-  --tte-text-secondary: #94a3b8 !important;
-  --tte-text-muted: #64748b !important;
-  --tte-border-primary: #334155 !important;
-  --tte-border-secondary: #475569 !important;
-  --tte-code-bg: #1e293b !important;
-  --tte-code-text: #e2e8f0 !important;
-  --tte-blockquote-border: #475569 !important;
-  --tte-blockquote-text: #94a3b8 !important;
+  --tte-bg-primary: #111827 !important;
+  --tte-bg-secondary: #1c2128 !important;
+  --tte-bg-tertiary: #1f2937 !important;
+  --tte-text-primary: #f8fafc !important;
+  --tte-text-secondary: #8b949e !important;
+  --tte-text-muted: #6e7681 !important;
+  --tte-border-primary: rgba(255, 255, 255, 0.1) !important;
+  --tte-border-secondary: rgba(255, 255, 255, 0.08) !important;
+  --tte-code-bg: #0b0f19 !important;
+  --tte-code-text: #dce3ed !important;
+  --tte-blockquote-border: rgba(255, 255, 255, 0.14) !important;
+  --tte-blockquote-text: #8b949e !important;
   --tte-link: #4d9fff !important;
   --tte-link-hover: #86c0ff !important;
-  --tte-toolbar-bg: #1e293b !important;
-  --tte-toolbar-btn: #cbd5e1 !important;
-  --tte-toolbar-btn-hover: #334155 !important;
+  --tte-toolbar-bg: #1c2128 !important;
+  --tte-toolbar-btn: #dce3ed !important;
+  --tte-toolbar-btn-hover: #1f2937 !important;
   --tte-toolbar-btn-active: #006be6 !important;
-  --tte-statusbar-bg: #1e293b !important;
+  --tte-statusbar-bg: #1c2128 !important;
 }
 
 .tiptap-editor-dark {
@@ -64,6 +69,14 @@
   display: flex;
   gap: 2px;
   align-items: center;
+}
+
+/* 工具栏右侧扩展槽：承载页级动作（AI 生成等），顶到最右；窄屏换行时独立成行右对齐 */
+.toolbar-extra {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  margin-left: auto;
 }
 
 .toolbar-divider {
@@ -220,6 +233,7 @@
   flex: 1 !important;
   width: 100% !important;
   height: 100% !important;
+  min-height: 260px;
   padding: 16px;
   font-size: 14px;
   line-height: 1.6;
@@ -248,7 +262,9 @@
 
 .tiptap-editor-dark .ProseMirror p.is-editor-empty:first-child::before,
 .tiptap-editor-content.dark .ProseMirror p.is-editor-empty:first-child::before {
-  color: var(--tte-text-secondary) !important;
+  /* 暗色空态提示与表单控件的 placeholder 同档（--tte-text-muted #6e7681）：
+     原先取 --tte-text-secondary，比 input/select 的提示语还亮，两态层级倒挂。 */
+  color: var(--tte-text-muted) !important;
 }
 
 /* Headings */
@@ -317,7 +333,7 @@
 
 .tiptap-editor-wrapper .ProseMirror pre .code-block-language-selector select {
   padding: 2px 20px 2px 8px;
-  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  font-family: var(--font-sans, inherit);
   font-size: 11px;
   color: #9ca3af;
   text-transform: uppercase;

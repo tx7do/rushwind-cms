@@ -25,6 +25,21 @@ const ADMIN_EXPECTED: &[(&str, &str)] = &[
     ("admin.service.v1.AuthenticationService", "GenerateCaptcha"),
     ("admin.service.v1.AuthenticationService", "VerifyCaptcha"),
     ("admin.service.v1.AuthenticationService", "RefreshToken"),
+    (
+        "admin.service.v1.AuthenticationService",
+        "GetOidcAuthorizeUrl",
+    ),
+    ("admin.service.v1.AuthenticationService", "ForgotPassword"),
+    (
+        "admin.service.v1.AuthenticationService",
+        "ResetPasswordByCode",
+    ),
+    (
+        "admin.service.v1.AuthenticationService",
+        "GetTenantBranding",
+    ),
+    ("admin.service.v1.AccessKeyService", "IssueToken"),
+    ("admin.service.v1.MFAService", "VerifyMFAChallenge"),
 ];
 
 /// The app face's expected public pairs — the app BFF's whitelist
@@ -47,6 +62,19 @@ const APP_EXPECTED: &[(&str, &str)] = &[
     ("app.service.v1.TagService", "List"),
     ("app.service.v1.TagService", "Get"),
     ("app.service.v1.InteractionService", "GetCounts"),
+    (
+        "app.service.v1.AuthenticationService",
+        "GetOidcAuthorizeUrl",
+    ),
+    ("app.service.v1.PostService", "SearchPostsSuggest"),
+    ("app.service.v1.PostService", "GetBySlug"),
+    ("app.service.v1.PageService", "GetBySlug"),
+    ("app.service.v1.PostService", "GetPostContentModel"),
+    ("app.service.v1.PostService", "ResolveContentReferences"),
+    ("app.service.v1.MediaAssetService", "Get"),
+    ("app.service.v1.InteractionService", "RecordView"),
+    ("app.service.v1.FormSubmissionService", "Submit"),
+    ("app.service.v1.RedirectService", "ListEnabled"),
 ];
 
 fn public_of(routes: &[proto::gen_admin::routes::RouteSpec]) -> (BTreeSet<(&str, &str)>, usize) {
@@ -114,22 +142,29 @@ fn auth_free_routes_match_the_go_whitelists() {
 /// shadow must land here consciously.
 #[test]
 fn shadowed_routes_match_the_registered_set() {
-    let admin_observed: Vec<(usize, &str, &str)> = proto::gen_admin::routes::ROUTES
+    // (method, path) pairs in route-table order — the table index rides
+    // along in the failure printout only (it shifts with every vintage
+    // growth, so it must not be part of the pinned invariant).
+    let admin_observed: Vec<(&str, &str)> = proto::gen_admin::routes::ROUTES
         .iter()
-        .enumerate()
-        .filter(|(_, r)| r.shadowed)
-        .map(|(i, r)| (i, r.method, r.path))
+        .filter(|r| r.shadowed)
+        .map(|r| (r.method, r.path))
         .collect();
-    let app_observed: Vec<(usize, &str, &str)> = proto::gen_app::routes::ROUTES
+    let app_observed: Vec<(&str, &str)> = proto::gen_app::routes::ROUTES
         .iter()
-        .enumerate()
-        .filter(|(_, r)| r.shadowed)
-        .map(|(i, r)| (i, r.method, r.path))
+        .filter(|r| r.shadowed)
+        .map(|r| (r.method, r.path))
         .collect();
     // i_api.proto: /admin/v1/apis/{id} (GET, registered earlier in the same
     // file) absorbs the walk-route literal path — the same registration-order
-    // shadow the reference's first-match mux exhibits.
-    let admin_expected: Vec<(usize, &str, &str)> = vec![(9, "GET", "/admin/v1/apis/walk-route")];
+    // shadow the reference's first-match mux exhibits. i_webhook.proto joins
+    // with the 2026-11 vintage: /admin/v1/webhooks/{id} (GET, earlier in the
+    // file) absorbs the ListDeliveries literal path /admin/v1/webhooks/
+    // deliveries the same way.
+    let admin_expected: Vec<(&str, &str)> = vec![
+        ("GET", "/admin/v1/apis/walk-route"),
+        ("GET", "/admin/v1/webhooks/deliveries"),
+    ];
     assert_eq!(
         admin_observed, admin_expected,
         "the admin shadow set diverged (registration-order or path-shape drift)"

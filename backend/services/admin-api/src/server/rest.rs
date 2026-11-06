@@ -232,6 +232,76 @@ pub fn build_router(state: Arc<AppState>) -> axum::Router {
             state: Arc::clone(&state),
         }),
         mount_user_service => Arc::new(proxies::UserProxy { state: Arc::clone(&state) }),
+        // ── 2026-11 契约批次新增域（AI / 通知 / 流程 / 监控 / 审批 / 配额…）——
+        //    薄代理先行：拨号域服务（core 侧随特性批次逐域落实现，未落地前
+        //    领域 gRPC 返回 Unimplemented）。
+        mount_access_key_service => Arc::new(proxies::AccessKeyProxy { state: Arc::clone(&state) }),
+        mount_ai_agent_service => Arc::new(proxies::AiAgentProxy { state: Arc::clone(&state) }),
+        mount_ai_chat_service => Arc::new(proxies::AiChatProxy { state: Arc::clone(&state) }),
+        mount_ai_content_service => Arc::new(proxies::AiContentProxy { state: Arc::clone(&state) }),
+        mount_ai_conversation_service => Arc::new(proxies::AiConversationProxy {
+            state: Arc::clone(&state),
+        }),
+        mount_ai_knowledge_base_service => Arc::new(proxies::AiKnowledgeBaseProxy {
+            state: Arc::clone(&state),
+        }),
+        mount_ai_message_service => Arc::new(proxies::AiMessageProxy { state: Arc::clone(&state) }),
+        mount_ai_provider_service => Arc::new(proxies::AiProviderProxy { state: Arc::clone(&state) }),
+        mount_ai_query_service => Arc::new(proxies::AiQueryProxy { state: Arc::clone(&state) }),
+        mount_ai_usage_log_service => Arc::new(proxies::AiUsageLogProxy {
+            state: Arc::clone(&state),
+        }),
+        mount_backup_service => Arc::new(proxies::BackupProxy { state: Arc::clone(&state) }),
+        mount_config_service => Arc::new(proxies::ConfigProxy { state: Arc::clone(&state) }),
+        mount_edit_lock_service => Arc::new(proxies::EditLockProxy { state: Arc::clone(&state) }),
+        mount_experiment_service => Arc::new(proxies::ExperimentProxy { state: Arc::clone(&state) }),
+        mount_flow_rule_service => Arc::new(proxies::FlowRuleProxy { state: Arc::clone(&state) }),
+        mount_form_submission_service => Arc::new(proxies::FormSubmissionProxy {
+            state: Arc::clone(&state),
+        }),
+        mount_mfa_service => Arc::new(proxies::MFAProxy { state: Arc::clone(&state) }),
+        mount_monitor_alert_service => Arc::new(proxies::MonitorAlertProxy {
+            state: Arc::clone(&state),
+        }),
+        mount_notification_service => Arc::new(proxies::NotificationProxy { state: Arc::clone(&state) }),
+        mount_notification_channel_service => Arc::new(proxies::NotificationChannelProxy {
+            state: Arc::clone(&state),
+        }),
+        mount_notification_preference_service => Arc::new(proxies::NotificationPreferenceProxy {
+            state: Arc::clone(&state),
+        }),
+        mount_notification_rule_service => Arc::new(proxies::NotificationRuleProxy {
+            state: Arc::clone(&state),
+        }),
+        mount_notification_template_service => Arc::new(proxies::NotificationTemplateProxy {
+            state: Arc::clone(&state),
+        }),
+        mount_online_session_service => Arc::new(proxies::OnlineSessionProxy {
+            state: Arc::clone(&state),
+        }),
+        mount_redirect_service => Arc::new(proxies::RedirectProxy { state: Arc::clone(&state) }),
+        mount_redis_cache_monitor_service => Arc::new(proxies::RedisCacheMonitorProxy {
+            state: Arc::clone(&state),
+        }),
+        mount_review_log_service => Arc::new(proxies::ReviewLogProxy { state: Arc::clone(&state) }),
+        mount_search_synonym_service => Arc::new(proxies::SearchSynonymProxy {
+            state: Arc::clone(&state),
+        }),
+        mount_server_monitor_service => Arc::new(proxies::ServerMonitorProxy {
+            state: Arc::clone(&state),
+        }),
+        mount_social_service => Arc::new(proxies::SocialProxy { state: Arc::clone(&state) }),
+        mount_tenant_quota_service => Arc::new(proxies::TenantQuotaProxy { state: Arc::clone(&state) }),
+        mount_webhook_service => Arc::new(proxies::WebhookProxy { state: Arc::clone(&state) }),
+        // 仅 admin 面声明、领域服务未落地的两个面——手写桩答 NOT_IMPLEMENTED。
+        mount_component_definition_service => Arc::new(
+            crate::services::component_definition::ComponentDefinitionService {
+                state: Arc::clone(&state),
+            },
+        ),
+        mount_preview_service => Arc::new(crate::services::preview::PreviewService {
+            state: Arc::clone(&state),
+        }),
     );
 
     let mut app = router_pub.merge(router_gate);

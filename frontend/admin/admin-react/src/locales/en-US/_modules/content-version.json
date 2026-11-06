@@ -1,0 +1,23 @@
+{
+    "title": "Version History",
+    "versionCount": "{{count}} versions",
+    "noVersions": "No versions yet",
+    "currentBadge": "Current",
+    "autosave": "Autosave",
+    "view": "View",
+    "restore": "Restore",
+    "restoreConfirm": "Restore to this version?",
+    "restoreConfirmDesc": "Current content will be overwritten by this snapshot. The restore itself creates a new version, so you can always roll back again.",
+    "restoreSuccess": "Restored, a new version was created",
+    "backToList": "Back to list",
+    "snapshotTitle": "Snapshot title",
+    "snapshotUnreadable": "Snapshot content is unreadable",
+    "loadDetailFailed": "Failed to load version detail",
+    "operator": "Operator",
+    "diffLegend": "Diff vs current editor content",
+    "diffOnlyCurrent": "only in current content",
+    "diffOnlyVersion": "only in this version",
+    "showUnchanged": "Show {{count}} unchanged lines",
+    "sectionCount": "{{count}} sections",
+    "pageSectionRestoreNote": "Page versions restore sections wholesale: after restoring, the page's sections, translations and settings are replaced by the snapshot."
+}

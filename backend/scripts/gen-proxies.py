@@ -59,10 +59,80 @@ PACKAGE = {
     "InternalMessage": "internal_message",
     "InternalMessageCategory": "internal_message",
     "InternalMessageRecipient": "internal_message",
+    # ── 2026-11 契约批次新增域 ──
+    "AccessKey": "access_key",
+    "AiAgent": "ai",
+    "AiChat": "ai",
+    "AiContent": "ai",
+    "AiConversation": "ai",
+    "AiKnowledgeBase": "ai",
+    "AiMessage": "ai",
+    "AiProvider": "ai",
+    "AiQuery": "ai",
+    "AiUsageLog": "ai",
+    "Backup": "task",
+    "Config": "config",
+    "EditLock": "content",
+    "Experiment": "content",
+    "FlowRule": "flow",
+    "FormSubmission": "content",
+    "MFA": "authentication",
+    "MonitorAlert": "monitor_alert",
+    "Notification": "notify",
+    "NotificationChannel": "notify",
+    "NotificationPreference": "notify",
+    "NotificationRule": "notify",
+    "NotificationTemplate": "notify",
+    "OnlineSession": "online_session",
+    "Redirect": "content",
+    "RedisCacheMonitor": "redis_cache",
+    "ReviewLog": "content",
+    "SearchSynonym": "content",
+    "ServerMonitor": "server_monitor",
+    "Social": "social",
+    "TenantQuota": "identity",
+    "Webhook": "webhook",
+}
+
+# 领域 client 名与 BFF 服务名错位的覆写：(模块, 类型)。缺省按
+# snake(service)_service_client + {service}ServiceClient 派生。
+DOMAIN_CLIENT = {
+    # i_backup 的领域对应是 task 域的 BackupArchiveService。
+    "Backup": ("backup_archive_service_client", "BackupArchiveServiceClient"),
+    # 缩略词归一：tonic 把 MFAService 的 client 命名为 MfaServiceClient。
+    "MFA": ("mfa_service_client", "MfaServiceClient"),
+}
+
+# snake 派生对连续大写词（缩略词）会把每个字母断开（MFA → m_f_a），领域
+# client 模块是整词 mfa——逐个钉正。
+SNAKE_OVERRIDE = {"MFA": "mfa"}
+
+# BFF 方法名与域 RPC 名漂移（同服务 client、消息同源）的改名转发：
+# (服务, BFF 方法) → 域 RPC 方法名。生成 `pass <bff> => <domain>`。
+RENAMED_METHODS = {
+    # i_mfa 面方法名的 m_f_a 蛇形（gen-http 对 MFA 缩略词的切法）↔
+    # tonic 域 client 的整词 mfa。verify_m_f_a_challenge 除外——响应
+    # 形状错位（BFF LoginResponse ↔ 域 VerifyMFAChallengeResponse），
+    # 走 behaviors 的逐字段映射（TokenType 钉 bearer，同上游 Go BFF）。
+    ("MFA", "get_m_f_a_status"): "get_mfa_status",
+    ("MFA", "disable_m_f_a"): "disable_mfa",
+    ("MFA", "reset_user_m_f_a"): "reset_user_mfa",
+    # i_online_session 面带 OnlineSession 后缀的方法名 ↔ 域短名。
+    ("OnlineSession", "list_online_session"): "list",
+    ("OnlineSession", "force_logout_session"): "force_logout",
+    ("OnlineSession", "list_my_online_session"): "list_my",
+    ("OnlineSession", "revoke_my_online_session"): "revoke_my",
 }
 
 # 手工实现的面（不生成）
-SKIP = {"Authentication", "AdminPortal", "FileTransfer"}
+SKIP = {
+    "Authentication",
+    "AdminPortal",
+    "FileTransfer",
+    # 契约仅 admin 面声明、领域尚无对应服务（随特性批次落域后转正）。
+    "ComponentDefinition",
+    "Preview",
+}
 # 面特定的额外跳过（BFF 方法集超出领域面）
 SKIP_BY_FACE = {"app": set(), "admin": set()}
 
@@ -73,6 +143,17 @@ STUB_METHODS = {
     ("File", "create"),
     ("Menu", "sync_menus"),
     ("Permission", "sync_permissions"),
+    # ── 2026-11 契约批次：BFF 聚合方法，域无对应 RPC（随特性批次落
+    #    behaviors 手写面）──
+    # GetBySlug：BFF 本地消息（app 包），SEO 路由数据源在域侧尚无 RPC。
+    ("Post", "get_by_slug"),
+    ("Page", "get_by_slug"),
+    # ListEnabled：BFF ListRedirectsRequest ↔ 域 List 只收 PagingRequest，
+    # 启用位过滤语义须手写。
+    ("Redirect", "list_enabled"),
+    # Chat：域侧 server-streaming（ChatStreamFrame），BFF 面按 unary
+    # ChatResponse 建模——流式桥接随 AI 特性批次落 behaviors/SSE。
+    ("AiChat", "chat"),
 }
 
 # 行为模块（手写面）按 face 路由：admin → services/behaviors.rs，
@@ -94,11 +175,18 @@ BEHAVIOR_METHODS = {
         ("UserProfile", "change_password"): "change_password",
         ("UserProfile", "bind_contact"): "bind_contact",
         ("UserProfile", "verify_contact"): "verify_contact",
+        # 挑战校验的响应映射：BFF LoginResponse（通过即发正式令牌对）
+        # ↔ 域 VerifyMFAChallengeResponse（success + 可选令牌对）。
+        ("MFA", "verify_m_f_a_challenge"): "mfa_verify_challenge",
     },
     "app": {
         ("Post", "list"): "post_list",
         ("Post", "get"): "post_get",
         ("Post", "search_posts"): "post_search",
+        # BFF 把模型查询/引用解析挂在 PostService 下，域对应在
+        # ContentModelService——改名转发（同消息类型）。
+        ("Post", "get_post_content_model"): "post_content_model",
+        ("Post", "resolve_content_references"): "resolve_content_references",
         ("Post", "create"): "forbidden_mutation",
         ("Post", "update"): "forbidden_mutation",
         ("Post", "delete"): "forbidden_mutation",
@@ -170,16 +258,21 @@ def snake(name):
 
 
 def method_kind(service, method, face):
-    """One contract method's proxy-kit form — (kind, behavior-name).
+    """One contract method's proxy-kit form — (kind, target-name).
 
     Precedence: the hand behavior wins over everything (an admin face
     method can be both STUB-listed and behavior-overridden — the stub
-    only applies where no behavior rides), then the response-dropping
-    adapter, then the not-implemented stub, else the plain pass-through.
+    only applies where no behavior rides), then the renamed forward
+    (same service client, same message types, drifted RPC name), then
+    the response-dropping adapter, then the not-implemented stub, else
+    the plain pass-through.
     """
     behavior = BEHAVIOR_METHODS.get(face, {}).get((service, method))
     if behavior:
         return "hand", behavior
+    renamed = RENAMED_METHODS.get((service, method))
+    if renamed:
+        return "renamed", renamed
     if (service, method) in ADAPTER_METHODS:
         return "drop", None
     if (service, method) in STUB_METHODS:
@@ -250,10 +343,14 @@ def main():
 
     emitted = 0
     for trait_name, service, pkg, kinds in faces:
-        client_mod = f"{snake(service)}_service_client"
+        client_mod, client_ty = DOMAIN_CLIENT.get(
+            service,
+            (f"{SNAKE_OVERRIDE.get(service, snake(service))}_service_client",
+             f"{service}ServiceClient"),
+        )
         # The Channel-generic spelled out: the kit calls the client via a
         # qualified path (<Ty>::new), where inference does not apply.
-        client_head = f"        client: {pkg}_v1::{client_mod}::{service}ServiceClient"
+        client_head = f"        client: {pkg}_v1::{client_mod}::{client_ty}"
         struct_name = f"{service}Proxy"
         behaviors = "behaviors" if face == "admin" else "public"
         out.append("passthrough_proxy! {")
@@ -275,14 +372,14 @@ def main():
             out.append("        >,")
         else:
             out.append(f"        client: {pkg}_v1::{client_mod}::")
-            out.append(f"            {service}ServiceClient<tonic::transport::Channel>,")
+            out.append(f"            {client_ty}<tonic::transport::Channel>,")
         out.append(f"        behaviors: {behaviors},")
         out.append("        methods: [")
         for method, kind, behavior, req_ty, resp_ty in kinds:
             mname = f"r#{method}" if method in RUST_KEYWORDS else method
             req = shorten(req_ty, used_pkgs)
             resp = shorten(resp_ty, used_pkgs)
-            suffix = f" => {behavior}," if kind == "hand" else ","
+            suffix = f" => {behavior}," if kind in ("hand", "renamed") else ","
             line = f"            {kind} {mname}({req}) -> {resp}{suffix}"
             if len(line) <= 100:
                 out.append(line)

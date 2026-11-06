@@ -630,10 +630,10 @@ class S {
     return Intl.message('电子邮件', name: 'contactEmail', desc: '', args: []);
   }
 
-  /// `您可以通过 support@gowind.dev 联系我们，咨询任何问题、建议或反馈。我们通常在 1-2 个工作日内回复。`
+  /// `您可以通过 support@rushwind.dev 联系我们，咨询任何问题、建议或反馈。我们通常在 1-2 个工作日内回复。`
   String get contactEmailDesc {
     return Intl.message(
-      '您可以通过 support@gowind.dev 联系我们，咨询任何问题、建议或反馈。我们通常在 1-2 个工作日内回复。',
+      '您可以通过 support@rushwind.dev 联系我们，咨询任何问题、建议或反馈。我们通常在 1-2 个工作日内回复。',
       name: 'contactEmailDesc',
       desc: '',
       args: [],
@@ -645,10 +645,10 @@ class S {
     return Intl.message('官方网站', name: 'contactWebsite', desc: '', args: []);
   }
 
-  /// `访问我们的官方网站 gowind.dev，获取最新动态、文档和社区资源。`
+  /// `访问我们的官方网站 rushwind.dev，获取最新动态、文档和社区资源。`
   String get contactWebsiteDesc {
     return Intl.message(
-      '访问我们的官方网站 gowind.dev，获取最新动态、文档和社区资源。',
+      '访问我们的官方网站 rushwind.dev，获取最新动态、文档和社区资源。',
       name: 'contactWebsiteDesc',
       desc: '',
       args: [],

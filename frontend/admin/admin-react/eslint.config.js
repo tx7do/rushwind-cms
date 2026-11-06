@@ -5,7 +5,7 @@ import reactRefresh from 'eslint-plugin-react-refresh';
 import tseslint from 'typescript-eslint';
 
 export default tseslint.config(
-  { ignores: ['dist'] },
+  { ignores: ['dist', 'src/api/generated'] },
   {
     extends: [js.configs.recommended, ...tseslint.configs.recommended],
     files: ['**/*.{ts,tsx}'],
@@ -134,6 +134,26 @@ export default tseslint.config(
       // 官方hooks校验
       'react-hooks/rules-of-hooks': 'error',
       'react-hooks/exhaustive-deps': 'error',
+    },
+  },
+  {
+    // 列表页高度契约守卫（2026-10-22）：ListTable 已内置高度自动撑满（页面不传
+    // scroll.y 即自动接管，外层用 ContentContainer 即可），列表页不要再手写
+    // useProTableScrollY 样板。存量未迁移页先 warn 提示债务，迁清后可升 error。
+    files: ['src/pages/**/*.{ts,tsx}'],
+    rules: {
+      'no-restricted-imports': [
+        'warn',
+        {
+          patterns: [
+            {
+              group: ['**/useProTableScrollY'],
+              message:
+                'ListTable 已内置高度自动撑满（未传 scroll.y 即生效，外层用 ContentContainer）；列表页不要再手接 useProTableScrollY 样板。',
+            },
+          ],
+        },
+      ],
     },
   },
 );

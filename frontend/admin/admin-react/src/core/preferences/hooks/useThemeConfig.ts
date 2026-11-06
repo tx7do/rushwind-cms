@@ -1,7 +1,9 @@
 import {useMemo, useState, useEffect} from 'react';
 import {theme as antdTheme, type ThemeConfig, type MappingAlgorithm} from 'antd';
 
-import {darkThemeComponents, darkThemeTokens} from '../config';
+import {darkThemeComponents, darkThemeTokens, lightThemeComponents} from '../config';
+import {SECONDARY_TEXT_DARK, SECONDARY_TEXT_LIGHT} from '../config/constants';
+import {mixColor} from '@/utils/color';
 import {usePreferencesStore} from '../store';
 
 export const useThemeConfig = (): ThemeConfig => {
@@ -33,10 +35,18 @@ export const useThemeConfig = (): ThemeConfig => {
         if (app.compact) algorithms.push(antdTheme.compactAlgorithm);
 
         const tokens: ThemeConfig['token'] = {
+            // design-language §3：antd 组件字体与全局 body 同栈（antd 默认栈无显式 CJK 名）
+            fontFamily: "-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, 'PingFang SC', 'Hiragino Sans GB', 'Microsoft YaHei', 'Source Han Sans SC', 'Noto Sans SC', sans-serif, 'Apple Color Emoji', 'Segoe UI Emoji', 'Noto Color Emoji'",
             colorPrimary: theme.colorPrimary,
             colorSuccess: theme.colorSuccess,
             colorWarning: theme.colorWarning,
             colorError: theme.colorDestructive,
+            // 与全局 ThemeProvider 同步：内层 ConfigProvider 会重算 token，
+            // 不写这两行则该子树的链接/info 回到 antd 默认 #1677FF（另一支蓝）。
+            colorInfo: theme.colorPrimary,
+            // 与全局 ThemeProvider 同步（同一套推导，否则内层子树又回到 2.90:1 的暗色主色文字）
+            colorLink: effectiveIsDark ? mixColor(theme.colorPrimary, '#ffffff', 0.7) : theme.colorPrimary,
+            colorTextDescription: effectiveIsDark ? SECONDARY_TEXT_DARK : SECONDARY_TEXT_LIGHT,
             borderRadius: Number.parseInt(theme.radius) || 6,
         };
         // 与全局 ThemeProvider 保持同一份暗色色阶，避免内层 ConfigProvider 覆盖外层
@@ -45,7 +55,7 @@ export const useThemeConfig = (): ThemeConfig => {
         return {
             algorithm: algorithms.length > 0 ? algorithms : antdTheme.defaultAlgorithm,
             token: tokens,
-            components: effectiveIsDark ? darkThemeComponents : undefined,
+            components: effectiveIsDark ? darkThemeComponents : lightThemeComponents,
         };
     }, [effectiveIsDark, theme, app]);
 };

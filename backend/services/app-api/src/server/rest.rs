@@ -155,6 +155,12 @@ pub fn build_router(state: Arc<AppState>) -> axum::Router {
         mount_interaction_service => Arc::new(proxies::InteractionProxy {
             state: Arc::clone(&state),
         }),
+        // ── 2026-11 契约批次新增（页面表单访客提交 / 公开重定向查询）——
+        //    薄代理先行，core 侧随特性批次落实现。
+        mount_form_submission_service => Arc::new(proxies::FormSubmissionProxy {
+            state: Arc::clone(&state),
+        }),
+        mount_redirect_service => Arc::new(proxies::RedirectProxy { state: Arc::clone(&state) }),
     );
 
     // ── Hand-mounted: the C-side register route (POST /app/v1/register) ──
