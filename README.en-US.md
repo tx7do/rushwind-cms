@@ -20,7 +20,7 @@ RushWind CMS is a **full-stack Headless content platform written in Rust**: buil
 
 - **Contract-driven**: proto contracts are byte-verified by a MANIFEST gate; the build deterministically generates routing tables / binding plans / service traits / error-status tables / mount glue — zero hand-written routes
 - **Three-service topology**: core-service (internal domain layer, gRPC :6602, sole owner of PostgreSQL/Redis, never exposed) + admin BFF (REST :6600 / SSE :6601) + app BFF (REST :6700 / SSE :6701); BFFs are thin proxies (script-generated pass-throughs), all domain logic stays in core
-- **Dual contract surfaces**: a single contract crate yields both the REST surface (rushwind-gen-http: routes/bindings/traits/mounts) and the gRPC surface (tonic-prost: server/client for 38 domain services) — one type tree, zero duplication
+- **Dual contract surfaces**: a single contract crate yields both the REST surface (rushwind-gen-http: routes/bindings/traits/mounts) and the gRPC surface (tonic-prost: server/client for the full contract service set) — one type tree, zero duplication
 - **Zero-modification frontends**: five frontend snapshots are kept in sync in-repo (sync scripts + RushWind brand overlay + dual-manifest check gate against hand edits); just point the API base URL at this repo's backends
 - **Wire-protocol compatibility**: four-field error envelope (code/reason/message/metadata, protojson codec — 64-bit integers as strings, EmitUnpopulated), gorilla-compatible CORS, HS256 JWT auth gate, HttpOnly cookie sessions
 

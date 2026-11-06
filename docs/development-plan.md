@@ -36,10 +36,11 @@
 - **sea-orm 2.0 的 DSN 只认 URL 形式**（`postgres://user:pass@host/db?sslmode=disable`），
   key=value 串解析失败。
 - buf 工作区输出文件名不带模块路径前缀（`admin/service/v1/...`），与 import 引用一致。
-- admin 面 42 个 BFF 服务、app 面 11 个；遮蔽路由恰一条（`GET /admin/v1/apis/walk-route`
+- （2026-11 批次前基线——现值见下方 2026-11-06 刷新记录）admin 面 42 个 BFF 服务、
+  app 面 11 个；遮蔽路由恰一条（`GET /admin/v1/apis/walk-route`
   被 `{id}` 模式吸收，与 rushwind-admin 同款注册顺序遮蔽）。
-- app 白名单 17 个 proto 操作 + 1 条手工路由；admin 白名单 4 个操作（Login /
-  GenerateCaptcha / VerifyCaptcha / RefreshToken）。
+- （同上，批次前基线）app 白名单 17 个 proto 操作 + 1 条手工路由；admin 白名单 4 个操作
+  （Login / GenerateCaptcha / VerifyCaptcha / RefreshToken）。
 - **2026-11-06 契约批次刷新**：接受上游 vintage 至 161d991c——proto 136 → 209 文件
   （AI 全家桶 / 通知 / 社交 / 监控 / 流程 / 表单 / 备份 / 配额 / MFA / AK-SK /
   在线会话 / 编辑锁 / 实验 / 重定向 / 审批留痕 / 搜索词库等 76 个新文件，约 341
@@ -87,23 +88,25 @@
 - [x] app 面：C 端注册（RegisterUser）+ 短期 token（15min，refresh 禁用语义）
 - [x] 两前端完整登录/登出/刷新 E2E
 
-### Phase 2 — 鉴权/数据横切
+### Phase 2 — 鉴权/数据横切 ✅（已完成，2026-11-06 盘点确认）
 
-- [ ] 租户门（站点域解析 TenantResolver：app 面按 Host 解析 tenant → 匿名只读 viewer，
-      fail-closed）+ 套餐/状态检查
-- [ ] RBAC 策略装载 + 判定日志（sys_policy_evaluation_logs）
-- [ ] SeaORM 数据层：动态 schema（50+ 表）、租户谓词注入、数据范围
-- [ ] 审计中间件（api/login/operation 三类起步）+ 黄金 DDL 管道
+- [x] 租户门（站点域解析 TenantResolver：app 面按 Host 解析 tenant → 匿名只读 viewer，
+      fail-closed）+ 套餐/状态检查（登录链 `tenant.status == "ON"` 门 + 用户状态门）
+- [x] RBAC 策略装载 + 判定日志（sys_policy_evaluation_logs）
+- [x] SeaORM 数据层：动态 schema（50+ 表）、租户谓词注入、数据范围
+- [x] 审计中间件（api/login/operation 起步 → 落地五类：api / login / operation /
+      data_access / permission）+ 黄金 DDL 管道
 
 ### Phase 3 — 模块流水线（最长尾）
 
-| 批 | 模块 | 特殊点 |
-|----|------|--------|
-| A 平台 | language / dict×2 / menu / permission / api / role / tenant / user / org_unit / position | 与 rushwind-admin 同族的 RBAC 基座 |
-| B 内容 | content_model / post / category / tag / page / section / 翻译（GetTranslation） | 内容建模元数据驱动；多语言子表；富文本/Markdown |
-| C 互动 | comment（审核/游客策略）/ interaction（点赞/收藏/观看）/ stats | 游客可选认证；公开计数 |
-| D 站点 | site / site_setting / navigation / navigation_item / media_asset / file / file_transfer | 多站点独立配置；OSS（MinIO）；HMAC 图链 |
-| E 运维 | task / translator / internal_message×3 / 六类审计查询 / dashboard | SSE 推送；OpenSearch（SearchPosts）选型落地 |
+| 批 | 模块 | 特殊点 | 进度（2026-11-06） |
+|----|------|--------|--------------------|
+| A 平台 | language / dict×2 / menu / permission / api / role / tenant / user / org_unit / position | 与 rushwind-admin 同族的 RBAC 基座 | ✅ 全落 |
+| B 内容 | content_model / post / category / tag / page / section / 翻译（GetTranslation） | 内容建模元数据驱动；多语言子表；富文本/Markdown | ✅ 除 section（未落） |
+| C 互动 | comment（审核/游客策略）/ interaction（点赞/收藏/观看）/ stats | 游客可选认证；公开计数 | ✅ 全落 |
+| D 站点 | site / site_setting / navigation / navigation_item / media_asset / file / file_transfer | 多站点独立配置；OSS（MinIO）；HMAC 图链 | ✅ 全落 |
+| E 运维 | task / translator / internal_message×3 / 六类审计查询 / dashboard | SSE 推送；OpenSearch（SearchPosts）选型落地 | ✅ 除 OpenSearch 桥接（SearchPosts 走 SQL 兜底，highlight_fragments 恒空） |
+| F 新契约域 | 2026-11 契约批次新增域：AI 全家桶（agent/chat/content/conversation/knowledge/message/provider/query/usage-log）/ notify×5 / flow / webhook / social / monitor-alert / server-monitor / online-session / redis-cache-monitor / config / access-key / backup / task-monitor / tenant-quota / edit-lock / experiment / form / redirect / review-log / search-synonym / email-template / collab-doc-state / mfa | 契约与 BFF 薄代理已就位；运行期 core 答 UNIMPLEMENTED | ⬜ 待逐域落地（当前最长尾） |
 
 ### Phase 4 — 收尾
 
@@ -150,3 +153,17 @@
   yaml 默认——env_string 语义）；`expires_in` 为 int64 → protojson 字符串化；
   CreateXRequest 一律 `{"data":{...}}` 包装；后台服务进程要用任务托管（nohup 子壳会被
   回收）。
+
+---
+
+## 7. 状态盘点（2026-11-06，v0.1.0 发布前）
+
+- Phase 0 / 1 / 2 ✅；Phase 3 批次 A / C / D 全落，B 缺 section，E 缺 OpenSearch 桥接；
+  批次 F（2026-11 契约新增域）为当前最长尾——契约与 BFF 薄代理就位，core 答 UNIMPLEMENTED。
+- 面上规模：core gRPC 注册 42 领域服务；admin BFF 76 服务（薄代理 71 + 手写 5）、
+  app BFF 14 服务（薄代理 12）；白名单 admin 10 / app 27 操作；契约 209 文件 / 29 领域。
+- 门禁基线：cargo fmt / clippy -D warnings / workspace 101 tests / proto 契约门 /
+  五前端快照门全绿（ubuntu + windows CI）；core 空库引导（schema + 种子 + 演示 + 菜单）过。
+- 已知问题：① i_user 的 redact.internal_method 与 gen-http plan-builder 的相容性未决
+  （上游决策挂起）——BFF REST 面整体 500，e2e 套件在 HEAD 不可复跑（基线为 2026-09-24
+  的 44 断言 / 13 模块）；② SearchPosts 的 OpenSearch 桥接未落；③ section 域未落。

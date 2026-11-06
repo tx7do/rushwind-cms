@@ -92,7 +92,8 @@ backend/
 - 快照按 **领域(domain) → service → version** 三级组织；BFF 面（admin/app）的文件以 `i_` 前缀，通过 import 复用领域消息，不重复定义实体；包名 `{domain}.service.v1`。
 - **字节冻结快照**：`protos/` 由 `sync-protos.sh` 从契约源同步，`MANIFEST.sha256` 逐文件哈希（BOM 归一化 + `LC_ALL=C` 排序钉死跨机稳定）。**禁止手改**；发现样式问题在契约源头修，再同步进来。
 - **buf 工作区**（`api/buf.yaml`）：六个第三方注解模块（googleapis / kratos errors / pagination / PGV / gnostic / redact）由 deps 声明、`buf.lock` 钉定 commit——不 vendor 进仓。`buf breaking --against` 做演进检查；**不做 buf format**（会砸字节清单门）。
-- **生成管线**：`crates/proto/build.rs` → `rushwind_proto_build::run` → buf 编译产出**注解闭包**（自定义选项字节保真——prost 再编码会丢 `google.api.http` / `errors.code` 字节，annotated 面必须原生 buf image）→ prost/pbjson 类型 + tonic server/client（38 个领域服务，默认 Unimplemented 桩）+ 每 BFF 一张 gen-http 面（`admin_gen.rs` / `app_gen.rs`：路由表 / 绑定计划 / trait / mounts）。admin 与 app 的 BFF 存在同名服务，两张面按 root prefix 切片、各指各的模块（`crate::gen_admin` / `crate::gen_app`），不能共享。
+- **生成管线**：`crates/proto/build.rs` → `rushwind_proto_build::run` → buf 编译产出**注解闭包**（自定义选项字节保真——prost 再编码会丢 `google.api.http` / `errors.code` 字节，annotated 面必须原生 buf image）→ prost/pbjson 类型 + tonic server/client（全量契约服务，默认 Unimplemented 桩；
+  core 侧当前注册 42 个领域服务，2026-11 新契约域随特性批次注册）+ 每 BFF 一张 gen-http 面（`admin_gen.rs` / `app_gen.rs`：路由表 / 绑定计划 / trait / mounts）。admin 与 app 的 BFF 存在同名服务，两张面按 root prefix 切片、各指各的模块（`crate::gen_admin` / `crate::gen_app`），不能共享。
 
 ## 关键约定（必须遵守）
 

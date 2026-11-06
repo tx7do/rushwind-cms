@@ -20,7 +20,7 @@ RushWind CMS 是一套 **Rust 全栈 Headless 内容平台**：以 [rushwind](ht
 
 - **契约驱动**：proto 契约字节同步自查（MANIFEST 校验门），构建期确定性生成路由表 / 绑定计划 / 服务 trait / 错误状态表 / 挂载胶水，零手写路由
 - **三服务拓扑**：core-service（对内领域层，gRPC :6602，独占 PostgreSQL/Redis，不对外暴露）+ admin BFF（REST :6600 / SSE :6601）+ app BFF（REST :6700 / SSE :6701）；BFF 是薄代理（脚本生成的 pass-through），领域逻辑全在 core
-- **契约双面**：同一契约 crate 同时产出 REST 面（rushwind-gen-http：路由/绑定/trait/mounts）与 gRPC 面（tonic-prost：38 个领域服务的 server/client），类型一树零重复
+- **契约双面**：同一契约 crate 同时产出 REST 面（rushwind-gen-http：路由/绑定/trait/mounts）与 gRPC 面（tonic-prost：全量契约服务的 server/client），类型一树零重复
 - **前端零改动**：五个前端快照随仓同步（同步脚本 + RushWind 品牌覆写层 + 双清单校验门防手改），API 基址指向本仓后端即可
 - **线上协议兼容**：四字段错误信封（code/reason/message/metadata，protojson 编解码——64 位整数字符串化、EmitUnpopulated）、gorilla 兼容 CORS、HS256 JWT 鉴权门、HttpOnly Cookie 会话
 

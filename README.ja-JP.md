@@ -20,7 +20,7 @@ RushWind CMS は、[rushwind](https://github.com/tx7do/rushwind) フレームワ
 
 - **契約駆動**：proto 契約は MANIFEST ゲートでバイト検証。ビルド時にルーティングテーブル / バインディングプラン / サービス trait / エラーステータス表 / マウントグルーを決定論的に生成し、手書きルートはゼロ
 - **3 サービストポロジ**：core-service（内部ドメイン層、gRPC :6602、PostgreSQL/Redis を独占、外部非公開）+ admin BFF（REST :6600 / SSE :6601）+ app BFF（REST :6700 / SSE :6701）。BFF は薄いプロキシ（スクリプト生成の pass-through）、ドメインロジックはすべて core に集約
-- **契約の両面**：同一の契約 crate から REST 面（rushwind-gen-http：ルート / バインディング / trait / mounts）と gRPC 面（tonic-prost：38 ドメインサービスの server/client）を生成。型は一ツリーで重複ゼロ
+- **契約の両面**：同一の契約 crate から REST 面（rushwind-gen-http：ルート / バインディング / trait / mounts）と gRPC 面（tonic-prost：契約サービス全量の server/client）を生成。型は一ツリーで重複ゼロ
 - **フロントエンドゼロ改修**：5 つのフロントエンドスナップショットをリポジトリ内で同期（同期スクリプト + RushWind ブランドオーバーレイ + 手改変防止の二重マニフェスト検証ゲート）。API ベース URL を本リポジトリのバックエンドに向けるだけ
 - **ワイヤープロトコル互換**：4 フィールドエラーエンベロープ（code/reason/message/metadata、protojson コーデック — 64 ビット整数の文字列化、EmitUnpopulated）、gorilla 互換 CORS、HS256 JWT 認証ゲート、HttpOnly Cookie セッション
 
