@@ -155,8 +155,8 @@ pub async fn insert(
         None => None,
     };
     let row = entity::ActiveModel {
-        tenant_id: Set(data.tenant_id.map(|v| v as i64)),
-        user_id: Set(data.user_id.map(|v| v as i64)),
+        tenant_id: Set(data.tenant_id),
+        user_id: Set(data.user_id),
         identity_type: Set(data.identity_type.and_then(identity_type_name)),
         identifier: Set(data.identifier),
         credential_type: Set(data.credential_type.and_then(credential_type_name)),
@@ -207,7 +207,7 @@ pub async fn update(
     let Some(data) = req.data else {
         return Err(bad("invalid request"));
     };
-    let exists = entity::Entity::find_by_id(req.id as i64)
+    let exists = entity::Entity::find_by_id(req.id)
         .one(db)
         .await
         .map_err(db_status)?
@@ -216,7 +216,7 @@ pub async fn update(
         insert(db, data).await?;
         return Ok(());
     }
-    let row = by_id(db, req.id as i64).await?;
+    let row = by_id(db, req.id).await?;
 
     let credential = if in_mask(req.update_mask.as_ref(), "credential") {
         match data.credential.as_deref() {

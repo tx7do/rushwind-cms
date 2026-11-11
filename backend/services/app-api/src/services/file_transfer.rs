@@ -242,9 +242,9 @@ pub async fn upload(State(state): State<Arc<AppState>>, req: Request) -> Respons
 /// Query shape of the download endpoint.
 #[derive(Default, serde::Deserialize)]
 pub struct DownloadQuery {
-    pub file_id: Option<u32>,
+    pub file_id: Option<i64>,
     #[serde(alias = "fileId")]
-    pub file_id_alias: Option<u32>,
+    pub file_id_alias: Option<i64>,
     pub file_guid: Option<String>,
     #[serde(alias = "fileGuid")]
     pub file_guid_alias: Option<String>,

@@ -36,7 +36,7 @@ impl identityv1::user_profile_service_server::UserProfileService for UserProfile
     ) -> Result<Response<pbjson_types::Empty>, Status> {
         let uid = operator_of(&request)?;
         let mut req = request.into_inner();
-        req.id = uid as u32;
+        req.id = uid;
         <UserService as identityv1::user_service_server::UserService>::update(
             &UserService {
                 state: Arc::clone(&self.state),

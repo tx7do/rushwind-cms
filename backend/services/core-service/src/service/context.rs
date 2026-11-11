@@ -56,15 +56,14 @@ pub fn request_tenant_of<T>(request: &tonic::Request<T>) -> i64 {
     0
 }
 
-/// The operator tenant scope as the write faces carry it (u32; 0 =
-/// platform). The identity/role/tenant write paths compare it against
-/// the column-side i64 with a cast.
-pub fn operator_tenant_id<T>(request: &tonic::Request<T>) -> u32 {
+/// The operator tenant scope as the write faces carry it (0 = platform,
+/// which scopes to nothing).
+pub fn operator_tenant_id<T>(request: &tonic::Request<T>) -> i64 {
     request
         .metadata()
         .get("x-tenant-id")
         .and_then(|v| v.to_str().ok())
-        .and_then(|v| v.parse::<u32>().ok())
+        .and_then(|v| v.parse::<i64>().ok())
         .unwrap_or(0)
 }
 

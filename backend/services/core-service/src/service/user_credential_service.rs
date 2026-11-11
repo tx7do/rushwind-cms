@@ -43,9 +43,9 @@ fn scoped_tenant_of<T>(request: &Request<T>) -> Option<i64> {
 /// back through their string names).
 fn credential_proto(r: store::entities::sys_user_credentials::Model) -> authv1::UserCredential {
     authv1::UserCredential {
-        id: r.id as u32,
-        user_id: r.user_id.map(|v| v as u32),
-        tenant_id: r.tenant_id.map(|v| v as u32),
+        id: r.id,
+        user_id: r.user_id,
+        tenant_id: r.tenant_id,
         identity_type: r
             .identity_type
             .as_deref()
@@ -82,7 +82,7 @@ impl UserCredentialService for UserCredentialServiceImpl {
         let (rows, total) = repo::list(&self.state.db, &request.into_inner()).await?;
         Ok(Response::new(authv1::ListUserCredentialResponse {
             items: rows.into_iter().map(credential_proto).collect(),
-            total,
+            total: total as i64,
         }))
     }
 
@@ -94,7 +94,7 @@ impl UserCredentialService for UserCredentialServiceImpl {
         let Some(authv1::get_user_credential_request::QueryBy::Id(id)) = req.query_by else {
             return Err(bad("query_by required"));
         };
-        let row = repo::by_id(&self.state.db, id as i64).await?;
+        let row = repo::by_id(&self.state.db, id).await?;
         Ok(Response::new(credential_proto(row)))
     }
 
@@ -144,7 +144,7 @@ impl UserCredentialService for UserCredentialServiceImpl {
         else {
             return Err(crate::state::not_found_status("user credential"));
         };
-        repo::delete(&self.state.db, id as i64).await?;
+        repo::delete(&self.state.db, id).await?;
         Ok(Response::new(pbjson_types::Empty {}))
     }
 

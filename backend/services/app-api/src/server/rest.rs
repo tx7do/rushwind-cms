@@ -40,7 +40,7 @@ struct CoreTokenChecker(std::sync::Arc<crate::state::AppState>);
 
 #[async_trait::async_trait]
 impl auth::AccessTokenChecker for CoreTokenChecker {
-    async fn is_valid_access_token(&self, _uid: u32, _jti: &str, token: &str) -> bool {
+    async fn is_valid_access_token(&self, _uid: i64, _jti: &str, token: &str) -> bool {
         let mut core = self.0.core.clone();
         let Ok(resp) = core
             .validate_token(tonic::Request::new(

@@ -33,7 +33,7 @@ macro_rules! audit_impl {
                 Ok(Response::new(
                     proto::proto::audit::service::v1::$list_resp {
                         items: rows.into_iter().map($mapper).collect(),
-                        total,
+                        total: total as i64,
                     },
                 ))
             }

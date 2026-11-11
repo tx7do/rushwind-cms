@@ -1120,7 +1120,8 @@ CREATE TABLE IF NOT EXISTS "sys_roles" (
   "name" character varying,
   "code" character varying,
   "is_protected" boolean NOT NULL DEFAULT false,
-  "type" character varying NOT NULL DEFAULT 'TENANT'::character varying
+  "type" character varying NOT NULL DEFAULT 'TENANT'::character varying,
+  "parent_id" bigint
 );
 
 CREATE TABLE IF NOT EXISTS "sys_tasks" (
@@ -1747,6 +1748,7 @@ CREATE INDEX IF NOT EXISTS idx_sys_roles_created_at ON public.sys_roles USING bt
 CREATE INDEX IF NOT EXISTS idx_sys_roles_created_by ON public.sys_roles USING btree (created_by);
 CREATE INDEX IF NOT EXISTS idx_sys_roles_is_protected ON public.sys_roles USING btree (is_protected);
 CREATE INDEX IF NOT EXISTS idx_sys_roles_name ON public.sys_roles USING btree (name);
+CREATE INDEX IF NOT EXISTS idx_sys_roles_parent_id ON public.sys_roles USING btree (parent_id);
 CREATE INDEX IF NOT EXISTS idx_sys_roles_sort_order ON public.sys_roles USING btree (sort_order);
 CREATE INDEX IF NOT EXISTS idx_sys_roles_status ON public.sys_roles USING btree (status);
 CREATE INDEX IF NOT EXISTS idx_sys_roles_tenant_id ON public.sys_roles USING btree (tenant_id);

@@ -44,7 +44,7 @@ fn processing_status_name(v: i32) -> Option<String> {
 
 fn media_asset_proto(r: media_assets::Model) -> mediav1::MediaAsset {
     mediav1::MediaAsset {
-        id: Some(r.id as u32),
+        id: Some(r.id),
         filename: r.filename.clone(),
         r#type: r.r#type.clone().map(|_| 1),
         mime_type: r.mime_type.clone(),
@@ -60,7 +60,7 @@ fn media_asset_proto(r: media_assets::Model) -> mediav1::MediaAsset {
         processing_status: r.processing_status.clone().map(|_| 1),
         processing_error: r.processing_error.clone(),
         file_hash: r.file_hash.clone(),
-        file_id: r.file_id.map(|v| v as u32),
+        file_id: r.file_id,
         reference_count: r.reference_count.map(|v| v as u32),
         is_private: r.is_private,
         created_at: r.created_at.and_then(ts_to_proto),
@@ -88,7 +88,7 @@ impl mediav1::media_asset_service_server::MediaAssetService for MediaAssetServic
         .map_err(|e| Status::internal(e.message))?;
         Ok(Response::new(mediav1::ListMediaAssetResponse {
             items: rows.into_iter().map(media_asset_proto).collect(),
-            total,
+            total: total as i64,
         }))
     }
 
@@ -98,7 +98,7 @@ impl mediav1::media_asset_service_server::MediaAssetService for MediaAssetServic
     ) -> Result<Response<mediav1::MediaAsset>, Status> {
         let req = request.into_inner();
         let id = req.id;
-        let row = media_asset_repo::media_assets_by_id(&self.state.db, id as i64).await?;
+        let row = media_asset_repo::media_assets_by_id(&self.state.db, id).await?;
         Ok(Response::new(media_asset_proto(row)))
     }
 
@@ -128,10 +128,10 @@ impl mediav1::media_asset_service_server::MediaAssetService for MediaAssetServic
                 processing_status: Set(data.processing_status.and_then(processing_status_name)),
                 processing_error: Set(data.processing_error),
                 file_hash: Set(data.file_hash),
-                file_id: Set(data.file_id.map(|v| v as i64)),
-                folder_id: Set(data.folder_id.map(|v| v as i64)),
+                file_id: Set(data.file_id),
+                folder_id: Set(data.folder_id),
                 is_private: Set(data.is_private),
-                created_by: Set(data.created_by.map(|v| v as i64)),
+                created_by: Set(data.created_by),
                 created_at: Set(Some(store::now())),
                 ..Default::default()
             },
@@ -145,7 +145,7 @@ impl mediav1::media_asset_service_server::MediaAssetService for MediaAssetServic
         request: Request<mediav1::UpdateMediaAssetRequest>,
     ) -> Result<Response<mediav1::MediaAsset>, Status> {
         let req = request.into_inner();
-        let row = media_asset_repo::media_assets_by_id(&self.state.db, req.id as i64).await?;
+        let row = media_asset_repo::media_assets_by_id(&self.state.db, req.id).await?;
         let mut a: media_assets::ActiveModel = row.into();
         if let Some(data) = req.data {
             if let Some(v) = data.r#type {
@@ -194,10 +194,10 @@ impl mediav1::media_asset_service_server::MediaAssetService for MediaAssetServic
                 a.file_hash = Set(Some(v));
             }
             if let Some(v) = data.file_id {
-                a.file_id = Set(Some(v as i64));
+                a.file_id = Set(Some(v));
             }
             if let Some(v) = data.folder_id {
-                a.folder_id = Set(Some(v as i64));
+                a.folder_id = Set(Some(v));
             }
             if let Some(v) = data.is_private {
                 a.is_private = Set(Some(v));
@@ -214,7 +214,7 @@ impl mediav1::media_asset_service_server::MediaAssetService for MediaAssetServic
     ) -> Result<Response<pbjson_types::Empty>, Status> {
         let req = request.into_inner();
         let id = match req.query_by {
-            Some(mediav1::delete_media_asset_request::QueryBy::Id(id)) => id as i64,
+            Some(mediav1::delete_media_asset_request::QueryBy::Id(id)) => id,
             _ => return Err(bad("query_by required")),
         };
         media_asset_repo::delete_media_assets(&self.state.db, id).await?;

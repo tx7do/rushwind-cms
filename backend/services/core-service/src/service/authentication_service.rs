@@ -128,8 +128,8 @@ impl AuthenticationServiceImpl {
         req: &LoginRequest,
     ) -> Result<UserTokenPayload, Status> {
         let mut payload = UserTokenPayload {
-            user_id: user.id as u32,
-            tenant_id: user.tenant_id.unwrap_or(0) as u32,
+            user_id: user.id,
+            tenant_id: user.tenant_id.unwrap_or(0),
             username: user.username.clone().unwrap_or_default(),
             jti: uuid::Uuid::now_v7().simple().to_string(),
             client_id: req.client_id.clone(),
@@ -164,7 +164,7 @@ impl AuthenticationServiceImpl {
     async fn resolve_target(
         &self,
         client_type: i32,
-        user_id: u32,
+        user_id: i64,
         target: Option<TokenTarget>,
     ) -> Result<(ClientType, String), Status> {
         let Some(client) = ClientType::from_i32_strict(client_type) else {
@@ -274,7 +274,7 @@ impl AuthenticationServiceImpl {
             return Err(Status::unauthenticated("invalid refresh token"));
         }
 
-        let user = self.user_row(user_id as i64).await?;
+        let user = self.user_row(user_id).await?;
         if user.status.as_deref() != Some("NORMAL") {
             return Err(forbidden("user is disabled"));
         }
@@ -325,9 +325,7 @@ impl AuthenticationService for AuthenticationServiceImpl {
         )
         .await
         .map_err(to_tonic)?;
-        Ok(Response::new(RegisterUserResponse {
-            user_id: user_id as u32,
-        }))
+        Ok(Response::new(RegisterUserResponse { user_id }))
     }
 
     async fn refresh_token(&self, request: Request<LoginRequest>) -> ResponseResult<LoginResponse> {
@@ -513,7 +511,7 @@ impl AuthenticationService for AuthenticationServiceImpl {
             .ok_or_else(|| Status::unauthenticated("missing authentication context"))?;
         let user = self.user_row(uid).await?;
         Ok(Response::new(WhoAmIResponse {
-            user_id: user.id as u32,
+            user_id: user.id,
             username: user.username.unwrap_or_default(),
         }))
     }

@@ -39,11 +39,11 @@ pub async fn insert(
     data: permv1::PolicyEvaluationLog,
 ) -> StatusResult<()> {
     entity::ActiveModel {
-        tenant_id: Set(data.tenant_id.map(|v| v as i64)),
-        user_id: Set(data.user_id.unwrap_or(0) as i64),
-        membership_id: Set(data.membership_id.unwrap_or(0) as i64),
-        permission_id: Set(data.permission_id.unwrap_or(0) as i64),
-        policy_id: Set(data.policy_id.map(|v| v as i64)),
+        tenant_id: Set(data.tenant_id),
+        user_id: Set(data.user_id.unwrap_or(0)),
+        membership_id: Set(data.membership_id.unwrap_or(0)),
+        permission_id: Set(data.permission_id.unwrap_or(0)),
+        policy_id: Set(data.policy_id),
         request_path: Set(data.request_path),
         request_method: Set(data.request_method),
         result: Set(data.result.unwrap_or(false)),

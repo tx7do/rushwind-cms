@@ -202,8 +202,8 @@ impl interactionv1::interaction_service_server::InteractionService for Interacti
     ) -> Result<Response<interactionv1::LikeResponse>, Status> {
         let user_id = operator_of(&request)?;
         let req = request.into_inner();
-        let liked = like_post(&self.state.db, user_id, req.target_id as i64, true).await?;
-        let count = read_counter(&self.state.db, "", req.target_id as i64, 1).await;
+        let liked = like_post(&self.state.db, user_id, req.target_id, true).await?;
+        let count = read_counter(&self.state.db, "", req.target_id, 1).await;
         Ok(Response::new(interactionv1::LikeResponse {
             liked,
             like_count: count as i32,
@@ -216,8 +216,8 @@ impl interactionv1::interaction_service_server::InteractionService for Interacti
     ) -> Result<Response<interactionv1::LikeResponse>, Status> {
         let user_id = operator_of(&request)?;
         let req = request.into_inner();
-        let liked = like_post(&self.state.db, user_id, req.target_id as i64, false).await?;
-        let count = read_counter(&self.state.db, "", req.target_id as i64, 1).await;
+        let liked = like_post(&self.state.db, user_id, req.target_id, false).await?;
+        let count = read_counter(&self.state.db, "", req.target_id, 1).await;
         Ok(Response::new(interactionv1::LikeResponse {
             liked,
             like_count: count as i32,
@@ -230,8 +230,8 @@ impl interactionv1::interaction_service_server::InteractionService for Interacti
     ) -> Result<Response<interactionv1::WatchResponse>, Status> {
         let user_id = operator_of(&request)?;
         let req = request.into_inner();
-        let watched = watch_post(&self.state.db, user_id, req.post_id as i64, true).await?;
-        let count = read_counter(&self.state.db, "", req.post_id as i64, 2).await;
+        let watched = watch_post(&self.state.db, user_id, req.post_id, true).await?;
+        let count = read_counter(&self.state.db, "", req.post_id, 2).await;
         Ok(Response::new(interactionv1::WatchResponse {
             watched,
             watch_count: count as i32,
@@ -244,8 +244,8 @@ impl interactionv1::interaction_service_server::InteractionService for Interacti
     ) -> Result<Response<interactionv1::WatchResponse>, Status> {
         let user_id = operator_of(&request)?;
         let req = request.into_inner();
-        let watched = watch_post(&self.state.db, user_id, req.post_id as i64, false).await?;
-        let count = read_counter(&self.state.db, "", req.post_id as i64, 2).await;
+        let watched = watch_post(&self.state.db, user_id, req.post_id, false).await?;
+        let count = read_counter(&self.state.db, "", req.post_id, 2).await;
         Ok(Response::new(interactionv1::WatchResponse {
             watched,
             watch_count: count as i32,
@@ -265,7 +265,7 @@ impl interactionv1::interaction_service_server::InteractionService for Interacti
             .iter()
             .map(|&id| {
                 (
-                    id,
+                    id as u32,
                     interactionv1::InteractionStatus {
                         liked: false,
                         watched: false,
@@ -273,7 +273,7 @@ impl interactionv1::interaction_service_server::InteractionService for Interacti
                 )
             })
             .collect();
-        let ids: Vec<i64> = req.target_ids.iter().map(|&v| v as i64).collect();
+        let ids: Vec<i64> = req.target_ids.clone();
         match req.target_type {
             1 => {
                 // post: liked off post_likes, watched off post_watches
@@ -360,7 +360,10 @@ impl interactionv1::interaction_service_server::InteractionService for Interacti
                 tag_ids,
             ));
         }
-        Ok(Response::new(contentv1::ListPostResponse { items, total }))
+        Ok(Response::new(contentv1::ListPostResponse {
+            items,
+            total: total as i64,
+        }))
     }
 
     async fn get_counts(
@@ -372,14 +375,13 @@ impl interactionv1::interaction_service_server::InteractionService for Interacti
         for target_id in req.target_ids {
             let mut map = interactionv1::CountMap::default();
             for metric in req.metrics.clone() {
-                let value =
-                    read_counter(&self.state.db, "", target_id as i64, metric_num(metric)).await;
+                let value = read_counter(&self.state.db, "", target_id, metric_num(metric)).await;
                 map.counts.push(interactionv1::MetricCount {
                     metric,
                     count: value,
                 });
             }
-            counts.insert(target_id, map);
+            counts.insert(target_id as u32, map);
         }
         Ok(Response::new(interactionv1::GetCountsResponse { counts }))
     }

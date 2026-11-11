@@ -91,11 +91,11 @@ impl TokenStore {
         self.refresh_secs
     }
 
-    fn at_key(&self, uid: u32, jti: &str) -> String {
+    fn at_key(&self, uid: i64, jti: &str) -> String {
         format!("gwc:at:{}:{}:{}", self.client.as_u32(), uid, jti)
     }
 
-    fn rt_key(&self, uid: u32, jti: &str) -> String {
+    fn rt_key(&self, uid: i64, jti: &str) -> String {
         format!("gwc:rt:{}:{}:{}", self.client.as_u32(), uid, jti)
     }
 
@@ -104,7 +104,7 @@ impl TokenStore {
     }
 
     /// Whitelist exact-match — false means revoked/expired.
-    pub async fn is_valid_access_token(&self, uid: u32, jti: &str, token: &str) -> bool {
+    pub async fn is_valid_access_token(&self, uid: i64, jti: &str, token: &str) -> bool {
         let Ok(stored): Result<String, _> = self.conn.clone().get(self.at_key(uid, jti)).await
         else {
             return false;
@@ -124,7 +124,7 @@ impl TokenStore {
     /// expiry (0s — the app profile) stores no RT row.
     pub async fn add_token_pair(
         &self,
-        uid: u32,
+        uid: i64,
         jti: &str,
         access: &str,
         refresh: Option<&str>,
@@ -150,7 +150,7 @@ impl TokenStore {
     /// The refresh rotation: verify-and-revoke atomically.
     pub async fn verify_and_revoke_pair(
         &self,
-        uid: u32,
+        uid: i64,
         jti: &str,
         refresh: &str,
     ) -> Result<bool, String> {
@@ -167,7 +167,7 @@ impl TokenStore {
     }
 
     /// Revokes every token of the user (the logout path).
-    pub async fn revoke_user_tokens(&self, uid: u32) -> Result<(), String> {
+    pub async fn revoke_user_tokens(&self, uid: i64) -> Result<(), String> {
         for prefix in ["at", "rt"] {
             let keys = self
                 .scan_keys(&format!("gwc:{prefix}:{}:{}:*", self.client.as_u32(), uid))
@@ -184,7 +184,7 @@ impl TokenStore {
     /// Every live access-token value of the user — the session family
     /// scan of the reference's GetAccessTokens (SCAN + MGET, expired
     /// rows dropped).
-    pub async fn access_tokens(&self, uid: u32) -> Result<Vec<String>, String> {
+    pub async fn access_tokens(&self, uid: i64) -> Result<Vec<String>, String> {
         let keys = self
             .scan_keys(&format!("gwc:at:{}:{}:*", self.client.as_u32(), uid))
             .await?;
@@ -200,7 +200,7 @@ impl TokenStore {
     /// reference's scanFindValue (the by-token blacklist target).
     pub async fn jti_of_access_token(
         &self,
-        uid: u32,
+        uid: i64,
         token: &str,
     ) -> Result<Option<String>, String> {
         let keys = self
@@ -221,7 +221,7 @@ impl TokenStore {
 
     /// Whether an access-token row exists for the jti (the reference's
     /// IsExistAccessTokenByJti).
-    pub async fn has_access_token(&self, uid: u32, jti: &str) -> Result<bool, String> {
+    pub async fn has_access_token(&self, uid: i64, jti: &str) -> Result<bool, String> {
         let mut conn = self.conn.clone();
         let n: i64 = conn
             .exists(self.at_key(uid, jti))
@@ -251,7 +251,7 @@ impl TokenStore {
     /// Revokes one token pair (access + refresh) of the jti — the
     /// reference's RevokeTokenByJti (the unblock face removes the
     /// session rows, the blacklist row itself just ages out).
-    pub async fn revoke_by_jti(&self, uid: u32, jti: &str) -> Result<(), String> {
+    pub async fn revoke_by_jti(&self, uid: i64, jti: &str) -> Result<(), String> {
         let mut conn = self.conn.clone();
         let _: () = conn
             .del(vec![self.at_key(uid, jti), self.rt_key(uid, jti)])

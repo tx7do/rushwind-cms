@@ -35,7 +35,7 @@ impl sitev1::navigation_item_service_server::NavigationItemService for Navigatio
         .map_err(|e| Status::internal(e.message))?;
         Ok(Response::new(sitev1::ListNavigationItemResponse {
             items: rows.into_iter().map(navigation_item_proto).collect(),
-            total,
+            total: total as i64,
         }))
     }
 
@@ -47,7 +47,7 @@ impl sitev1::navigation_item_service_server::NavigationItemService for Navigatio
         let Some(sitev1::get_navigation_item_request::QueryBy::Id(id)) = req.query_by else {
             return Err(bad("query_by required"));
         };
-        let row = navigation_item_repo::navigation_items_by_id(&self.state.db, id as i64).await?;
+        let row = navigation_item_repo::navigation_items_by_id(&self.state.db, id).await?;
         Ok(Response::new(navigation_item_proto(row)))
     }
 
@@ -60,13 +60,13 @@ impl sitev1::navigation_item_service_server::NavigationItemService for Navigatio
             return Err(bad("data required"));
         };
         let row = navigation_items::ActiveModel {
-            navigation_id: Set(data.navigation_id.map(|v| v as i64)),
+            navigation_id: Set(data.navigation_id),
             title: Set(data.title),
             description: Set(data.description),
             icon: Set(data.icon),
             url: Set(data.url),
             link_type: Set(data.link_type.and_then(link_type_name)),
-            object_id: Set(data.object_id.map(|v| v as i64)),
+            object_id: Set(data.object_id),
             sort_order: Set(data.sort_order.map(|v| v as i64)),
             is_open_new_tab: Set(data.is_open_new_tab),
             created_at: Set(Some(store::now())),
@@ -83,7 +83,7 @@ impl sitev1::navigation_item_service_server::NavigationItemService for Navigatio
         request: Request<sitev1::UpdateNavigationItemRequest>,
     ) -> Result<Response<sitev1::NavigationItem>, Status> {
         let req = request.into_inner();
-        let row = navigation_items::Entity::find_by_id(req.id as i64)
+        let row = navigation_items::Entity::find_by_id(req.id)
             .one(&self.state.db)
             .await
             .map_err(db_status)?
@@ -113,7 +113,7 @@ impl sitev1::navigation_item_service_server::NavigationItemService for Navigatio
         let Some(sitev1::delete_navigation_item_request::QueryBy::Id(id)) = req.query_by else {
             return Err(bad("query_by required"));
         };
-        navigation_item_repo::delete_navigation_items(&self.state.db, id as i64).await?;
+        navigation_item_repo::delete_navigation_items(&self.state.db, id).await?;
         Ok(Response::new(pbjson_types::Empty {}))
     }
 }

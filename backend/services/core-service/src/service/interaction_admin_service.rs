@@ -46,8 +46,8 @@ async fn write_purge_audit(
     success: bool,
 ) {
     let entry = auditv1::OperationAuditLog {
-        tenant_id: Some(operator_tenant_id as u32),
-        user_id: Some(operator_user_id as u32),
+        tenant_id: Some(operator_tenant_id),
+        user_id: Some(operator_user_id),
         resource_type: Some(resource_type.to_string()),
         resource_id: Some(resource_id.to_string()),
         action: Some(auditv1::operation_audit_log::ActionType::Delete as i32),
@@ -175,7 +175,7 @@ impl interactionv1::interaction_admin_service_server::InteractionAdminService
         let req = request.into_inner();
         let target_type =
             target_type_num(req.target_type).ok_or_else(|| bad("invalid target type"))?;
-        let target_id = req.target_id as i64;
+        let target_id = req.target_id;
 
         let outcome = purge_target_interactions_inner(&self.state.db, target_type, target_id).await;
         write_purge_audit(
@@ -200,7 +200,7 @@ impl interactionv1::interaction_admin_service_server::InteractionAdminService
     ) -> Result<Response<interactionv1::PurgeUserInteractionsResponse>, Status> {
         let (op_tid, op_uid) = require_admin_operator(&request)?;
         let req = request.into_inner();
-        let user_id = req.user_id as i64;
+        let user_id = req.user_id;
 
         let outcome = purge_user_interactions_inner(&self.state.db, user_id).await;
         write_purge_audit(
@@ -225,7 +225,7 @@ impl interactionv1::interaction_admin_service_server::InteractionAdminService
     ) -> Result<Response<interactionv1::ResetCounterResponse>, Status> {
         let (op_tid, op_uid) = require_admin_operator(&request)?;
         let req = request.into_inner();
-        let target_id = req.target_id as i64;
+        let target_id = req.target_id;
 
         let outcome =
             reset_counter_inner(&self.state.db, req.target_type, target_id, req.metric).await;

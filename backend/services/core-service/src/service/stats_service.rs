@@ -218,7 +218,7 @@ impl statsv1::stats_service_server::StatsService for StatsService {
         let top_liked_posts = top
             .into_iter()
             .map(|r| statsv1::InteractionTopItem {
-                target_id: r.try_get::<i64>("", "post_id").unwrap_or(0) as u32,
+                target_id: r.try_get::<i64>("", "post_id").unwrap_or(0),
                 title: r.try_get::<String>("", "title").unwrap_or_default(),
                 like_count: r.try_get::<i64>("", "likes").unwrap_or(0),
             })
@@ -240,7 +240,7 @@ impl statsv1::stats_service_server::StatsService for StatsService {
         let top_viewed_posts: Vec<statsv1::InteractionTopItem> = top_viewed
             .into_iter()
             .map(|r| statsv1::InteractionTopItem {
-                target_id: r.try_get::<i64>("", "post_id").unwrap_or(0) as u32,
+                target_id: r.try_get::<i64>("", "post_id").unwrap_or(0),
                 title: String::new(),
                 like_count: r.try_get::<i64>("", "views").unwrap_or(0),
             })

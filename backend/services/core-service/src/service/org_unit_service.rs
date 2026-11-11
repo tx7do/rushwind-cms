@@ -49,14 +49,14 @@ pub(crate) fn ts_to_column(
 
 fn org_unit_proto(r: sys_org_units::Model) -> identityv1::OrgUnit {
     identityv1::OrgUnit {
-        id: Some(r.id as u32),
+        id: Some(r.id),
         name: Some(r.name),
         code: r.code,
         path: r.path,
         status: Some(1),
         sort_order: r.sort_order.map(|v| v as u32),
-        leader_id: r.leader_id.map(|v| v as u32),
-        tenant_id: r.tenant_id.map(|v| v as u32),
+        leader_id: r.leader_id,
+        tenant_id: r.tenant_id,
         remark: r.remark,
         description: r.description,
         r#type: Some(1),
@@ -83,7 +83,7 @@ impl identityv1::org_unit_service_server::OrgUnitService for OrgUnitService {
         .map_err(|e| Status::internal(e.message))?;
         Ok(Response::new(identityv1::ListOrgUnitResponse {
             items: rows.into_iter().map(org_unit_proto).collect(),
-            total,
+            total: total as i64,
         }))
     }
 
@@ -96,7 +96,7 @@ impl identityv1::org_unit_service_server::OrgUnitService for OrgUnitService {
             .await
             .map_err(db_status)?;
         Ok(Response::new(identityv1::CountOrgUnitResponse {
-            count: total,
+            count: total as i64,
         }))
     }
 
@@ -108,7 +108,7 @@ impl identityv1::org_unit_service_server::OrgUnitService for OrgUnitService {
         let Some(identityv1::get_org_unit_request::QueryBy::Id(id)) = req.query_by else {
             return Err(bad("query_by required"));
         };
-        let row = org_unit_repo::org_units_by_id(&self.state.db, id as i64).await?;
+        let row = org_unit_repo::org_units_by_id(&self.state.db, id).await?;
         Ok(Response::new(org_unit_proto(row)))
     }
 
@@ -122,19 +122,19 @@ impl identityv1::org_unit_service_server::OrgUnitService for OrgUnitService {
         };
         let txn = self.state.db.begin().await.map_err(db_status)?;
         let mut a = sys_org_units::ActiveModel {
-            tenant_id: Set(data.tenant_id.map(|v| v as i64)),
+            tenant_id: Set(data.tenant_id),
             name: Set(data.name.unwrap_or_default()),
             code: Set(data.code),
-            parent_id: Set(data.parent_id.map(|v| v as i64)),
+            parent_id: Set(data.parent_id),
             sort_order: Set(data.sort_order.map(|v| v as i64)),
-            leader_id: Set(data.leader_id.map(|v| v as i64)),
+            leader_id: Set(data.leader_id),
             description: Set(data.description),
             remark: Set(data.remark),
             external_id: Set(data.external_id),
             is_legal_entity: Set(data.is_legal_entity),
             registration_number: Set(data.registration_number),
             tax_id: Set(data.tax_id),
-            legal_entity_org_id: Set(data.legal_entity_org_id.map(|v| v as i64)),
+            legal_entity_org_id: Set(data.legal_entity_org_id),
             address: Set(data.address),
             phone: Set(data.phone),
             email: Set(data.email),
@@ -144,13 +144,13 @@ impl identityv1::org_unit_service_server::OrgUnitService for OrgUnitService {
             longitude: Set(data.longitude),
             start_at: Set(ts_to_column(data.start_at)),
             end_at: Set(ts_to_column(data.end_at)),
-            contact_user_id: Set(data.contact_user_id.map(|v| v as i64)),
-            created_by: Set(data.created_by.map(|v| v as i64)),
+            contact_user_id: Set(data.contact_user_id),
+            created_by: Set(data.created_by),
             created_at: Set(Some(store::now())),
             ..Default::default()
         };
         if let Some(id) = data.id {
-            a.id = Set(id as i64);
+            a.id = Set(id);
         }
         if let Some(name) = data
             .status
@@ -165,7 +165,7 @@ impl identityv1::org_unit_service_server::OrgUnitService for OrgUnitService {
         // The tree path is derived (parent's path + own id) and written
         // back — the reference computes it in the same transaction.
         let parent_path = match data.parent_id {
-            Some(pid) => org_unit_repo::org_units_by_id(&txn, pid as i64)
+            Some(pid) => org_unit_repo::org_units_by_id(&txn, pid)
                 .await?
                 .path
                 .unwrap_or_default(),
@@ -189,7 +189,7 @@ impl identityv1::org_unit_service_server::OrgUnitService for OrgUnitService {
         };
         // 不存在则创建
         if req.allow_missing.unwrap_or(false)
-            && org_unit_repo::org_units_by_id(&self.state.db, req.id as i64)
+            && org_unit_repo::org_units_by_id(&self.state.db, req.id)
                 .await
                 .is_err()
         {
@@ -206,7 +206,7 @@ impl identityv1::org_unit_service_server::OrgUnitService for OrgUnitService {
             return Ok(Response::new(pbjson_types::Empty {}));
         }
         let mut a = sys_org_units::ActiveModel {
-            id: Set(req.id as i64),
+            id: Set(req.id),
             ..Default::default()
         };
         if let Some(v) = data.name {
@@ -225,13 +225,13 @@ impl identityv1::org_unit_service_server::OrgUnitService for OrgUnitService {
             a.r#type = Set(name);
         }
         if let Some(v) = data.parent_id {
-            a.parent_id = Set(Some(v as i64));
+            a.parent_id = Set(Some(v));
         }
         if let Some(v) = data.sort_order {
             a.sort_order = Set(Some(v as i64));
         }
         if let Some(v) = data.leader_id {
-            a.leader_id = Set(Some(v as i64));
+            a.leader_id = Set(Some(v));
         }
         if let Some(v) = data.description {
             a.description = Set(Some(v));
@@ -252,7 +252,7 @@ impl identityv1::org_unit_service_server::OrgUnitService for OrgUnitService {
             a.tax_id = Set(Some(v));
         }
         if let Some(v) = data.legal_entity_org_id {
-            a.legal_entity_org_id = Set(Some(v as i64));
+            a.legal_entity_org_id = Set(Some(v));
         }
         if let Some(v) = data.address {
             a.address = Set(Some(v));
@@ -282,12 +282,12 @@ impl identityv1::org_unit_service_server::OrgUnitService for OrgUnitService {
             a.end_at = Set(ts_to_column(data.end_at));
         }
         if let Some(v) = data.contact_user_id {
-            a.contact_user_id = Set(Some(v as i64));
+            a.contact_user_id = Set(Some(v));
         }
         a.updated_at = Set(Some(store::now()));
         sys_org_units::Entity::update_many()
             .set(a)
-            .filter(sys_org_units::Column::Id.eq(req.id as i64))
+            .filter(sys_org_units::Column::Id.eq(req.id))
             .exec(&self.state.db)
             .await
             .map_err(db_status)?;
@@ -303,8 +303,8 @@ impl identityv1::org_unit_service_server::OrgUnitService for OrgUnitService {
             return Err(bad("query_by required"));
         };
         // 级联删除全部子孙节点
-        let mut ids = org_unit_repo::org_unit_descendant_ids(&self.state.db, id as i64).await?;
-        ids.push(id as i64);
+        let mut ids = org_unit_repo::org_unit_descendant_ids(&self.state.db, id).await?;
+        ids.push(id);
         sys_org_units::Entity::delete_many()
             .filter(sys_org_units::Column::Id.is_in(ids))
             .exec(&self.state.db)

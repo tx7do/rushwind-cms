@@ -49,8 +49,8 @@ const DEFAULT_ADMIN_USER_NAME: &str = "admin";
 
 pub(crate) fn user_proto(r: sys_users::Model) -> identityv1::User {
     identityv1::User {
-        id: Some(r.id as u32),
-        tenant_id: r.tenant_id.map(|v| v as u32),
+        id: Some(r.id),
+        tenant_id: r.tenant_id,
         username: r.username,
         nickname: r.nickname,
         realname: r.realname,
@@ -92,7 +92,7 @@ impl identityv1::user_service_server::UserService for UserService {
         .map_err(|e| Status::internal(e.message))?;
         Ok(Response::new(identityv1::ListUserResponse {
             items: rows.into_iter().map(user_proto).collect(),
-            total,
+            total: total as i64,
         }))
     }
 
@@ -106,7 +106,7 @@ impl identityv1::user_service_server::UserService for UserService {
             .await
             .map_err(db_status)?;
         Ok(Response::new(identityv1::CountUserResponse {
-            count: total,
+            count: total as i64,
         }))
     }
 
@@ -118,7 +118,7 @@ impl identityv1::user_service_server::UserService for UserService {
         let Some(identityv1::get_user_request::QueryBy::Id(id)) = req.query_by else {
             return Err(bad("query_by required"));
         };
-        let row = user_repo::users_by_id(&self.state.db, id as i64).await?;
+        let row = user_repo::users_by_id(&self.state.db, id).await?;
         Ok(Response::new(user_proto(row)))
     }
 
@@ -133,7 +133,7 @@ impl identityv1::user_service_server::UserService for UserService {
         let password = req.password.unwrap_or_else(|| "12345678".to_string());
         let txn = self.state.db.begin().await.map_err(db_status)?;
         let row = sys_users::ActiveModel {
-            tenant_id: Set(data.tenant_id.map(|v| v as i64)),
+            tenant_id: Set(data.tenant_id),
             username: Set(Some(data.username.clone().unwrap_or_default())),
             nickname: Set(data.nickname),
             realname: Set(data.realname),
@@ -171,7 +171,7 @@ impl identityv1::user_service_server::UserService for UserService {
                 .map(|r| vec![r.id])
                 .unwrap_or_default()
         } else {
-            data.role_ids.iter().map(|v| *v as i64).collect()
+            data.role_ids.clone()
         };
         for role_id in role_ids {
             sys_user_roles::ActiveModel {
@@ -196,7 +196,7 @@ impl identityv1::user_service_server::UserService for UserService {
         request: Request<identityv1::UpdateUserRequest>,
     ) -> Result<Response<pbjson_types::Empty>, Status> {
         let req = request.into_inner();
-        let row = sys_users::Entity::find_by_id(req.id as i64)
+        let row = sys_users::Entity::find_by_id(req.id)
             .one(&self.state.db)
             .await
             .map_err(db_status)?
@@ -256,8 +256,6 @@ impl identityv1::user_service_server::UserService for UserService {
         let Some(identityv1::delete_user_request::QueryBy::Id(id)) = req.query_by else {
             return Err(bad("query_by required"));
         };
-        let id = id as i64;
-
         let txn = self.state.db.begin().await.map_err(db_status)?;
         let target = sys_users::Entity::find_by_id(id)
             .one(&txn)
@@ -266,7 +264,7 @@ impl identityv1::user_service_server::UserService for UserService {
             .ok_or_else(|| not_found("user"))?;
         // Tenant scope: the reference's viewer-predicated lookup hides
         // cross-tenant users from tenant operators.
-        if caller_tenant_id > 0 && target.tenant_id.unwrap_or(0) != caller_tenant_id as i64 {
+        if caller_tenant_id > 0 && target.tenant_id.unwrap_or(0) != caller_tenant_id {
             return Err(not_found("user"));
         }
 
@@ -310,9 +308,7 @@ impl identityv1::user_service_server::UserService for UserService {
         let req = request.into_inner();
         let row = match req.query_by {
             Some(identityv1::user_exists_request::QueryBy::Id(id)) => {
-                sys_users::Entity::find_by_id(id as i64)
-                    .one(&self.state.db)
-                    .await
+                sys_users::Entity::find_by_id(id).one(&self.state.db).await
             }
             Some(identityv1::user_exists_request::QueryBy::Username(username)) => {
                 sys_users::Entity::find()

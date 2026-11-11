@@ -106,7 +106,7 @@ async fn optional_operator(state: &AppState, ctx: &Ctx) -> Option<UserTokenPaylo
 
 /// The Host→tenant resolution over the core face (0 = unresolved —
 /// the caller decides the fail-closed shape).
-async fn tenant_by_host(state: &AppState, ctx: &Ctx) -> u32 {
+async fn tenant_by_host(state: &AppState, ctx: &Ctx) -> i64 {
     let Some(domain) = host_of(ctx) else {
         return 0;
     };
@@ -128,7 +128,7 @@ async fn tenant_by_host(state: &AppState, ctx: &Ctx) -> u32 {
 /// The outbound relay with the operator bag plus the trusted inner
 /// tenant stamp (the anonymous chain's Host resolution; inner-gRPC
 /// metadata cannot be forged by external callers).
-fn request_with_tenant<T>(ctx: &Ctx, msg: T, tenant: u32) -> tonic::Request<T> {
+fn request_with_tenant<T>(ctx: &Ctx, msg: T, tenant: i64) -> tonic::Request<T> {
     let mut req = with_operator(ctx, msg);
     if tenant > 0 {
         if let Ok(v) = tonic::metadata::MetadataValue::try_from(tenant.to_string().as_str()) {
@@ -159,7 +159,7 @@ pub async fn post_list(
         .map_err(map_status)?
         .into_inner();
     resp.items.retain(|p| p.status == Some(PUBLISHED));
-    resp.total = resp.items.len() as u64;
+    resp.total = resp.items.len() as i64;
     Ok(resp)
 }
 
@@ -219,7 +219,7 @@ pub async fn category_list(
         .map_err(map_status)?
         .into_inner();
     resp.items.retain(|c| c.status == Some(ACTIVE));
-    resp.total = resp.items.len() as u64;
+    resp.total = resp.items.len() as i64;
     Ok(resp)
 }
 
@@ -260,7 +260,7 @@ pub async fn page_list(
         .map_err(map_status)?
         .into_inner();
     resp.items.retain(|p| p.status == Some(PUBLISHED));
-    resp.total = resp.items.len() as u64;
+    resp.total = resp.items.len() as i64;
     Ok(resp)
 }
 
@@ -324,7 +324,7 @@ pub async fn comment_list(
         .map_err(map_status)?
         .into_inner();
     resp.items.retain(|c| c.status == Some(APPROVED));
-    resp.total = resp.items.len() as u64;
+    resp.total = resp.items.len() as i64;
     Ok(resp)
 }
 
@@ -401,8 +401,8 @@ pub async fn comment_create(
 /// IDOR 防护：只能改/删自己创建的评论。
 async fn ensure_comment_owner(
     state: &AppState,
-    comment_id: u32,
-    user_id: u32,
+    comment_id: i64,
+    user_id: i64,
 ) -> Result<(), StatusError> {
     let mut core =
         proto::proto::comment::service::v1::comment_service_client::CommentServiceClient::new(
@@ -523,7 +523,7 @@ pub async fn register(
     state: &AppState,
     ctx: &Ctx,
     mut req: proto::proto::authentication::service::v1::RegisterUserRequest,
-) -> Result<u32, StatusError> {
+) -> Result<i64, StatusError> {
     use proto::proto::identity::service::v1::get_tenant_request::QueryBy;
     if req.username.trim().is_empty() || req.password.is_empty() {
         return Err(bad_request("invalid username or password"));

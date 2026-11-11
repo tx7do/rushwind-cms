@@ -22,6 +22,7 @@ pub struct Model {
     pub code: Option<String>,
     pub is_protected: bool,
     pub r#type: String,
+    pub parent_id: Option<i64>,
 }
 
 #[derive(Copy, Clone, Debug, EnumIter, DeriveRelation)]

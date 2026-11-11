@@ -14,14 +14,14 @@ use store::paging::fetch_paged;
 
 fn group_proto(r: sys_permission_groups::Model) -> permissionv1::PermissionGroup {
     permissionv1::PermissionGroup {
-        id: Some(r.id as u32),
+        id: Some(r.id),
         name: Some(r.name),
         path: r.path,
         module: r.module,
         sort_order: r.sort_order.map(|v| v as u32),
         status: Some(1),
         description: r.description,
-        parent_id: r.parent_id.map(|v| v as u32),
+        parent_id: r.parent_id,
         created_at: r.created_at.and_then(ts_to_proto),
         updated_at: r.updated_at.and_then(ts_to_proto),
         ..Default::default()
@@ -49,7 +49,7 @@ impl permissionv1::permission_group_service_server::PermissionGroupService
         .map_err(|e| Status::internal(e.message))?;
         Ok(Response::new(permissionv1::ListPermissionGroupResponse {
             items: rows.into_iter().map(group_proto).collect(),
-            total,
+            total: total as i64,
         }))
     }
 
@@ -62,7 +62,7 @@ impl permissionv1::permission_group_service_server::PermissionGroupService
             .await
             .map_err(db_status)?;
         Ok(Response::new(permissionv1::CountPermissionGroupResponse {
-            count: total,
+            count: total as i64,
         }))
     }
 
@@ -74,7 +74,7 @@ impl permissionv1::permission_group_service_server::PermissionGroupService
         let Some(permissionv1::get_permission_group_request::QueryBy::Id(id)) = req.query_by else {
             return Err(bad("query_by required"));
         };
-        let row = permission_group_repo::permission_groups_by_id(&self.state.db, id as i64).await?;
+        let row = permission_group_repo::permission_groups_by_id(&self.state.db, id).await?;
         Ok(Response::new(group_proto(row)))
     }
 
@@ -93,7 +93,7 @@ impl permissionv1::permission_group_service_server::PermissionGroupService
             sort_order: Set(data.sort_order.map(|v| v as i64)),
             status: Set("ON".to_string()),
             description: Set(data.description),
-            parent_id: Set(data.parent_id.map(|v| v as i64)),
+            parent_id: Set(data.parent_id),
             tenant_id: Set(Some(0)),
             created_at: Set(Some(store::now())),
             updated_at: Set(Some(store::now())),
@@ -110,7 +110,7 @@ impl permissionv1::permission_group_service_server::PermissionGroupService
         request: Request<permissionv1::UpdatePermissionGroupRequest>,
     ) -> Result<Response<pbjson_types::Empty>, Status> {
         let req = request.into_inner();
-        let row = sys_permission_groups::Entity::find_by_id(req.id as i64)
+        let row = sys_permission_groups::Entity::find_by_id(req.id)
             .one(&self.state.db)
             .await
             .map_err(db_status)?
@@ -141,7 +141,7 @@ impl permissionv1::permission_group_service_server::PermissionGroupService
         else {
             return Err(bad("query_by required"));
         };
-        permission_group_repo::delete_permission_groups(&self.state.db, id as i64).await?;
+        permission_group_repo::delete_permission_groups(&self.state.db, id).await?;
         Ok(Response::new(pbjson_types::Empty {}))
     }
 }

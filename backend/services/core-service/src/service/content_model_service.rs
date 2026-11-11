@@ -18,7 +18,7 @@ use proto::proto::content::service::v1 as contentv1;
 
 fn content_model_proto(r: content_models::Model) -> contentv1::ContentModel {
     contentv1::ContentModel {
-        id: Some(r.id as u32),
+        id: Some(r.id),
         name: r.name,
         code: r.code,
         description: r.description,
@@ -63,8 +63,8 @@ fn relation_config_from_json(v: &sea_orm::JsonValue) -> Option<contentv1::Relati
         allow_cross_tenant: obj.get("allow_cross_tenant").and_then(|x| x.as_bool()),
         filter_category_id: obj
             .get("filter_category_id")
-            .and_then(|x| x.as_u64())
-            .map(|x| x as u32),
+            .and_then(|x| x.as_i64())
+            ,
     })
 }
 
@@ -88,13 +88,13 @@ fn field_translation_proto(
     r: field_definition_translations::Model,
 ) -> contentv1::FieldDefinitionTranslation {
     contentv1::FieldDefinitionTranslation {
-        id: Some(r.id as u32),
-        field_definition_id: r.field_definition_id.map(|v| v as u32),
+        id: Some(r.id),
+        field_definition_id: r.field_definition_id,
         language_code: r.language_code,
         label: r.label,
         description: r.description,
         placeholder: r.placeholder,
-        created_by: r.created_by.map(|v| v as u32),
+        created_by: r.created_by,
         ..Default::default()
     }
 }
@@ -104,8 +104,8 @@ fn field_definition_proto(
     translations: Vec<field_definition_translations::Model>,
 ) -> contentv1::FieldDefinition {
     contentv1::FieldDefinition {
-        id: Some(r.id as u32),
-        content_model_id: r.content_model_id.map(|v| v as u32),
+        id: Some(r.id),
+        content_model_id: r.content_model_id,
         name: r.name,
         r#type: r.r#type.as_deref().and_then(field_type_enum),
         label: r.label,
@@ -123,7 +123,7 @@ fn field_definition_proto(
             .into_iter()
             .map(field_translation_proto)
             .collect(),
-        created_by: r.created_by.map(|v| v as u32),
+        created_by: r.created_by,
         ..Default::default()
     }
 }
@@ -148,7 +148,7 @@ async fn batch_create_fields<C: ConnectionTrait>(
             is_required: Set(f.is_required),
             validation_regex: Set(f.validation_regex.clone()),
             sort_order: Set(f.sort_order.map(|v| v as i64)),
-            created_by: Set(f.created_by.map(|v| v as i64)),
+            created_by: Set(f.created_by),
             created_at: Set(Some(store::now())),
             ..Default::default()
         };
@@ -171,7 +171,7 @@ async fn batch_create_fields<C: ConnectionTrait>(
                     label: Set(tr.label.clone()),
                     description: Set(tr.description.clone()),
                     placeholder: Set(tr.placeholder.clone()),
-                    created_by: Set(tr.created_by.map(|v| v as i64)),
+                    created_by: Set(tr.created_by),
                     created_at: Set(Some(store::now())),
                     ..Default::default()
                 },
@@ -198,7 +198,7 @@ async fn batch_create_model_translations<C: ConnectionTrait>(
                 language_code: Set(tr.language_code.clone()),
                 name: Set(tr.name.clone()),
                 description: Set(tr.description.clone()),
-                created_by: Set(tr.created_by.map(|v| v as i64)),
+                created_by: Set(tr.created_by),
                 created_at: Set(Some(store::now())),
                 ..Default::default()
             },
@@ -227,7 +227,7 @@ impl contentv1::content_model_service_server::ContentModelService for ContentMod
         .map_err(|e| Status::internal(e.message))?;
         Ok(Response::new(contentv1::ListContentModelResponse {
             items: rows.into_iter().map(content_model_proto).collect(),
-            total,
+            total: total as i64,
         }))
     }
 
@@ -239,7 +239,7 @@ impl contentv1::content_model_service_server::ContentModelService for ContentMod
         let Some(contentv1::get_content_model_request::QueryBy::Id(id)) = req.query_by else {
             return Err(bad("query_by required"));
         };
-        let row = content_model_repo::content_models_by_id(&self.state.db, id as i64).await?;
+        let row = content_model_repo::content_models_by_id(&self.state.db, id).await?;
         Ok(Response::new(content_model_proto(row)))
     }
 
@@ -252,7 +252,7 @@ impl contentv1::content_model_service_server::ContentModelService for ContentMod
             .await
             .map_err(db_status)?;
         Ok(Response::new(contentv1::CountContentModelResponse {
-            count: total,
+            count: total as i64,
         }))
     }
 
@@ -268,12 +268,12 @@ impl contentv1::content_model_service_server::ContentModelService for ContentMod
         let row = content_model_repo::insert_content_models(
             &txn,
             content_models::ActiveModel {
-                tenant_id: Set(data.tenant_id.map(|v| v as i64)),
+                tenant_id: Set(data.tenant_id),
                 name: Set(data.name),
                 code: Set(data.code),
                 description: Set(data.description),
                 sort_order: Set(data.sort_order.map(|v| v as i64)),
-                created_by: Set(data.created_by.map(|v| v as i64)),
+                created_by: Set(data.created_by),
                 created_at: Set(Some(store::now())),
                 ..Default::default()
             },
@@ -294,7 +294,7 @@ impl contentv1::content_model_service_server::ContentModelService for ContentMod
             return Err(bad("data required"));
         };
         let txn = self.state.db.begin().await.map_err(db_status)?;
-        let row = content_model_repo::content_models_by_id(&txn, req.id as i64).await?;
+        let row = content_model_repo::content_models_by_id(&txn, req.id).await?;
         let mut a: content_models::ActiveModel = row.into();
         if let Some(v) = data.name {
             a.name = Set(Some(v));
@@ -309,12 +309,12 @@ impl contentv1::content_model_service_server::ContentModelService for ContentMod
         let row = content_model_repo::update_content_models(&txn, a).await?;
         // 字段定义与翻译整体替换（对位 replace-fields / replace-translations）
         let old_field_ids =
-            content_model_repo::content_model_field_ids(&txn, req.id as i64).await?;
+            content_model_repo::content_model_field_ids(&txn, req.id).await?;
         content_model_repo::delete_field_definition_translations_of(&txn, &old_field_ids).await?;
-        content_model_repo::delete_field_definitions_of(&txn, req.id as i64).await?;
-        batch_create_fields(&txn, req.id as i64, &data.fields).await?;
-        content_model_repo::delete_content_model_translations_of(&txn, req.id as i64).await?;
-        batch_create_model_translations(&txn, req.id as i64, &data.translations).await?;
+        content_model_repo::delete_field_definitions_of(&txn, req.id).await?;
+        batch_create_fields(&txn, req.id, &data.fields).await?;
+        content_model_repo::delete_content_model_translations_of(&txn, req.id).await?;
+        batch_create_model_translations(&txn, req.id, &data.translations).await?;
         txn.commit().await.map_err(db_status)?;
         Ok(Response::new(content_model_proto(row)))
     }
@@ -328,7 +328,7 @@ impl contentv1::content_model_service_server::ContentModelService for ContentMod
             return Err(bad("query_by required"));
         };
         let txn = self.state.db.begin().await.map_err(db_status)?;
-        let model_id = id as i64;
+        let model_id = id;
         // 级联清理：字段翻译 → 字段定义 → 模型翻译 → 模型
         let field_ids = content_model_repo::content_model_field_ids(&txn, model_id).await?;
         content_model_repo::delete_field_definition_translations_of(&txn, &field_ids).await?;
@@ -352,7 +352,7 @@ impl contentv1::content_model_service_server::ContentModelService for ContentMod
             return Err(bad("invalid parameter"));
         }
         let rows =
-            content_model_repo::field_definitions_of(&self.state.db, req.content_model_id as i64)
+            content_model_repo::field_definitions_of(&self.state.db, req.content_model_id)
                 .await?;
         let mut items = Vec::with_capacity(rows.len());
         for r in rows {
@@ -363,7 +363,7 @@ impl contentv1::content_model_service_server::ContentModelService for ContentMod
         let total = items.len() as u64;
         Ok(Response::new(contentv1::ListFieldDefinitionsResponse {
             items,
-            total,
+            total: total as i64,
         }))
     }
 }

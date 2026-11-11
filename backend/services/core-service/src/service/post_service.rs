@@ -20,8 +20,8 @@ use crate::service::content_support::{seo_of, seo_to_json, status_from_i32, stat
 
 pub(crate) fn post_translation_proto(r: post_translations::Model) -> contentv1::PostTranslation {
     contentv1::PostTranslation {
-        id: Some(r.id as u32),
-        post_id: r.post_id.map(|v| v as u32),
+        id: Some(r.id),
+        post_id: r.post_id,
         language_code: r.language_code,
         title: r.title,
         slug: r.slug,
@@ -48,7 +48,7 @@ pub(crate) fn post_proto(
         .filter_map(|t| t.language_code.clone())
         .collect();
     contentv1::Post {
-        id: Some(r.id as u32),
+        id: Some(r.id),
         status: status_to_i32("post", r.status),
         editor_type: r.editor_type.as_deref().map(|_| 1),
         code: r.code,
@@ -57,7 +57,7 @@ pub(crate) fn post_proto(
         auto_summary: r.auto_summary,
         is_featured: r.is_featured,
         sort_order: r.sort_order.map(|v| v as u32),
-        author_id: r.author_id.map(|v| v as u32),
+        author_id: r.author_id,
         author_name: r.author_name,
         thumbnail: r.thumbnail,
         custom_fields: r
@@ -69,8 +69,8 @@ pub(crate) fn post_proto(
             .map(post_translation_proto)
             .collect(),
         available_languages,
-        category_ids: category_ids.into_iter().map(|v| v as u32).collect(),
-        tag_ids: tag_ids.into_iter().map(|v| v as u32).collect(),
+        category_ids: category_ids.into_iter().collect(),
+        tag_ids: tag_ids.into_iter().collect(),
         password_hash: r.password_hash,
         publish_time: r.publish_time.and_then(ts_to_proto),
         created_at: r.created_at.and_then(ts_to_proto),
@@ -127,7 +127,10 @@ impl contentv1::post_service_server::PostService for PostService {
                 post_relations(&self.state.db, r.id).await?;
             items.push(post_proto(r, translations, category_ids, tag_ids));
         }
-        Ok(Response::new(contentv1::ListPostResponse { items, total }))
+        Ok(Response::new(contentv1::ListPostResponse {
+            items,
+            total: total as i64,
+        }))
     }
 
     async fn get(
@@ -136,7 +139,7 @@ impl contentv1::post_service_server::PostService for PostService {
     ) -> Result<Response<contentv1::Post>, Status> {
         let req = request.into_inner();
         let id = match req.query_by {
-            Some(contentv1::get_post_request::QueryBy::Id(id)) => id as i64,
+            Some(contentv1::get_post_request::QueryBy::Id(id)) => id,
             Some(contentv1::get_post_request::QueryBy::Code(code)) => {
                 posts::Entity::find()
                     .filter(posts::Column::Code.eq(code))
@@ -185,7 +188,7 @@ impl contentv1::post_service_server::PostService for PostService {
             auto_summary: Set(data.auto_summary),
             is_featured: Set(data.is_featured),
             sort_order: Set(data.sort_order.map(|v| v as i64)),
-            author_id: Set(data.author_id.map(|v| v as i64)),
+            author_id: Set(data.author_id),
             author_name: Set(data.author_name),
             thumbnail: Set(data.thumbnail),
             password_hash: Set(data.password_hash),
@@ -226,7 +229,7 @@ impl contentv1::post_service_server::PostService for PostService {
         for cid in data.category_ids {
             post_categories::Entity::insert(post_categories::ActiveModel {
                 post_id: Set(row.id),
-                category_id: Set(cid as i64),
+                category_id: Set(cid),
                 ..Default::default()
             })
             .exec(&self.state.db)
@@ -236,7 +239,7 @@ impl contentv1::post_service_server::PostService for PostService {
         for tid in data.tag_ids {
             post_tags::Entity::insert(post_tags::ActiveModel {
                 post_id: Set(row.id),
-                tag_id: Set(tid as i64),
+                tag_id: Set(tid),
                 ..Default::default()
             })
             .exec(&self.state.db)
@@ -258,7 +261,7 @@ impl contentv1::post_service_server::PostService for PostService {
         request: Request<contentv1::UpdatePostRequest>,
     ) -> Result<Response<contentv1::Post>, Status> {
         let req = request.into_inner();
-        let row = post_repo::post_by_id(&self.state.db, req.id as i64).await?;
+        let row = post_repo::post_by_id(&self.state.db, req.id).await?;
         let mut a: posts::ActiveModel = row.into();
         let embedded = req.data.as_ref().map(|d| d.translations.clone());
         if let Some(data) = req.data {
@@ -345,7 +348,7 @@ impl contentv1::post_service_server::PostService for PostService {
         let items: Vec<contentv1::SearchPostHit> = rows
             .into_iter()
             .map(|r| contentv1::SearchPostHit {
-                post_id: r.try_get::<i64>("", "post_id").unwrap_or(0) as u32,
+                post_id: r.try_get::<i64>("", "post_id").unwrap_or(0),
                 language: r.try_get::<String>("", "lang").unwrap_or_default(),
                 title: r.try_get::<String>("", "title").unwrap_or_default(),
                 // 摘要随行返回（2026-11 契约批次扩字段）；<mark> 高亮片段
@@ -369,7 +372,7 @@ impl contentv1::post_service_server::PostService for PostService {
         let Some(contentv1::delete_post_request::QueryBy::Id(id)) = req.query_by else {
             return Err(bad("query_by required"));
         };
-        post_repo::delete_post(&self.state.db, id as i64).await?;
+        post_repo::delete_post(&self.state.db, id).await?;
         Ok(Response::new(pbjson_types::Empty {}))
     }
 
@@ -379,7 +382,7 @@ impl contentv1::post_service_server::PostService for PostService {
     ) -> Result<Response<contentv1::PostTranslationExistsResponse>, Status> {
         let req = request.into_inner();
         let exists =
-            repo::post_translation_exists(&self.state.db, req.post_id as i64, &req.language_code)
+            repo::post_translation_exists(&self.state.db, req.post_id, &req.language_code)
                 .await?;
         Ok(Response::new(contentv1::PostTranslationExistsResponse {
             exists,
@@ -395,7 +398,7 @@ impl contentv1::post_service_server::PostService for PostService {
         // and thus the zero translation (a missing translation is not an
         // error — the response is simply the empty message).
         let id = match req.query_by {
-            Some(contentv1::get_post_request::QueryBy::Id(id)) => id as i64,
+            Some(contentv1::get_post_request::QueryBy::Id(id)) => id,
             _ => 0,
         };
         let row = post_translation_repo::get_post_translation(
@@ -422,7 +425,7 @@ impl contentv1::post_service_server::PostService for PostService {
         };
         let row = repo::create_post_translation(
             &self.state.db,
-            req.post_id as i64,
+            req.post_id,
             repo::PostTranslationFields {
                 language_code: data.language_code,
                 title: data.title,
@@ -432,7 +435,7 @@ impl contentv1::post_service_server::PostService for PostService {
                 original_content: data.original_content,
                 full_path: data.full_path,
                 seo: seo_to_json(data.seo),
-                created_by: data.created_by.map(|v| v as i64),
+                created_by: data.created_by,
             },
         )
         .await?;
@@ -450,8 +453,8 @@ impl contentv1::post_service_server::PostService for PostService {
         };
         let row = post_translation_repo::update_post_translation(
             &self.state.db,
-            req.id as i64,
-            data.post_id.map(|v| v as i64).unwrap_or(0),
+            req.id,
+            data.post_id.unwrap_or(0),
             // update_mask is accepted but not applied, like the other
             // update faces of this port.
             repo::PostTranslationFields {
@@ -463,7 +466,7 @@ impl contentv1::post_service_server::PostService for PostService {
                 original_content: data.original_content,
                 full_path: data.full_path,
                 seo: seo_to_json(data.seo),
-                created_by: data.created_by.map(|v| v as i64),
+                created_by: data.created_by,
             },
             req.allow_missing.unwrap_or(false),
         )
@@ -479,11 +482,11 @@ impl contentv1::post_service_server::PostService for PostService {
         let req = request.into_inner();
         let query = match req.query_by {
             Some(contentv1::delete_post_translation_request::QueryBy::Id(id)) => {
-                repo::PostTranslationQuery::Id(id as i64)
+                repo::PostTranslationQuery::Id(id)
             }
             Some(contentv1::delete_post_translation_request::QueryBy::Identifier(identifier)) => {
                 repo::PostTranslationQuery::Identifier {
-                    post_id: identifier.post_id as i64,
+                    post_id: identifier.post_id,
                     language_code: identifier.language_code,
                 }
             }

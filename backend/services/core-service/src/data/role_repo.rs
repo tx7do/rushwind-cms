@@ -40,6 +40,21 @@ pub async fn delete_roles(db: &DatabaseConnection, id: i64) -> StatusResult<()> 
         .map_err(db_status)?;
     Ok(())
 }
+/// Roles by ids (ListRolesByRoleIds) — the parent-role backfill batch
+/// of the enrich face; empty in, empty out.
+pub async fn roles_by_ids(
+    db: &DatabaseConnection,
+    role_ids: &[i64],
+) -> StatusResult<Vec<sys_roles::Model>> {
+    if role_ids.is_empty() {
+        return Ok(Vec::new());
+    }
+    sys_roles::Entity::find()
+        .filter(sys_roles::Column::Id.is_in(role_ids.to_vec()))
+        .all(db)
+        .await
+        .map_err(db_status)
+}
 /// Role codes by role ids (ListRoleCodesByRoleIds); empty in, empty out.
 pub async fn role_codes_by_ids(
     db: &DatabaseConnection,

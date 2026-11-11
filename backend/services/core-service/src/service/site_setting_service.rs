@@ -15,8 +15,8 @@ use proto::proto::site::service::v1 as sitev1;
 
 fn site_setting_proto(r: site_settings::Model) -> sitev1::SiteSetting {
     sitev1::SiteSetting {
-        id: Some(r.id as u32),
-        site_id: r.site_id.map(|v| v as u32),
+        id: Some(r.id),
+        site_id: r.site_id,
         locale: r.locale,
         group: r.r#group,
         key: r.key,
@@ -55,7 +55,7 @@ impl sitev1::site_setting_service_server::SiteSettingService for SiteSettingServ
         .map_err(|e| Status::internal(e.message))?;
         Ok(Response::new(sitev1::ListSiteSettingResponse {
             items: rows.into_iter().map(site_setting_proto).collect(),
-            total,
+            total: total as i64,
         }))
     }
 
@@ -65,7 +65,7 @@ impl sitev1::site_setting_service_server::SiteSettingService for SiteSettingServ
     ) -> Result<Response<sitev1::SiteSetting>, Status> {
         let req = request.into_inner();
         let id = req.id;
-        let row = site_setting_repo::site_settings_by_id(&self.state.db, id as i64).await?;
+        let row = site_setting_repo::site_settings_by_id(&self.state.db, id).await?;
         Ok(Response::new(site_setting_proto(row)))
     }
 
@@ -78,7 +78,7 @@ impl sitev1::site_setting_service_server::SiteSettingService for SiteSettingServ
             return Err(bad("data required"));
         };
         let row = site_settings::ActiveModel {
-            site_id: Set(data.site_id.map(|v| v as i64)),
+            site_id: Set(data.site_id),
             locale: Set(data.locale),
             group: Set(data.r#group),
             key: Set(Some(data.key.unwrap_or_default())),
@@ -105,7 +105,7 @@ impl sitev1::site_setting_service_server::SiteSettingService for SiteSettingServ
         request: Request<sitev1::UpdateSiteSettingRequest>,
     ) -> Result<Response<sitev1::SiteSetting>, Status> {
         let req = request.into_inner();
-        let row = site_settings::Entity::find_by_id(req.id as i64)
+        let row = site_settings::Entity::find_by_id(req.id)
             .one(&self.state.db)
             .await
             .map_err(db_status)?
@@ -132,7 +132,7 @@ impl sitev1::site_setting_service_server::SiteSettingService for SiteSettingServ
         let Some(sitev1::delete_site_setting_request::QueryBy::Id(id)) = req.query_by else {
             return Err(bad("query_by required"));
         };
-        site_setting_repo::delete_site_settings(&self.state.db, id as i64).await?;
+        site_setting_repo::delete_site_settings(&self.state.db, id).await?;
         Ok(Response::new(pbjson_types::Empty {}))
     }
 }

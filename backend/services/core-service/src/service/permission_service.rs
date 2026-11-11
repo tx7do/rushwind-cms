@@ -9,6 +9,7 @@ use sea_orm::{ActiveModelTrait, ColumnTrait, EntityTrait, PaginatorTrait, QueryF
 use tonic::{Request, Response, Status};
 
 use crate::data::{permission_repo, role_permission_repo};
+use crate::service::constants::is_reserved_permission_code;
 use crate::service::permission_sync;
 use crate::state::{bad, db_status, not_found, ts_to_proto, AppState};
 use proto::proto::permission::service::v1 as permissionv1;
@@ -19,12 +20,12 @@ use store::paging::fetch_paged;
 
 fn permission_proto(r: sys_permissions::Model) -> permissionv1::Permission {
     permissionv1::Permission {
-        id: Some(r.id as u32),
+        id: Some(r.id),
         name: Some(r.name),
         code: Some(r.code),
         description: r.description,
         status: Some(1),
-        group_id: r.group_id.map(|v| v as u32),
+        group_id: r.group_id,
         created_at: r.created_at.and_then(ts_to_proto),
         updated_at: r.updated_at.and_then(ts_to_proto),
         ..Default::default()
@@ -50,7 +51,7 @@ impl permissionv1::permission_service_server::PermissionService for PermissionSe
         .map_err(|e| Status::internal(e.message))?;
         Ok(Response::new(permissionv1::ListPermissionResponse {
             items: rows.into_iter().map(permission_proto).collect(),
-            total,
+            total: total as i64,
         }))
     }
 
@@ -63,7 +64,7 @@ impl permissionv1::permission_service_server::PermissionService for PermissionSe
             .await
             .map_err(db_status)?;
         Ok(Response::new(permissionv1::CountPermissionResponse {
-            count: total,
+            count: total as i64,
         }))
     }
 
@@ -75,7 +76,7 @@ impl permissionv1::permission_service_server::PermissionService for PermissionSe
         let Some(permissionv1::get_permission_request::QueryBy::Id(id)) = req.query_by else {
             return Err(bad("query_by required"));
         };
-        let row = permission_repo::permissions_by_id(&self.state.db, id as i64).await?;
+        let row = permission_repo::permissions_by_id(&self.state.db, id).await?;
         Ok(Response::new(permission_proto(row)))
     }
 
@@ -87,11 +88,16 @@ impl permissionv1::permission_service_server::PermissionService for PermissionSe
         let Some(data) = req.data else {
             return Err(bad("data required"));
         };
+        // 权限码保留字校验：sys: 命名空间在服务端承载判定语义，用户自建
+        // 权限不得占用（堵伪造登录资格等权限语义）。
+        if is_reserved_permission_code(&data.code.clone().unwrap_or_default()) {
+            return Err(bad("permission code is reserved"));
+        }
         sys_permissions::ActiveModel {
             name: Set(data.name.clone().unwrap_or_default()),
             code: Set(data.code.clone().unwrap_or_default()),
             description: Set(data.description),
-            group_id: Set(data.group_id.map(|v| v as i64)),
+            group_id: Set(data.group_id),
             status: Set("ON".to_string()),
             tenant_id: Set(Some(0)),
             created_at: Set(Some(store::now())),
@@ -109,7 +115,14 @@ impl permissionv1::permission_service_server::PermissionService for PermissionSe
         request: Request<permissionv1::UpdatePermissionRequest>,
     ) -> Result<Response<pbjson_types::Empty>, Status> {
         let req = request.into_inner();
-        let row = sys_permissions::Entity::find_by_id(req.id as i64)
+        // 权限码保留字校验：与 Create 同口径——更新不得把 code 改成
+        // sys: 命名空间的保留码。
+        if let Some(code) = req.data.as_ref().and_then(|d| d.code.as_deref()) {
+            if is_reserved_permission_code(code) {
+                return Err(bad("permission code is reserved"));
+            }
+        }
+        let row = sys_permissions::Entity::find_by_id(req.id)
             .one(&self.state.db)
             .await
             .map_err(db_status)?
@@ -135,11 +148,11 @@ impl permissionv1::permission_service_server::PermissionService for PermissionSe
         let req = request.into_inner();
         match req.query_by {
             Some(permissionv1::delete_permission_request::QueryBy::Id(id)) => {
-                permission_repo::delete_permissions(&self.state.db, id as i64).await?;
+                permission_repo::delete_permissions(&self.state.db, id).await?;
             }
             Some(permissionv1::delete_permission_request::QueryBy::GroupId(gid)) => {
                 sys_permissions::Entity::delete_many()
-                    .filter(sys_permissions::Column::GroupId.eq(gid as i64))
+                    .filter(sys_permissions::Column::GroupId.eq(gid))
                     .exec(&self.state.db)
                     .await
                     .map_err(db_status)?;
@@ -182,11 +195,9 @@ impl permissionv1::permission_service_server::PermissionService for PermissionSe
 
         // RoleIds 分支：角色 → 权限 id，并入后按 Unique 去重（保持首现序）。
         if !req.role_ids.is_empty() {
-            let role_ids: Vec<i64> = req.role_ids.iter().map(|v| *v as i64).collect();
-            let limit = role_permission_repo::permission_ids_by_role_ids(&self.state.db, &role_ids)
-                .await?
-                .into_iter()
-                .map(|v| v as u32);
+            let limit =
+                role_permission_repo::permission_ids_by_role_ids(&self.state.db, &req.role_ids)
+                    .await?;
             req.permission_ids.extend(limit);
             let mut seen = std::collections::HashSet::new();
             req.permission_ids.retain(|v| seen.insert(*v));
@@ -196,7 +207,7 @@ impl permissionv1::permission_service_server::PermissionService for PermissionSe
         if req.permission_ids.is_empty() {
             return Err(bad("invalid parameter"));
         }
-        let ids: Vec<i64> = req.permission_ids.iter().map(|v| *v as i64).collect();
+        let ids = req.permission_ids.clone();
 
         // 逐请求的类型查询：命中类型即使空集也入 map（参照语义），
         // 未知类型跳过。
@@ -212,7 +223,7 @@ impl permissionv1::permission_service_server::PermissionService for PermissionSe
                     resources.insert(
                         *ty,
                         permissionv1::PermissionResourceIds {
-                            ids: rows.into_iter().map(|r| r.api_id as u32).collect(),
+                            ids: rows.into_iter().map(|r| r.api_id).collect(),
                         },
                     );
                 }
@@ -225,7 +236,7 @@ impl permissionv1::permission_service_server::PermissionService for PermissionSe
                     resources.insert(
                         *ty,
                         permissionv1::PermissionResourceIds {
-                            ids: rows.into_iter().map(|r| r.menu_id as u32).collect(),
+                            ids: rows.into_iter().map(|r| r.menu_id).collect(),
                         },
                     );
                 }
@@ -249,7 +260,7 @@ impl permissionv1::permission_service_server::PermissionService for PermissionSe
                 permissionv1::ListPermissionCodesByIdsResponse::default(),
             ));
         }
-        let ids: Vec<i64> = req.permission_ids.iter().map(|v| *v as i64).collect();
+        let ids: Vec<i64> = req.permission_ids.clone();
         let rows = sys_permissions::Entity::find()
             .filter(sys_permissions::Column::Id.is_in(ids))
             .all(&self.state.db)

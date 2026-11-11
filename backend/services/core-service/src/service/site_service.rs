@@ -62,8 +62,8 @@ pub(crate) fn location_name(v: i32) -> Option<String> {
 
 fn site_proto(r: sites::Model) -> sitev1::Site {
     sitev1::Site {
-        id: Some(r.id as u32),
-        tenant_id: r.tenant_id.map(|v| v as u32),
+        id: Some(r.id),
+        tenant_id: r.tenant_id,
         name: r.name,
         slug: r.slug,
         domain: r.domain,
@@ -98,7 +98,7 @@ impl sitev1::site_service_server::SiteService for SiteService {
                 .map_err(|e| Status::internal(e.message))?;
         Ok(Response::new(sitev1::ListSiteResponse {
             items: rows.into_iter().map(site_proto).collect(),
-            total,
+            total: total as i64,
         }))
     }
 
@@ -108,7 +108,7 @@ impl sitev1::site_service_server::SiteService for SiteService {
     ) -> Result<Response<sitev1::Site>, Status> {
         let req = request.into_inner();
         let id = req.id;
-        let row = site_repo::sites_by_id(&self.state.db, id as i64).await?;
+        let row = site_repo::sites_by_id(&self.state.db, id).await?;
         Ok(Response::new(site_proto(row)))
     }
 
@@ -136,7 +136,7 @@ impl sitev1::site_service_server::SiteService for SiteService {
         };
         let now = store::now();
         let row = sites::ActiveModel {
-            tenant_id: Set(data.tenant_id.map(|v| v as i64)),
+            tenant_id: Set(data.tenant_id),
             name: Set(data.name),
             slug: Set(data.slug),
             domain: Set(data.domain),
@@ -163,7 +163,7 @@ impl sitev1::site_service_server::SiteService for SiteService {
         request: Request<sitev1::UpdateSiteRequest>,
     ) -> Result<Response<sitev1::Site>, Status> {
         let req = request.into_inner();
-        let row = sites::Entity::find_by_id(req.id as i64)
+        let row = sites::Entity::find_by_id(req.id)
             .one(&self.state.db)
             .await
             .map_err(db_status)?
@@ -205,7 +205,7 @@ impl sitev1::site_service_server::SiteService for SiteService {
         let Some(sitev1::delete_site_request::QueryBy::Id(id)) = req.query_by else {
             return Err(bad("query_by required"));
         };
-        site_repo::delete_sites(&self.state.db, id as i64).await?;
+        site_repo::delete_sites(&self.state.db, id).await?;
         Ok(Response::new(pbjson_types::Empty {}))
     }
 }

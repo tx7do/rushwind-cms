@@ -41,9 +41,9 @@ pub(crate) fn recipient_proto(
     r: internal_message_recipients::Model,
 ) -> imv1::InternalMessageRecipient {
     imv1::InternalMessageRecipient {
-        id: Some(r.id as u32),
-        message_id: r.message_id.map(|v| v as u32),
-        recipient_user_id: r.recipient_user_id.map(|v| v as u32),
+        id: Some(r.id),
+        message_id: r.message_id,
+        recipient_user_id: r.recipient_user_id,
         status: r.status.as_deref().and_then(recipient_status_num),
         received_at: r.received_at.and_then(ts_to_proto),
         read_at: r.read_at.and_then(ts_to_proto),
@@ -74,7 +74,7 @@ impl imv1::internal_message_recipient_service_server::InternalMessageRecipientSe
         .map_err(|e| Status::internal(e.message))?;
         Ok(Response::new(imv1::ListInternalMessageRecipientResponse {
             items: rows.into_iter().map(recipient_proto).collect(),
-            total,
+            total: total as i64,
         }))
     }
 
@@ -87,11 +87,9 @@ impl imv1::internal_message_recipient_service_server::InternalMessageRecipientSe
         else {
             return Err(bad("query_by required"));
         };
-        let row = internal_message_recipient_repo::internal_message_recipients_by_id(
-            &self.state.db,
-            id as i64,
-        )
-        .await?;
+        let row =
+            internal_message_recipient_repo::internal_message_recipients_by_id(&self.state.db, id)
+                .await?;
         Ok(Response::new(recipient_proto(row)))
     }
 
@@ -163,7 +161,10 @@ impl imv1::internal_message_recipient_service_server::InternalMessageRecipientSe
                 p
             })
             .collect();
-        Ok(Response::new(imv1::ListUserInboxResponse { items, total }))
+        Ok(Response::new(imv1::ListUserInboxResponse {
+            items,
+            total: total as i64,
+        }))
     }
 
     async fn mark_notification_as_read(
@@ -174,7 +175,7 @@ impl imv1::internal_message_recipient_service_server::InternalMessageRecipientSe
         let req = request.into_inner();
         let _ = req.user_id; // operator wins over the echoed field
         for rid in req.recipient_ids {
-            let row = internal_message_recipients::Entity::find_by_id(rid as i64)
+            let row = internal_message_recipients::Entity::find_by_id(rid)
                 .one(&self.state.db)
                 .await
                 .map_err(db_status)?;
@@ -208,7 +209,7 @@ impl imv1::internal_message_recipient_service_server::InternalMessageRecipientSe
         let _ = req.user_id; // 强制使用调用者身份，忽略请求体里的 user_id
         internal_message_recipient_repo::mark_notifications_status(
             &self.state.db,
-            req.recipient_ids.into_iter().map(|v| v as i64).collect(),
+            req.recipient_ids,
             uid,
             new_status,
             store::now(),
@@ -226,10 +227,7 @@ impl imv1::internal_message_recipient_service_server::InternalMessageRecipientSe
         internal_message_recipients::Entity::delete_many()
             .filter(
                 sea_orm::Condition::all()
-                    .add(
-                        internal_message_recipients::Column::Id
-                            .is_in(req.recipient_ids.into_iter().map(|v| v as i64)),
-                    )
+                    .add(internal_message_recipients::Column::Id.is_in(req.recipient_ids))
                     .add(internal_message_recipients::Column::RecipientUserId.eq(uid)),
             )
             .exec(&self.state.db)

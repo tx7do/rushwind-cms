@@ -145,13 +145,13 @@ impl proto::gen_admin::services::AuthenticationServiceHandlers for Authenticatio
                     let uid = claims
                         .as_ref()
                         .and_then(|c| c.get("uid"))
-                        .and_then(|v| v.as_u64())
-                        .unwrap_or(0) as u32;
+                        .and_then(|v| v.as_i64())
+                        .unwrap_or(0);
                     let tid = claims
                         .as_ref()
                         .and_then(|c| c.get("tid"))
-                        .and_then(|v| v.as_u64())
-                        .unwrap_or(0) as u32;
+                        .and_then(|v| v.as_i64())
+                        .unwrap_or(0);
                     (true, String::new(), uid, tid)
                 }
                 Err(e) => (false, e.message().to_string(), 0, 0),

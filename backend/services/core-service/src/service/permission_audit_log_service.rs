@@ -15,9 +15,9 @@ fn permission_audit_proto(
     r: store::entities::sys_permission_audit_logs::Model,
 ) -> auditv1::PermissionAuditLog {
     auditv1::PermissionAuditLog {
-        id: Some(r.id as u32),
-        tenant_id: r.tenant_id.map(|v| v as u32),
-        operator_id: r.operator_id.map(|v| v as u32),
+        id: Some(r.id),
+        tenant_id: r.tenant_id,
+        operator_id: r.operator_id,
         target_type: r.target_type,
         target_id: r.target_id,
         action: enum_num(r.action),
@@ -52,8 +52,8 @@ pub async fn insert_permission_audit(
 ) -> Result<(), Status> {
     use sea_orm::ActiveModelTrait;
     store::entities::sys_permission_audit_logs::ActiveModel {
-        tenant_id: Set(d.tenant_id.map(|v| v as i64)),
-        operator_id: Set(d.operator_id.map(|v| v as i64)),
+        tenant_id: Set(d.tenant_id),
+        operator_id: Set(d.operator_id),
         target_type: Set(d.target_type),
         target_id: Set(d.target_id),
         action: Set(d.action.and_then(permission_action_name)),

@@ -36,3 +36,20 @@ pub async fn assign_permission_apis(
     }
     Ok(())
 }
+
+/// AssignSyncBindings' api leg — the whole-set replacement of the sync
+/// MERGE's update segment: clear the permission's rows first, then
+/// re-insert the derived set (an empty derivation = clear the bindings).
+pub async fn replace_permission_apis(
+    db: &DatabaseConnection,
+    permission_id: i64,
+    api_ids: &[i64],
+) -> StatusResult<()> {
+    use sea_orm::{ColumnTrait as _, QueryFilter as _};
+    sys_permission_apis::Entity::delete_many()
+        .filter(sys_permission_apis::Column::PermissionId.eq(permission_id))
+        .exec(db)
+        .await
+        .map_err(db_status)?;
+    assign_permission_apis(db, permission_id, api_ids).await
+}

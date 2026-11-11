@@ -17,17 +17,20 @@ use crate::entities::{
 /// The verified-operator payload — the JWT claim set of the reference's
 /// `UserTokenPayload` (pkg/jwt/user_token_payload.go), field-for-field.
 /// The core service mints it; the BFF deployments parse it back off the
-/// verified claim bag.
+/// verified claim bag. The ids settle on i64 — the signed-only postgres
+/// doctrine (PG has no unsigned, sea-orm refuses u64 reads) makes the
+/// entity ids i64 at rest, and the contract's int64 finalize rides the
+/// same width end to end.
 #[derive(Clone, Debug, Default, serde::Serialize, serde::Deserialize)]
 pub struct UserTokenPayload {
-    pub user_id: u32,
-    pub tenant_id: u32,
+    pub user_id: i64,
+    pub tenant_id: i64,
     pub username: String,
     pub jti: String,
     #[serde(default)]
     pub roles: Vec<String>,
     #[serde(default)]
-    pub org_unit_id: Option<u32>,
+    pub org_unit_id: Option<i64>,
     #[serde(default)]
     pub data_scope: Option<String>,
     #[serde(default)]
@@ -39,13 +42,13 @@ pub struct UserTokenPayload {
 impl UserTokenPayload {
     /// Reads the payload off a verified claim bag.
     pub fn from_claims(claims: &serde_json::Map<String, serde_json::Value>) -> Option<Self> {
-        let user_id = claims.get("uid").and_then(|v| v.as_u64())? as u32;
-        if user_id == 0 {
+        let user_id = claims.get("uid").and_then(|v| v.as_i64())?;
+        if user_id <= 0 {
             return None;
         }
         Some(Self {
             user_id,
-            tenant_id: claims.get("tid").and_then(|v| v.as_u64()).unwrap_or(0) as u32,
+            tenant_id: claims.get("tid").and_then(|v| v.as_i64()).unwrap_or(0),
             username: claims
                 .get("sub")
                 .and_then(|v| v.as_str())
@@ -65,10 +68,7 @@ impl UserTokenPayload {
                         .collect()
                 })
                 .unwrap_or_default(),
-            org_unit_id: claims
-                .get("ouid")
-                .and_then(|v| v.as_u64())
-                .map(|v| v as u32),
+            org_unit_id: claims.get("ouid").and_then(|v| v.as_i64()),
             data_scope: claims.get("ds").and_then(|v| v.as_str()).map(str::to_owned),
             client_id: claims
                 .get("cid")

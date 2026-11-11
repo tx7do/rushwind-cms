@@ -170,7 +170,7 @@ async fn read_upload(
 struct UploadedFileRef {
     response: Response,
     link: Option<String>,
-    file_id: Option<u32>,
+    file_id: Option<i64>,
     size: Option<u64>,
     storage_path: Option<String>,
 }
@@ -220,7 +220,7 @@ async fn stream_upload(
                 .metadata()
                 .get("x-file-id")
                 .and_then(|v| v.to_str().ok())
-                .and_then(|v| v.parse::<u32>().ok());
+                .and_then(|v| v.parse::<i64>().ok());
             let size = resp
                 .metadata()
                 .get("x-file-size")
@@ -335,8 +335,7 @@ pub async fn upload_asset(State(state): State<Arc<AppState>>, req: Request) -> R
             created_by: claims
                 .as_ref()
                 .and_then(|c| c.get("uid"))
-                .and_then(|v| v.as_u64())
-                .map(|v| v as u32),
+                .and_then(|v| v.as_i64()),
             ..Default::default()
         }),
     };
@@ -352,9 +351,9 @@ pub async fn upload_asset(State(state): State<Arc<AppState>>, req: Request) -> R
 /// Query shape of the download endpoint.
 #[derive(Default, serde::Deserialize)]
 pub struct DownloadQuery {
-    pub file_id: Option<u32>,
+    pub file_id: Option<i64>,
     #[serde(alias = "fileId")]
-    pub file_id_alias: Option<u32>,
+    pub file_id_alias: Option<i64>,
     pub file_guid: Option<String>,
     #[serde(alias = "fileGuid")]
     pub file_guid_alias: Option<String>,

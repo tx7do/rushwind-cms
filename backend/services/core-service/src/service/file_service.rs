@@ -24,7 +24,7 @@ const STORAGE_ROOT: &str = "/tmp/rushwind-cms-files";
 
 fn file_proto(r: files::Model) -> storagev1::File {
     storagev1::File {
-        id: Some(r.id as u32),
+        id: Some(r.id),
         // The row's provider label maps back through the proto enum's
         // name table (the reference's registered converter pair);
         // unmapped labels land nil.
@@ -43,8 +43,8 @@ fn file_proto(r: files::Model) -> storagev1::File {
         size_format: r.size_format.clone(),
         link_url: r.link_url.clone(),
         content_hash: r.content_hash.clone(),
-        tenant_id: r.tenant_id.map(|v| v as u32),
-        created_by: r.created_by.map(|v| v as u32),
+        tenant_id: r.tenant_id,
+        created_by: r.created_by,
         created_at: r.created_at.and_then(ts_to_proto),
         updated_at: r.updated_at.and_then(ts_to_proto),
         ..Default::default()
@@ -506,7 +506,7 @@ impl storagev1::file_service_server::FileService for FileService {
                 .map_err(|e| Status::internal(e.message))?;
         Ok(Response::new(storagev1::ListFileResponse {
             items: rows.into_iter().map(file_proto).collect(),
-            total,
+            total: total as i64,
         }))
     }
 
@@ -518,7 +518,9 @@ impl storagev1::file_service_server::FileService for FileService {
             .count(&self.state.db)
             .await
             .map_err(db_status)?;
-        Ok(Response::new(storagev1::CountFileResponse { count: total }))
+        Ok(Response::new(storagev1::CountFileResponse {
+            count: total as i64,
+        }))
     }
 
     async fn get(
@@ -527,7 +529,7 @@ impl storagev1::file_service_server::FileService for FileService {
     ) -> Result<Response<storagev1::File>, Status> {
         let req = request.into_inner();
         let id = match req.query_by {
-            Some(storagev1::get_file_request::QueryBy::Id(id)) => id as i64,
+            Some(storagev1::get_file_request::QueryBy::Id(id)) => id,
             _ => return Err(bad("query_by required")),
         };
         let row = file_repo::files_by_id(&self.state.db, id).await?;
@@ -559,8 +561,8 @@ impl storagev1::file_service_server::FileService for FileService {
                 size_format: Set(size.map(|v| format_size(v as i64))),
                 link_url: Set(data.link_url),
                 content_hash: Set(data.content_hash),
-                tenant_id: Set(data.tenant_id.map(|v| v as i64)),
-                created_by: Set(data.created_by.map(|v| v as i64)),
+                tenant_id: Set(data.tenant_id),
+                created_by: Set(data.created_by),
                 created_at: Set(Some(store::now())),
                 ..Default::default()
             },
@@ -574,7 +576,7 @@ impl storagev1::file_service_server::FileService for FileService {
         request: Request<storagev1::UpdateFileRequest>,
     ) -> Result<Response<pbjson_types::Empty>, Status> {
         let req = request.into_inner();
-        let row = file_repo::files_by_id(&self.state.db, req.id as i64).await?;
+        let row = file_repo::files_by_id(&self.state.db, req.id).await?;
         let mut a: files::ActiveModel = row.into();
         if let Some(data) = req.data {
             if let Some(v) = data.provider {
@@ -624,7 +626,7 @@ impl storagev1::file_service_server::FileService for FileService {
     ) -> Result<Response<pbjson_types::Empty>, Status> {
         let req = request.into_inner();
         let id = match req.query_by {
-            Some(storagev1::delete_file_request::QueryBy::Id(id)) => id as i64,
+            Some(storagev1::delete_file_request::QueryBy::Id(id)) => id,
             _ => return Err(bad("query_by required")),
         };
         if let Ok(row) = file_repo::files_by_id(&self.state.db, id).await {
@@ -680,7 +682,7 @@ impl storagev1::file_transfer_service_server::FileTransferService for FileServic
         let Some(storagev1::download_file_request::Selector::FileId(id)) = req.selector else {
             return Err(bad("file_id required"));
         };
-        let (row, bytes) = self.get_object(id as i64).await?;
+        let (row, bytes) = self.get_object(id).await?;
         if row.tenant_id.unwrap_or(0) != tenant {
             return Err(Status::permission_denied(
                 "forbidden: file does not belong to caller's tenant",

@@ -1,11 +1,14 @@
-//! The derived-permission rebuild (SyncPermissions): the enabled menu
-//! set becomes
-//! groups + permissions, the api registry appends its own
-//! resource:action codes, and everything rebuilds wholesale —
-//! truncate (biz permissions + biz groups) → batch-create groups →
-//! backfill group ids → batch-create permissions → re-assign the
-//! derived api/menu tables. The menu→code conversion and the group
-//! construction walk the reference's converters line by line.
+//! The derived-permission sync (SyncPermissions): the enabled menu set
+//! becomes groups + permissions, the api registry appends its own
+//! resource:action codes, and the permission rows land by a **MERGE
+//! over the natural key `code`** — existing rows update in place (id
+//! preserved, so role grants and api/menu bindings don't drift; a
+//! manually-disabled status is left untouched), missing codes insert,
+//! and biz rows the derivation no longer produces get deleted with
+//! their bindings cascade-cleaned. The group rows carry no grant
+//! references and keep their rebuild semantics. The menu→code
+//! conversion and the group construction walk the reference's
+//! converters line by line.
 
 use std::collections::{HashMap, HashSet};
 
@@ -39,9 +42,9 @@ fn map_entry<'a>(map: &'a mut Vec<(String, Vec<usize>)>, module: &str) -> &'a mu
 
 pub async fn sync_permissions(
     db: &DatabaseConnection,
-    operator_id: Option<u32>,
+    operator_id: Option<i64>,
 ) -> Result<(), Status> {
-    let operator = operator_id.map(|v| v as i64);
+    let operator = operator_id;
 
     // 输入：启用菜单集（id 降序基序 → 稳定按 parent_id 升序）
     let mut menus = menu_repo::menus_enabled_desc(db).await?;
@@ -78,14 +81,11 @@ pub async fn sync_permissions(
         map_entry(&mut map_permissions, &module).push(perms.len() - 1);
     }
 
-    // 清理菜单相关权限——失败必须返回错误，否则后续批量创建会产生重复数据
-    permission_repo::truncate_biz_permissions(db).await?;
-    permission_group_repo::truncate_biz_groups(db).await?;
-
     // 为权限追加对应的 API 资源 ID 列表
     append_apis(db, &mut perms, &mut map_permissions).await?;
 
-    // 批量建组
+    // 分组行无授权绑定引用：保持重建语义（先重建分组，派生权限挂新组 id）
+    permission_group_repo::truncate_biz_groups(db).await?;
     if groups.is_empty() {
         return Err(bad("invalid parameter"));
     }
@@ -117,30 +117,57 @@ pub async fn sync_permissions(
             }
         }
     }
-
-    // 批量建权限 + 派生表重建
     if perms.is_empty() {
         return Err(bad("invalid parameter"));
     }
-    let perm_rows = permission_repo::insert_permissions_bulk(
-        db,
-        perms
-            .iter()
-            .map(|p| sys_permissions::ActiveModel {
-                name: Set(p.name.clone()),
-                code: Set(p.code.clone()),
-                status: Set("ON".to_string()),
-                group_id: Set(p.group_id),
-                tenant_id: Set(Some(0)),
-                created_by: Set(operator),
-                created_at: Set(Some(store::now())),
-                ..Default::default()
-            })
-            .collect(),
-    )
-    .await?;
 
-    for (p, row) in perms.iter().zip(&perm_rows) {
+    // —— MERGE 分段：按 code 对齐派生集与库存 ——
+    // 基线：库存全部业务权限（code 非空且非 sys: 前缀）。
+    let existing = permission_repo::list_biz_permissions(db).await?;
+    let existing_by_code: HashMap<&str, &sys_permissions::Model> =
+        existing.iter().map(|p| (p.code.as_str(), p)).collect();
+
+    // 更新段：code 已存在 → 原位更新（保 id + 不触碰 status）+ 按派生集
+    // 整体替换接口/菜单绑定；merge_hit 记录已消化码：插入段与删除段都以
+    // 它判定。
+    let mut merge_hit: HashSet<&str> = HashSet::new();
+    for p in &perms {
+        let Some(exist) = existing_by_code.get(p.code.as_str()) else {
+            continue;
+        };
+        permission_repo::update_for_sync(db, exist.id, Some(p.name.clone()), p.group_id).await?;
+        permission_api_repo::replace_permission_apis(db, exist.id, &p.api_ids).await?;
+        permission_menu_repo::replace_permission_menus(db, exist.id, &p.menu_ids).await?;
+        merge_hit.insert(exist.code.as_str());
+    }
+
+    // 插入段：派生集有、库没有
+    let to_insert: Vec<sys_permissions::ActiveModel> = perms
+        .iter()
+        .filter(|p| !merge_hit.contains(p.code.as_str()))
+        .map(|p| sys_permissions::ActiveModel {
+            name: Set(p.name.clone()),
+            code: Set(p.code.clone()),
+            status: Set("ON".to_string()),
+            group_id: Set(p.group_id),
+            tenant_id: Set(Some(0)),
+            created_by: Set(operator),
+            created_at: Set(Some(store::now())),
+            ..Default::default()
+        })
+        .collect();
+    let perm_rows = if to_insert.is_empty() {
+        Vec::new()
+    } else {
+        permission_repo::insert_permissions_bulk(db, to_insert).await?
+    };
+
+    // 插入段的绑定分配（更新段的绑定已在原位替换）
+    for (p, row) in perms
+        .iter()
+        .filter(|p| !merge_hit.contains(p.code.as_str()))
+        .zip(&perm_rows)
+    {
         if !p.api_ids.is_empty() {
             permission_api_repo::assign_permission_apis(db, row.id, &p.api_ids).await?;
         }
@@ -148,6 +175,15 @@ pub async fn sync_permissions(
             permission_menu_repo::assign_permission_menus(db, row.id, &p.menu_ids).await?;
         }
     }
+
+    // 删除段：库有、派生集没有 → 删行并级联清角色授权/接口/菜单绑定。
+    // 放最后：中途失败残留的是"本该删的旧码"，重跑同步即自愈，好过删多了。
+    let gone_ids: Vec<i64> = existing
+        .iter()
+        .filter(|p| !merge_hit.contains(p.code.as_str()))
+        .map(|p| p.id)
+        .collect();
+    permission_repo::delete_by_ids_cascade(db, &gone_ids).await?;
 
     Ok(())
 }

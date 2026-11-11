@@ -43,7 +43,7 @@ impl AdminPortalService {
     /// RoleService.list_permission_ids, the UserId branch (the
     /// reference's GetMyPermissionCode path; GetNavigation rides the
     /// user → roleIds detour instead).
-    async fn permission_ids(&self, ctx: &Ctx, uid: u32) -> Result<Vec<u32>, StatusError> {
+    async fn permission_ids(&self, ctx: &Ctx, uid: i64) -> Result<Vec<i64>, StatusError> {
         let mut roles =
             role_service_client::RoleServiceClient::new(self.state.core_channel.clone());
         let ids = roles
@@ -66,7 +66,7 @@ impl AdminPortalService {
     /// with the UserId branch: permission ids → ListPermissionResources(MENU).
     /// An empty permission set stays empty (the reference's "user has no
     /// roles assigned" warn path, before the resources call).
-    async fn my_menu_ids(&self, ctx: &Ctx, uid: u32) -> Result<Vec<u32>, StatusError> {
+    async fn my_menu_ids(&self, ctx: &Ctx, uid: i64) -> Result<Vec<i64>, StatusError> {
         let permission_ids = self.permission_ids(ctx, uid).await?;
         if permission_ids.is_empty() {
             return Ok(Vec::new());
@@ -104,8 +104,8 @@ impl AdminPortalService {
     /// component / name / redirect / alias / meta with the title+icon
     /// pair; non-ON rows and buttons skipped). An empty grant set is
     /// the empty tree.
-    async fn route_tree(&self, ctx: &Ctx, uid: u32) -> Result<Vec<MenuRouteItem>, StatusError> {
-        let menu_ids: HashSet<u32> = self.my_menu_ids(ctx, uid).await?.into_iter().collect();
+    async fn route_tree(&self, ctx: &Ctx, uid: i64) -> Result<Vec<MenuRouteItem>, StatusError> {
+        let menu_ids: HashSet<i64> = self.my_menu_ids(ctx, uid).await?.into_iter().collect();
         if menu_ids.is_empty() {
             return Ok(Vec::new());
         }
@@ -146,7 +146,7 @@ impl AdminPortalService {
 
     /// The operator's permission codes — GetMyPermissionCode's chain:
     /// role → permission ids → ListPermissionCodesByIds.
-    async fn permission_codes(&self, ctx: &Ctx, uid: u32) -> Result<Vec<String>, StatusError> {
+    async fn permission_codes(&self, ctx: &Ctx, uid: i64) -> Result<Vec<String>, StatusError> {
         let permission_ids = self.permission_ids(ctx, uid).await?;
         let mut perms = permission_service_client::PermissionServiceClient::new(
             self.state.core_channel.clone(),

@@ -18,18 +18,18 @@ fn internal_message_category_proto(
     r: internal_message_categories::Model,
 ) -> imv1::InternalMessageCategory {
     imv1::InternalMessageCategory {
-        id: Some(r.id as u32),
+        id: Some(r.id),
         name: r.name,
         code: r.code,
         icon_url: r.icon_url,
         sort_order: r.sort_order.map(|v| v as u32),
         is_enabled: r.is_enabled,
-        parent_id: r.parent_id.map(|v| v as u32),
+        parent_id: r.parent_id,
         depth: r.depth,
         path: r.path,
-        tenant_id: r.tenant_id.map(|v| v as u32),
-        created_by: r.created_by.map(|v| v as u32),
-        updated_by: r.updated_by.map(|v| v as u32),
+        tenant_id: r.tenant_id,
+        created_by: r.created_by,
+        updated_by: r.updated_by,
         created_at: r.created_at.and_then(ts_to_proto),
         updated_at: r.updated_at.and_then(ts_to_proto),
         ..Default::default()
@@ -39,8 +39,8 @@ fn internal_message_category_proto(
 /// 沿 parent 链上溯校验 parentId 不构成环（对位 ensureParentAcyclic）。
 async fn ensure_parent_acyclic(
     db: &impl ConnectionTrait,
-    self_id: u32,
-    parent_id: u32,
+    self_id: i64,
+    parent_id: i64,
 ) -> Result<(), Status> {
     if parent_id == 0 {
         return Ok(());
@@ -50,7 +50,7 @@ async fn ensure_parent_acyclic(
     }
     let mut current = parent_id;
     while current != 0 {
-        let row = internal_message_categories::Entity::find_by_id(current as i64)
+        let row = internal_message_categories::Entity::find_by_id(current)
             .one(db)
             .await
             .map_err(db_status)?;
@@ -59,10 +59,10 @@ async fn ensure_parent_acyclic(
             return Ok(());
         };
         match row.parent_id {
-            Some(pid) if pid as u32 == self_id => {
+            Some(pid) if pid == self_id => {
                 return Err(bad("parent cannot be itself or its descendant"));
             }
-            Some(pid) => current = pid as u32,
+            Some(pid) => current = pid,
             None => return Ok(()),
         }
     }
@@ -93,7 +93,7 @@ impl imv1::internal_message_category_service_server::InternalMessageCategoryServ
                 .into_iter()
                 .map(internal_message_category_proto)
                 .collect(),
-            total,
+            total: total as i64,
         }))
     }
 
@@ -106,7 +106,7 @@ impl imv1::internal_message_category_service_server::InternalMessageCategoryServ
             .await
             .map_err(db_status)?;
         Ok(Response::new(imv1::CountInternalMessageCategoryResponse {
-            count: total,
+            count: total as i64,
         }))
     }
 
@@ -119,11 +119,9 @@ impl imv1::internal_message_category_service_server::InternalMessageCategoryServ
         else {
             return Err(bad("query_by required"));
         };
-        let row = internal_message_category_repo::internal_message_categories_by_id(
-            &self.state.db,
-            id as i64,
-        )
-        .await?;
+        let row =
+            internal_message_category_repo::internal_message_categories_by_id(&self.state.db, id)
+                .await?;
         Ok(Response::new(internal_message_category_proto(row)))
     }
 
@@ -142,21 +140,21 @@ impl imv1::internal_message_category_service_server::InternalMessageCategoryServ
         )
         .await?;
         let mut a = internal_message_categories::ActiveModel {
-            tenant_id: Set(data.tenant_id.map(|v| v as i64)),
+            tenant_id: Set(data.tenant_id),
             name: Set(data.name),
             code: Set(data.code),
             icon_url: Set(data.icon_url),
             sort_order: Set(data.sort_order.map(|v| v as i64)),
             is_enabled: Set(data.is_enabled),
-            parent_id: Set(data.parent_id.map(|v| v as i64)),
+            parent_id: Set(data.parent_id),
             depth: Set(data.depth),
             path: Set(data.path),
-            created_by: Set(data.created_by.map(|v| v as i64)),
+            created_by: Set(data.created_by),
             created_at: Set(Some(store::now())),
             ..Default::default()
         };
         if let Some(id) = data.id {
-            a.id = Set(id as i64);
+            a.id = Set(id);
         }
         a.insert(&self.state.db).await.map_err(db_status)?;
         Ok(Response::new(pbjson_types::Empty {}))
@@ -174,7 +172,7 @@ impl imv1::internal_message_category_service_server::InternalMessageCategoryServ
         if req.allow_missing.unwrap_or(false)
             && internal_message_category_repo::internal_message_categories_by_id(
                 &self.state.db,
-                req.id as i64,
+                req.id,
             )
             .await
             .is_err()
@@ -212,7 +210,7 @@ impl imv1::internal_message_category_service_server::InternalMessageCategoryServ
             a.is_enabled = Set(Some(v));
         }
         if let Some(v) = data.parent_id {
-            a.parent_id = Set(Some(v as i64));
+            a.parent_id = Set(Some(v));
         }
         if let Some(v) = data.depth {
             a.depth = Set(Some(v));
@@ -223,7 +221,7 @@ impl imv1::internal_message_category_service_server::InternalMessageCategoryServ
         a.updated_at = Set(Some(store::now()));
         internal_message_categories::Entity::update_many()
             .set(a)
-            .filter(internal_message_categories::Column::Id.eq(req.id as i64))
+            .filter(internal_message_categories::Column::Id.eq(req.id))
             .exec(&self.state.db)
             .await
             .map_err(db_status)?;
@@ -242,10 +240,10 @@ impl imv1::internal_message_category_service_server::InternalMessageCategoryServ
         // 级联删除全部子孙节点
         let mut ids = internal_message_category_repo::internal_message_category_descendant_ids(
             &self.state.db,
-            id as i64,
+            id,
         )
         .await?;
-        ids.push(id as i64);
+        ids.push(id);
         internal_message_categories::Entity::delete_many()
             .filter(internal_message_categories::Column::Id.is_in(ids))
             .exec(&self.state.db)

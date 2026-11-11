@@ -59,6 +59,35 @@
   （admin 上游切 React19+AntD v6；flutter 全量重写：token 化主题 + 四档断点
   + 18MB 可变字体入库）；品牌表扩容（上游产品名归一 GoWind Content Hub、
   新增 vue ar 语言包、flutter 原生工程显示名、taro 工程面），双清单重钉。
+- **2026-11-11 契约批次刷新**：接受上游 vintage 至 faeceafd（破坏性定版，buf
+  breaking 显式接受）。proto 209 文件中 88 个原位变更：ID 全链 uint32 →
+  int64、分页 total uint64 → int64（946 处字段类型变更，零删字段、零新增
+  RPC/消息——protojson 面所有 ID 从数字变字符串）；唯一语义新增是 role 的
+  parentId/parentName（父子角色继承）。领域行为随批移植：角色权限继承全栈
+  （sys_roles 加 parent_id 列 + idx_sys_roles_parent_id、Create/Update 的
+  子角色权限 ⊆ 父角色绑定集校验、换父环检测深度 32、parent_id 三态/全量
+  更新双口径、删父角色同事务解除子引用、List/Get 回填 parentName）、角色码/
+  权限码保留字校验（platform:*/template:*/tenant:manager 与 sys: 命名空间，
+  新 constants.rs 模块）、权限同步 MERGE 化（按 code 保 id 增量对齐——原位
+  更新不触碰 status、缺失插入、库有派生集无的删除并同事务级联清角色授权与
+  接口/菜单绑定；分组行保持重建语义）、role Update 全量语义权限关联落库 +
+  Delete 不存在 404。Rust 底层同批升级：rushwind a344105b→08fbfcd（authn-gate/
+  SSE 的 uid 落 i64 身份教条 + 两轮安全审计战役——constant-time 比较、bind 层
+  body 限额、msgpack/cbor 深度守卫等）、rust-utils 7ff37eb1→8f3e991；仓内
+  UserTokenPayload/TokenStore 的 uid/tenant_id 同步落 i64，全仓 ~260 处编译错误
+  + ~200 处 clippy 残留（同型转换/恒等 map）一次性收敛（u32/u64→i64）。前端
+  五快照整树重同步（admin 169 changed + 3 new——
+  @rc-component/table 新 patch、角色抽屉父角色 TreeSelect + 保留码即时校验
+  + i18n；react 37 / vue 35 / taro 22 / flutter 1 changed——ID 字符串化适配），
+  双清单重钉；品牌表无新增行（新增面全部落在已登记豁免/既有覆盖内）。
+  验证：buf breaking 946 处类型变更先记录后接受、proto 门绿、fmt/clippy
+  -D warnings 全仓绿、workspace 104 测试绿（新增保留码口径 3 测）、五快照门
+  绿、core-service 空库引导（schema+种子+演示+菜单）按新 DDL 落库
+  （sys_roles 含 parent_id）。E2E 维持既有瘫痪基线：13 PASS / 112 FAIL——
+  全部失败落在登记在案的 redact REST 瘫痪（i_user 的 redact.internal_method
+  vs plan-builder 拒绝，本批 88 文件不含 i_user、crates/proto 零触碰，故障
+  形态与 2026-11-10 前记录一致：401 错误路径全过、成功响应路径在 redact
+  阶段 panic）；全绿仍待上游 redact 决策。
 
 ## 4. 分阶段计划
 

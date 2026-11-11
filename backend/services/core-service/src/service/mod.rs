@@ -10,6 +10,7 @@ pub mod audit_support;
 pub mod authentication_service;
 pub mod category_service;
 pub mod comment_service;
+pub mod constants;
 pub mod content_model_service;
 pub mod content_support;
 pub mod context;

@@ -13,14 +13,14 @@ use store::paging::fetch_paged;
 
 fn dict_entry_proto(r: sys_dict_entries::Model) -> proto::proto::dict::service::v1::DictEntry {
     proto::proto::dict::service::v1::DictEntry {
-        id: Some(r.id as u32),
-        type_id: r.type_id.map(|v| v as u32),
+        id: Some(r.id),
+        type_id: r.type_id,
         entry_value: Some(r.entry_value),
         numeric_value: r.numeric_value,
         is_enabled: r.is_enabled,
         sort_order: r.sort_order.map(|v| v as u32),
-        created_by: r.created_by.map(|v| v as u32),
-        updated_by: r.updated_by.map(|v| v as u32),
+        created_by: r.created_by,
+        updated_by: r.updated_by,
         created_at: r.created_at.and_then(crate::state::ts_to_proto),
         updated_at: r.updated_at.and_then(crate::state::ts_to_proto),
         ..Default::default()
@@ -49,7 +49,7 @@ impl proto::proto::dict::service::v1::dict_entry_service_server::DictEntryServic
         Ok(Response::new(
             proto::proto::dict::service::v1::ListDictEntryResponse {
                 items: rows.into_iter().map(dict_entry_proto).collect(),
-                total,
+                total: total as i64,
             },
         ))
     }
@@ -63,7 +63,9 @@ impl proto::proto::dict::service::v1::dict_entry_service_server::DictEntryServic
             .await
             .map_err(db_status)?;
         Ok(Response::new(
-            proto::proto::dict::service::v1::CountDictEntryResponse { count: total },
+            proto::proto::dict::service::v1::CountDictEntryResponse {
+                count: total as i64,
+            },
         ))
     }
 
@@ -101,7 +103,7 @@ impl proto::proto::dict::service::v1::dict_entry_service_server::DictEntryServic
             return Err(bad("data required"));
         };
         sys_dict_entries::ActiveModel {
-            type_id: Set(data.type_id.map(|v| v as i64)),
+            type_id: Set(data.type_id),
             entry_value: Set(data.entry_value.unwrap_or_default()),
             numeric_value: Set(data.numeric_value),
             is_enabled: Set(data.is_enabled.or(Some(true))),
@@ -121,7 +123,7 @@ impl proto::proto::dict::service::v1::dict_entry_service_server::DictEntryServic
         request: Request<proto::proto::dict::service::v1::UpdateDictEntryRequest>,
     ) -> Result<Response<pbjson_types::Empty>, Status> {
         let req = request.into_inner();
-        let row = sys_dict_entries::Entity::find_by_id(req.id as i64)
+        let row = sys_dict_entries::Entity::find_by_id(req.id)
             .one(&self.state.db)
             .await
             .map_err(db_status)?
@@ -129,7 +131,7 @@ impl proto::proto::dict::service::v1::dict_entry_service_server::DictEntryServic
         let mut a: sys_dict_entries::ActiveModel = row.into();
         if let Some(data) = req.data {
             if let Some(v) = data.type_id {
-                a.type_id = Set(Some(v as i64));
+                a.type_id = Set(Some(v));
             }
             if let Some(v) = data.entry_value {
                 a.entry_value = Set(v);
@@ -155,7 +157,7 @@ impl proto::proto::dict::service::v1::dict_entry_service_server::DictEntryServic
     ) -> Result<Response<pbjson_types::Empty>, Status> {
         let req = request.into_inner();
         sys_dict_entries::Entity::delete_many()
-            .filter(sys_dict_entries::Column::Id.is_in(req.ids.into_iter().map(|v| v as i64)))
+            .filter(sys_dict_entries::Column::Id.is_in(req.ids))
             .exec(&self.state.db)
             .await
             .map_err(db_status)?;

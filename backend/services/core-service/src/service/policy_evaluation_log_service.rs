@@ -22,12 +22,12 @@ fn policy_evaluation_log_proto(
     r: store::entities::sys_policy_evaluation_logs::Model,
 ) -> permv1::PolicyEvaluationLog {
     permv1::PolicyEvaluationLog {
-        id: Some(r.id as u32),
-        tenant_id: r.tenant_id.map(|v| v as u32),
-        user_id: Some(r.user_id as u32),
-        membership_id: Some(r.membership_id as u32),
-        permission_id: Some(r.permission_id as u32),
-        policy_id: r.policy_id.map(|v| v as u32),
+        id: Some(r.id),
+        tenant_id: r.tenant_id,
+        user_id: Some(r.user_id),
+        membership_id: Some(r.membership_id),
+        permission_id: Some(r.permission_id),
+        policy_id: r.policy_id,
         request_path: r.request_path,
         request_method: r.request_method,
         result: Some(r.result),
@@ -51,7 +51,7 @@ impl PolicyEvaluationLogService for PolicyEvaluationLogServiceImpl {
         let (rows, total) = repo::list(&self.state.db, &request.into_inner()).await?;
         Ok(Response::new(permv1::ListPolicyEvaluationLogResponse {
             items: rows.into_iter().map(policy_evaluation_log_proto).collect(),
-            total,
+            total: total as i64,
         }))
     }
 
@@ -63,7 +63,7 @@ impl PolicyEvaluationLogService for PolicyEvaluationLogServiceImpl {
         let Some(permv1::get_policy_evaluation_log_request::QueryBy::Id(id)) = req.query_by else {
             return Err(bad("query_by required"));
         };
-        let row = repo::by_id(&self.state.db, id as i64).await?;
+        let row = repo::by_id(&self.state.db, id).await?;
         Ok(Response::new(policy_evaluation_log_proto(row)))
     }
 

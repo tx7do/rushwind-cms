@@ -18,8 +18,8 @@ use crate::service::content_support::{seo_of, seo_to_json, status_from_i32, stat
 
 pub(crate) fn tag_translation_proto(r: tag_translations::Model) -> contentv1::TagTranslation {
     contentv1::TagTranslation {
-        id: Some(r.id as u32),
-        tag_id: r.tag_id.map(|v| v as u32),
+        id: Some(r.id),
+        tag_id: r.tag_id,
         language_code: r.language_code,
         name: r.name,
         slug: r.slug,
@@ -42,7 +42,7 @@ pub(crate) fn tag_proto(
         .filter_map(|t| t.language_code.clone())
         .collect();
     contentv1::Tag {
-        id: Some(r.id as u32),
+        id: Some(r.id),
         status: status_to_i32("tag", r.status),
         color: r.color,
         icon: r.icon,
@@ -85,7 +85,10 @@ impl contentv1::tag_service_server::TagService for TagService {
                 .map_err(db_status)?;
             items.push(tag_proto(r, translations));
         }
-        Ok(Response::new(contentv1::ListTagResponse { items, total }))
+        Ok(Response::new(contentv1::ListTagResponse {
+            items,
+            total: total as i64,
+        }))
     }
 
     async fn get(
@@ -96,7 +99,7 @@ impl contentv1::tag_service_server::TagService for TagService {
         let Some(contentv1::get_tag_request::QueryBy::Id(id)) = req.query_by else {
             return Err(bad("query_by required"));
         };
-        let row = tag_repo::tag_by_id(&self.state.db, id as i64).await?;
+        let row = tag_repo::tag_by_id(&self.state.db, id).await?;
         let translations = tag_translations::Entity::find()
             .filter(tag_translations::Column::TagId.eq(row.id))
             .all(&self.state.db)
@@ -159,7 +162,7 @@ impl contentv1::tag_service_server::TagService for TagService {
         request: Request<contentv1::UpdateTagRequest>,
     ) -> Result<Response<contentv1::Tag>, Status> {
         let req = request.into_inner();
-        let row = tag_repo::tag_by_id(&self.state.db, req.id as i64).await?;
+        let row = tag_repo::tag_by_id(&self.state.db, req.id).await?;
         let mut a: tags::ActiveModel = row.into();
         let embedded = req.data.as_ref().map(|d| d.translations.clone());
         if let Some(data) = req.data {
@@ -206,7 +209,7 @@ impl contentv1::tag_service_server::TagService for TagService {
         let Some(contentv1::delete_tag_request::QueryBy::Id(id)) = req.query_by else {
             return Err(bad("query_by required"));
         };
-        tag_repo::delete_tag(&self.state.db, id as i64).await?;
+        tag_repo::delete_tag(&self.state.db, id).await?;
         Ok(Response::new(pbjson_types::Empty {}))
     }
 
@@ -216,7 +219,7 @@ impl contentv1::tag_service_server::TagService for TagService {
     ) -> Result<Response<contentv1::TagTranslationExistsResponse>, Status> {
         let req = request.into_inner();
         let exists =
-            repo::tag_translation_exists(&self.state.db, req.tag_id as i64, &req.language_code)
+            repo::tag_translation_exists(&self.state.db, req.tag_id, &req.language_code)
                 .await?;
         Ok(Response::new(contentv1::TagTranslationExistsResponse {
             exists,
@@ -232,7 +235,7 @@ impl contentv1::tag_service_server::TagService for TagService {
         // and thus the zero translation (a missing translation is not an
         // error — the response is simply the empty message).
         let id = match req.query_by {
-            Some(contentv1::get_tag_request::QueryBy::Id(id)) => id as i64,
+            Some(contentv1::get_tag_request::QueryBy::Id(id)) => id,
             _ => 0,
         };
         let row = tag_translation_repo::get_tag_translation(
@@ -256,7 +259,7 @@ impl contentv1::tag_service_server::TagService for TagService {
         };
         let row = repo::create_tag_translation(
             &self.state.db,
-            req.tag_id as i64,
+            req.tag_id,
             repo::NamedTranslationFields {
                 language_code: data.language_code,
                 name: data.name,
@@ -265,7 +268,7 @@ impl contentv1::tag_service_server::TagService for TagService {
                 cover_image: data.cover_image,
                 full_path: data.full_path,
                 seo: seo_to_json(data.seo),
-                created_by: data.created_by.map(|v| v as i64),
+                created_by: data.created_by,
             },
         )
         .await?;
@@ -282,8 +285,8 @@ impl contentv1::tag_service_server::TagService for TagService {
         };
         let row = repo::update_tag_translation(
             &self.state.db,
-            req.id as i64,
-            data.tag_id.map(|v| v as i64).unwrap_or(0),
+            req.id,
+            data.tag_id.unwrap_or(0),
             // update_mask is accepted but not applied, like the other
             // update faces of this port.
             repo::NamedTranslationFields {
@@ -294,7 +297,7 @@ impl contentv1::tag_service_server::TagService for TagService {
                 cover_image: data.cover_image,
                 full_path: data.full_path,
                 seo: seo_to_json(data.seo),
-                created_by: data.created_by.map(|v| v as i64),
+                created_by: data.created_by,
             },
             req.allow_missing.unwrap_or(false),
         )
@@ -309,11 +312,11 @@ impl contentv1::tag_service_server::TagService for TagService {
         let req = request.into_inner();
         let query = match req.query_by {
             Some(contentv1::delete_tag_translation_request::QueryBy::Id(id)) => {
-                repo::TagTranslationQuery::Id(id as i64)
+                repo::TagTranslationQuery::Id(id)
             }
             Some(contentv1::delete_tag_translation_request::QueryBy::Identifier(identifier)) => {
                 repo::TagTranslationQuery::Identifier {
-                    tag_id: identifier.tag_id as i64,
+                    tag_id: identifier.tag_id,
                     language_code: identifier.language_code,
                 }
             }

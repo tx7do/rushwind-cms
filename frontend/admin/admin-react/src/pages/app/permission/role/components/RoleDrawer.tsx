@@ -8,18 +8,29 @@ import {
   ProFormRadio,
   ProFormSelect,
   ProFormDependency,
+  ProFormTreeSelect,
 } from '@ant-design/pro-components';
 import { App, Tree, Spin, Checkbox } from 'antd';
 import AiGenerateButton from '@/components/common/AiGenerateButton';
 import { useQueryClient } from '@tanstack/react-query';
 import { useTranslation } from 'react-i18next';
 import type { permissionservicev1_Role as Role } from '@/api/generated/admin/service/v1';
-import { useCreateRole, useUpdateRole } from '@/api/hooks/role';
+import { useCreateRole, useUpdateRole, fetchGetRole, fetchListRoles } from '@/api/hooks/role';
 import { fetchListPermissionGroups } from '@/api/hooks/permission-group';
 import { fetchListPermissions } from '@/api/hooks/permission';
 import { fetchListOrgUnits } from '@/api/hooks/org-unit';
 import { PaginationQuery } from '@/core';
-import { getStatusOptions, getDataScopeOptions, buildPermissionTree, extractLeafIds, buildOrgUnitTree, getUserFieldPermissionOptions } from '../constants';
+import {
+  getStatusOptions,
+  getDataScopeOptions,
+  buildPermissionTree,
+  extractLeafIds,
+  buildOrgUnitTree,
+  getUserFieldPermissionOptions,
+  filterPermissionsByCap,
+  collectSelfAndDescendantIds,
+  buildRoleTreeOptions,
+} from '../constants';
 import { useDrawerCloseGuard } from '@/components/common/use-drawer-close-guard';
 
 interface RoleDrawerProps {
@@ -29,6 +40,13 @@ interface RoleDrawerProps {
   onClose: () => void;
   onSuccess: () => void;
 }
+
+// 保留角色码：platform: / template: 命名空间与内置租户管理员码承载登录态
+// 身份判定语义（后端按码值精确匹配填管理员标志），禁止用户自建角色占用。
+// 前端拦截只是即时反馈，后端 Create/Update 仍有一道校验兜底。
+const RESERVED_ROLE_CODE_PATTERN = /^(platform:|template:)/;
+const isReservedRoleCode = (v: string) =>
+  RESERVED_ROLE_CODE_PATTERN.test(v) || v === 'tenant:manager';
 
 /**
  * 角色编辑/创建抽屉组件
@@ -40,18 +58,66 @@ const RoleDrawer: React.FC<RoleDrawerProps> = ({ open, mode, data, onClose, onSu
   // 关闭守卫：遮罩/ESC/X/取消统一，脏数据先确认（docs/form_drawer_close_guard.md）
   const { guardClose, handleValuesChange } = useDrawerCloseGuard(open, onClose);
   const queryClient = useQueryClient();
-  const { message } = App.useApp();
+  const { message, modal } = App.useApp();
 
   const [confirmLoading, setConfirmLoading] = useState(false);
   const [treeData, setTreeData] = useState<any[]>([]);
-  const [checkedKeys, setCheckedKeys] = useState<number[]>([]);
+  const [checkedKeys, setCheckedKeys] = useState<string[]>([]);
   const [treeVersion, setTreeVersion] = useState(0);
   const [treeLoading, setTreeLoading] = useState(false);
   const [unitTreeData, setUnitTreeData] = useState<any[]>([]);
-  const [unitCheckedKeys, setUnitCheckedKeys] = useState<number[]>([]);
+  const [unitCheckedKeys, setUnitCheckedKeys] = useState<string[]>([]);
   const [unitTreeVersion, setUnitTreeVersion] = useState(0);
   // 字段权限：User 资源上勾选隐藏的字段（json_name）
   const [userHiddenFields, setUserHiddenFields] = useState<string[]>([]);
+  // 权限继承：父角色候选树（排除自身及后代防环）、当前选中父角色（'0'=根角色）、
+  // 父角色权限上限集（null=无父角色，不收窄）
+  const [roleTreeData, setRoleTreeData] = useState<any[]>([]);
+  const [selectedParentId, setSelectedParentId] = useState('0');
+  const [permCapIds, setPermCapIds] = useState<string[] | null>(null);
+  // 权限树全量数据源（groups + permissions），父角色切换时按 cap 过滤重建
+  const treeSourceRef = useRef<{ groups: any[]; permissions: any[] } | null>(null);
+
+  // 按父角色上限集重建权限树；返回本次生效的 cap（供调用方做勾选收敛）。
+  // 拉取父角色失败时按全量展示，保存仍由后端子集校验兜底。
+  const rebuildTree = async (parentId: string | null): Promise<string[] | null> => {
+    const src = treeSourceRef.current;
+    if (!src) return null;
+    let cap: string[] | null = null;
+    if (parentId) {
+      try {
+        const parent = await fetchGetRole({ id: parentId });
+        cap = ((parent as any)?.permissions || [])
+          .map((v: any) => String(v))
+          .filter(Boolean);
+      } catch (error) {
+        console.error('加载父角色权限上限失败:', error);
+      }
+    }
+    setPermCapIds(cap);
+    const filtered = filterPermissionsByCap(src.groups, src.permissions, cap);
+    if (filtered.groups.length === 0 && filtered.permissions.length > 0) {
+      // 无权限组时，直接罗列权限（平铺，不嵌套）
+      setTreeData(filtered.permissions.map((p) => ({
+        key: String(p.id),
+        title: p.name || p.code || String(p.id),
+      })));
+    } else {
+      setTreeData(buildPermissionTree(filtered.groups, filtered.permissions));
+    }
+    setTreeVersion((v) => v + 1);
+    return cap;
+  };
+
+  // 切换父角色：重建权限树，并把已勾权限收敛到新 cap 内（后端保存时还有子集校验兜底）
+  const handleParentChange = async (pid: string) => {
+    setSelectedParentId(pid);
+    formRef.current?.setFieldValue('parentId', pid);
+    const cap = await rebuildTree(pid && pid !== '0' ? pid : null);
+    if (pid && pid !== '0' && cap) {
+      setCheckedKeys((prev) => prev.filter((k) => typeof k === 'string' && cap!.includes(k)));
+    }
+  };
 
   // 加载权限树数据
   useEffect(() => {
@@ -60,22 +126,25 @@ const RoleDrawer: React.FC<RoleDrawerProps> = ({ open, mode, data, onClose, onSu
       Promise.all([
         fetchListPermissionGroups(new PaginationQuery({ formValues: { status: 'ON' } })),
         fetchListPermissions(new PaginationQuery({ formValues: { status: 'ON' } })),
+        fetchListRoles(new PaginationQuery({ paging: { page: 1, pageSize: 1000 }, formValues: { status: 'ON' } })),
       ])
-        .then(([groupRes, permRes]) => {
-          const groups = groupRes?.items || [];
-          const permissions = permRes?.items || [];
-          if (groups.length === 0 && permissions.length > 0) {
-            // 无权限组时，直接罗列权限（平铺，不嵌套）
-            setTreeData(permissions.map((p) => ({
-              key: Number(p.id),
-              title: p.name || p.code || String(p.id),
-            })));
-          } else {
-            setTreeData(buildPermissionTree(groups, permissions));
-          }
-          setTreeVersion((v) => v + 1);
+        .then(async ([groupRes, permRes, roleRes]) => {
+          treeSourceRef.current = {
+            groups: groupRes?.items || [],
+            permissions: permRes?.items || [],
+          };
+          setRoleTreeData(
+            buildRoleTreeOptions(
+              roleRes?.items || [],
+              collectSelfAndDescendantIds(roleRes?.items || [], data?.id),
+            ),
+          );
+          await rebuildTree(mode === 'edit' ? String(data?.parentId || '0') : null);
         })
-        .catch(() => setTreeData([]))
+        .catch((error) => {
+          console.error('加载权限树数据失败:', error);
+          setTreeData([]);
+        })
         .finally(() => setTreeLoading(false));
     }
   }, [open]);
@@ -102,19 +171,22 @@ const RoleDrawer: React.FC<RoleDrawerProps> = ({ open, mode, data, onClose, onSu
           sortOrder: (data as any).sortOrder ?? 1,
           status: data.status || 'ON',
           dataScope: (data as any).dataScope || 'ALL',
+          // 父角色回填为字符串（'0'=根角色），保证清空选择时提交的是显式 '0' 而非 undefined
+          parentId: String((data as any).parentId || '0'),
           description: (data as any).description || '',
         });
       }, 0);
       // 设置已勾选的权限
+      setSelectedParentId(String((data as any).parentId || '0'));
       const perms = (data as any).permissions;
       if (Array.isArray(perms)) {
-        setCheckedKeys(perms.filter((v: any) => typeof v === 'number'));
+        setCheckedKeys(perms.filter((v: any) => typeof v === 'string'));
       }
       // SELECTED_UNITS 时回填已配置的授权单元集
       if ((data as any).dataScope === 'SELECTED_UNITS') {
         const units = (data as any).orgUnits;
         if (Array.isArray(units)) {
-          setUnitCheckedKeys(units.filter((v: any) => typeof v === 'number'));
+          setUnitCheckedKeys(units.filter((v: any) => typeof v === 'string'));
         }
       }
       // 回填字段权限（User 资源的隐藏字段集）
@@ -154,19 +226,34 @@ const RoleDrawer: React.FC<RoleDrawerProps> = ({ open, mode, data, onClose, onSu
   });
 
   const handleSubmit = async (values: any) => {
-    setConfirmLoading(true);
-    try {
+    const submittedPerms = extractLeafIds(checkedKeys, treeData);
+
+    // 保存收敛确认：存量越权（超出父角色上限）的已勾权限点在收窄后的树上不可见，
+    // 提交时会被剥离，先向操作者确认（编辑时校验语义的前端引导；后端亦有校验兜底）。
+    const storedPerms: string[] = Array.isArray((data as any)?.permissions)
+      ? (data as any).permissions.filter((v: any) => typeof v === 'string')
+      : [];
+    const outOfCap = permCapIds
+      ? storedPerms.filter((id) => !permCapIds!.includes(String(id)))
+      : [];
+
+    const doSubmit = async () => {
+      setConfirmLoading(true);
+      try {
       const payload = {
         ...values,
         // 用叶子交集剥离权限组父节点 ID（父子联动会自动勾选父节点，
         // 组 ID 混入提交会被后端当作权限 ID，可能越权绑定）。
-        permissions: extractLeafIds(checkedKeys, treeData),
+        permissions: submittedPerms,
+        // 父角色始终随表单提交：'0'=根角色（清空父角色须显式 '0' 进 updateMask，
+        // 否则后端三态语义会把它当"未声明"静默跳过）。
+        parentId: selectedParentId || '0',
       };
 
       // 仅 SELECTED_UNITS 档提交授权单元集（含清空场景）；
       // 其余档位不携带该字段，后端维持既有集不替换。
       if (values.dataScope === 'SELECTED_UNITS') {
-        payload.orgUnits = unitCheckedKeys.filter((v) => typeof v === 'number');
+        payload.orgUnits = unitCheckedKeys.filter((v) => typeof v === 'string');
       }
 
       // 字段权限始终随表单提交（含清空场景）：抽屉所见即保存后的最终态。
@@ -180,8 +267,21 @@ const RoleDrawer: React.FC<RoleDrawerProps> = ({ open, mode, data, onClose, onSu
         await updateMutation.mutateAsync({ id: data.id, values: payload });
       }
     } finally {
-      setConfirmLoading(false);
+          setConfirmLoading(false);
+        }
+      };
+
+    if (outOfCap.length > 0) {
+      modal.confirm({
+        title: t('permTrimConfirmTitle'),
+        content: t('permTrimConfirmContent', { count: outOfCap.length }),
+        okText: t('common:button.submit'),
+        cancelText: t('common:button.cancel'),
+        onOk: doSubmit,
+      });
+      return;
     }
+    await doSubmit();
   };
 
   return (
@@ -195,6 +295,11 @@ const RoleDrawer: React.FC<RoleDrawerProps> = ({ open, mode, data, onClose, onSu
           setCheckedKeys([]);
           setUnitCheckedKeys([]);
           setUserHiddenFields([]);
+          // 权限继承中间态一并清空，防上个角色残留进下一次创建
+          treeSourceRef.current = null;
+          setPermCapIds(null);
+          setSelectedParentId('0');
+          setRoleTreeData([]);
           onClose();
         }
       }}
@@ -232,7 +337,15 @@ const RoleDrawer: React.FC<RoleDrawerProps> = ({ open, mode, data, onClose, onSu
         name="code"
         label={t('code')}
         placeholder={t('codePlaceholder')}
-        rules={[{ required: true, message: t('requiredCode') }]}
+        rules={[
+          { required: true, message: t('requiredCode') },
+          {
+            validator: (_, value: string) =>
+              !value || !isReservedRoleCode(value)
+                ? Promise.resolve()
+                : Promise.reject(new Error(t('reservedCode'))),
+          },
+        ]}
         fieldProps={{ allowClear: true }}
       />
 
@@ -261,6 +374,23 @@ const RoleDrawer: React.FC<RoleDrawerProps> = ({ open, mode, data, onClose, onSu
         fieldProps={{ allowClear: false }}
       />
 
+      {/* 权限继承：父角色（可选）。子角色的可选权限与保存校验均受父角色约束 */}
+      <ProFormTreeSelect
+        name="parentId"
+        label={t('parentId')}
+        placeholder={t('parentIdPlaceholder')}
+        fieldProps={{
+          showSearch: true,
+          treeDefaultExpandAll: true,
+          treeNodeFilterProp: 'title',
+          allowClear: true,
+          treeData: roleTreeData,
+          onChange: (value: any) => {
+            handleParentChange(value == null || value === '' ? '0' : String(value));
+          },
+        }}
+      />
+
       <ProFormDependency name={['dataScope']}>
         {({ dataScope }) =>
           dataScope === 'SELECTED_UNITS' ? (
@@ -274,7 +404,7 @@ const RoleDrawer: React.FC<RoleDrawerProps> = ({ open, mode, data, onClose, onSu
                     checkable
                     checkedKeys={unitCheckedKeys}
                     onCheck={(checked) => {
-                      setUnitCheckedKeys(checked as number[]);
+                      setUnitCheckedKeys(checked as string[]);
                     }}
                     treeData={unitTreeData}
                     defaultExpandAll
@@ -315,6 +445,11 @@ const RoleDrawer: React.FC<RoleDrawerProps> = ({ open, mode, data, onClose, onSu
         <label className="block mb-2 text-sm font-medium text-[color:var(--ant-color-text)]">
           {t('permissions')}
         </label>
+        {permCapIds != null && (
+          <p className="mb-1.5 text-xs text-[color:var(--ant-color-text-quaternary)]">
+            {t('permCapHint')}
+          </p>
+        )}
         <Spin spinning={treeLoading}>
           {treeData.length > 0 ? (
             <div className="rounded-lg border border-[color:var(--ant-color-border-secondary)] bg-[color:var(--ant-color-fill-quaternary)] p-2.5">
@@ -322,7 +457,7 @@ const RoleDrawer: React.FC<RoleDrawerProps> = ({ open, mode, data, onClose, onSu
                 checkable
                 checkedKeys={checkedKeys}
                 onCheck={(checked) => {
-                  setCheckedKeys(checked as number[]);
+                  setCheckedKeys(checked as string[]);
                 }}
                 treeData={treeData}
                 defaultExpandAll

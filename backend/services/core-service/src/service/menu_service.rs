@@ -54,7 +54,7 @@ fn menu_meta_json(meta: Option<permissionv1::MenuMeta>) -> Option<sea_orm::JsonV
 
 fn menu_proto(r: sys_menus::Model, children: Vec<sys_menus::Model>) -> permissionv1::Menu {
     permissionv1::Menu {
-        id: Some(r.id as u32),
+        id: Some(r.id),
         status: Some(1),
         path: r.path,
         redirect: r.redirect,
@@ -62,7 +62,7 @@ fn menu_proto(r: sys_menus::Model, children: Vec<sys_menus::Model>) -> permissio
         name: r.name,
         component: r.component,
         meta: menu_meta(r.meta),
-        parent_id: r.parent_id.map(|v| v as u32),
+        parent_id: r.parent_id,
         children: children
             .into_iter()
             .map(|c| menu_proto(c, Vec::new()))
@@ -95,7 +95,7 @@ impl permissionv1::menu_service_server::MenuService for MenuService {
                 .into_iter()
                 .map(|r| menu_proto(r, Vec::new()))
                 .collect(),
-            total,
+            total: total as i64,
         }))
     }
 
@@ -108,7 +108,7 @@ impl permissionv1::menu_service_server::MenuService for MenuService {
             .await
             .map_err(db_status)?;
         Ok(Response::new(permissionv1::CountMenuResponse {
-            count: total,
+            count: total as i64,
         }))
     }
 
@@ -120,7 +120,7 @@ impl permissionv1::menu_service_server::MenuService for MenuService {
         let Some(permissionv1::get_menu_request::QueryBy::Id(id)) = req.query_by else {
             return Err(bad("query_by required"));
         };
-        let row = menu_repo::menus_by_id(&self.state.db, id as i64).await?;
+        let row = menu_repo::menus_by_id(&self.state.db, id).await?;
         let children = sys_menus::Entity::find()
             .filter(sys_menus::Column::ParentId.eq(row.id))
             .all(&self.state.db)
@@ -145,7 +145,7 @@ impl permissionv1::menu_service_server::MenuService for MenuService {
             name: Set(data.name),
             component: Set(data.component),
             meta: Set(menu_meta_json(data.meta)),
-            parent_id: Set(data.parent_id.map(|v| v as i64)),
+            parent_id: Set(data.parent_id),
             status: Set("ON".to_string()),
             tenant_id: Set(Some(0)),
             created_at: Set(Some(store::now())),
@@ -163,7 +163,7 @@ impl permissionv1::menu_service_server::MenuService for MenuService {
         request: Request<permissionv1::UpdateMenuRequest>,
     ) -> Result<Response<pbjson_types::Empty>, Status> {
         let req = request.into_inner();
-        let row = sys_menus::Entity::find_by_id(req.id as i64)
+        let row = sys_menus::Entity::find_by_id(req.id)
             .one(&self.state.db)
             .await
             .map_err(db_status)?
@@ -199,7 +199,7 @@ impl permissionv1::menu_service_server::MenuService for MenuService {
         let Some(permissionv1::delete_menu_request::QueryBy::Id(id)) = req.query_by else {
             return Err(bad("query_by required"));
         };
-        menu_repo::delete_menus(&self.state.db, id as i64).await?;
+        menu_repo::delete_menus(&self.state.db, id).await?;
         Ok(Response::new(pbjson_types::Empty {}))
     }
 }

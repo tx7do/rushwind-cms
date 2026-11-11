@@ -20,8 +20,8 @@ pub(crate) fn category_translation_proto(
     r: category_translations::Model,
 ) -> contentv1::CategoryTranslation {
     contentv1::CategoryTranslation {
-        id: Some(r.id as u32),
-        category_id: r.category_id.map(|v| v as u32),
+        id: Some(r.id),
+        category_id: r.category_id,
         language_code: r.language_code,
         name: r.name,
         slug: r.slug,
@@ -44,7 +44,7 @@ pub(crate) fn category_proto(
         .filter_map(|t| t.language_code.clone())
         .collect();
     contentv1::Category {
-        id: Some(r.id as u32),
+        id: Some(r.id),
         status: status_to_i32("category", r.status),
         sort_order: r.sort_order.map(|v| v as u32),
         is_nav: r.is_nav,
@@ -55,8 +55,8 @@ pub(crate) fn category_proto(
         direct_post_count: r.direct_post_count.map(|v| v as u32),
         depth: r.depth,
         path: r.path,
-        content_model_id: r.content_model_id.map(|v| v as u32),
-        parent_id: r.parent_id.map(|v| v as u32),
+        content_model_id: r.content_model_id,
+        parent_id: r.parent_id,
         custom_fields: r
             .custom_fields
             .and_then(|j| serde_json::from_value(j).ok())
@@ -107,7 +107,7 @@ impl contentv1::category_service_server::CategoryService for CategoryService {
         }
         Ok(Response::new(contentv1::ListCategoryResponse {
             items,
-            total,
+            total: total as i64,
         }))
     }
 
@@ -119,7 +119,7 @@ impl contentv1::category_service_server::CategoryService for CategoryService {
         let Some(contentv1::get_category_request::QueryBy::Id(id)) = req.query_by else {
             return Err(bad("query_by required"));
         };
-        let row = category_repo::category_by_id(&self.state.db, id as i64).await?;
+        let row = category_repo::category_by_id(&self.state.db, id).await?;
         let translations = category_translations_of(&self.state.db, row.id).await?;
         Ok(Response::new(category_proto(row, translations)))
     }
@@ -141,8 +141,8 @@ impl contentv1::category_service_server::CategoryService for CategoryService {
             code: Set(data.code),
             thumbnail: Set(data.thumbnail),
             depth: Set(data.depth),
-            parent_id: Set(data.parent_id.map(|v| v as i64)),
-            content_model_id: Set(data.content_model_id.map(|v| v as i64)),
+            parent_id: Set(data.parent_id),
+            content_model_id: Set(data.content_model_id),
             created_at: Set(Some(now)),
             updated_at: Set(Some(now)),
             ..Default::default()
@@ -176,7 +176,7 @@ impl contentv1::category_service_server::CategoryService for CategoryService {
         request: Request<contentv1::UpdateCategoryRequest>,
     ) -> Result<Response<contentv1::Category>, Status> {
         let req = request.into_inner();
-        let row = category_repo::category_by_id(&self.state.db, req.id as i64).await?;
+        let row = category_repo::category_by_id(&self.state.db, req.id).await?;
         let mut a: categories::ActiveModel = row.into();
         let embedded = req.data.as_ref().map(|d| d.translations.clone());
         if let Some(data) = req.data {
@@ -216,7 +216,7 @@ impl contentv1::category_service_server::CategoryService for CategoryService {
         let Some(contentv1::delete_category_request::QueryBy::Id(id)) = req.query_by else {
             return Err(bad("query_by required"));
         };
-        category_repo::delete_category(&self.state.db, id as i64).await?;
+        category_repo::delete_category(&self.state.db, id).await?;
         Ok(Response::new(pbjson_types::Empty {}))
     }
 
@@ -227,7 +227,7 @@ impl contentv1::category_service_server::CategoryService for CategoryService {
         let req = request.into_inner();
         let exists = repo::category_translation_exists(
             &self.state.db,
-            req.category_id as i64,
+            req.category_id,
             &req.language_code,
         )
         .await?;
@@ -245,7 +245,7 @@ impl contentv1::category_service_server::CategoryService for CategoryService {
         // and thus the zero translation (a missing translation is not an
         // error — the response is simply the empty message).
         let id = match req.query_by {
-            Some(contentv1::get_category_request::QueryBy::Id(id)) => id as i64,
+            Some(contentv1::get_category_request::QueryBy::Id(id)) => id,
             _ => 0,
         };
         let row = category_translation_repo::get_category_translation(
@@ -269,7 +269,7 @@ impl contentv1::category_service_server::CategoryService for CategoryService {
         };
         let row = repo::create_category_translation(
             &self.state.db,
-            req.category_id as i64,
+            req.category_id,
             repo::NamedTranslationFields {
                 language_code: data.language_code,
                 name: data.name,
@@ -278,7 +278,7 @@ impl contentv1::category_service_server::CategoryService for CategoryService {
                 cover_image: data.cover_image,
                 full_path: data.full_path,
                 seo: seo_to_json(data.seo),
-                created_by: data.created_by.map(|v| v as i64),
+                created_by: data.created_by,
             },
         )
         .await?;
@@ -295,8 +295,8 @@ impl contentv1::category_service_server::CategoryService for CategoryService {
         };
         let row = repo::update_category_translation(
             &self.state.db,
-            req.id as i64,
-            data.category_id.map(|v| v as i64).unwrap_or(0),
+            req.id,
+            data.category_id.unwrap_or(0),
             // update_mask is accepted but not applied, like the other
             // update faces of this port.
             repo::NamedTranslationFields {
@@ -307,7 +307,7 @@ impl contentv1::category_service_server::CategoryService for CategoryService {
                 cover_image: data.cover_image,
                 full_path: data.full_path,
                 seo: seo_to_json(data.seo),
-                created_by: data.created_by.map(|v| v as i64),
+                created_by: data.created_by,
             },
             req.allow_missing.unwrap_or(false),
         )
@@ -322,12 +322,12 @@ impl contentv1::category_service_server::CategoryService for CategoryService {
         let req = request.into_inner();
         let query = match req.query_by {
             Some(contentv1::delete_category_translation_request::QueryBy::Id(id)) => {
-                repo::CategoryTranslationQuery::Id(id as i64)
+                repo::CategoryTranslationQuery::Id(id)
             }
             Some(contentv1::delete_category_translation_request::QueryBy::Identifier(
                 identifier,
             )) => repo::CategoryTranslationQuery::Identifier {
-                category_id: identifier.category_id as i64,
+                category_id: identifier.category_id,
                 language_code: identifier.language_code,
             },
             None => return Err(bad("query_by required")),

@@ -15,9 +15,9 @@ fn data_access_audit_proto(
     r: store::entities::sys_data_access_audit_logs::Model,
 ) -> auditv1::DataAccessAuditLog {
     auditv1::DataAccessAuditLog {
-        id: Some(r.id as u32),
-        tenant_id: r.tenant_id.map(|v| v as u32),
-        user_id: r.user_id.map(|v| v as u32),
+        id: Some(r.id),
+        tenant_id: r.tenant_id,
+        user_id: r.user_id,
         username: r.username,
         ip_address: r.ip_address,
         request_id: r.request_id,
@@ -56,8 +56,8 @@ pub async fn insert_data_access_audit(
 ) -> Result<(), Status> {
     use sea_orm::ActiveModelTrait;
     store::entities::sys_data_access_audit_logs::ActiveModel {
-        tenant_id: Set(d.tenant_id.map(|v| v as i64)),
-        user_id: Set(d.user_id.map(|v| v as i64)),
+        tenant_id: Set(d.tenant_id),
+        user_id: Set(d.user_id),
         username: Set(d.username),
         ip_address: Set(d.ip_address),
         request_id: Set(d.request_id),

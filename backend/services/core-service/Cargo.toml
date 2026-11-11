@@ -13,10 +13,10 @@ workspace = true
 [dependencies]
 proto = { path = "../../crates/proto" }
 store = { path = "../../crates/store" }
-rushwind-authn = { git = "https://github.com/tx7do/rushwind", rev = "a344105bda4475b42a3b3feaf8782147895b10e6" }
-rushwind-bootstrap = { git = "https://github.com/tx7do/rushwind", rev = "a344105bda4475b42a3b3feaf8782147895b10e6" }
-rushwind-authn-jwt = { git = "https://github.com/tx7do/rushwind", rev = "a344105bda4475b42a3b3feaf8782147895b10e6" }
-rushwind-http-binding = { git = "https://github.com/tx7do/rushwind", rev = "a344105bda4475b42a3b3feaf8782147895b10e6" }
+rushwind-authn = { git = "https://github.com/tx7do/rushwind", rev = "08fbfcd59eb60acdf381794041e09bfbd18cbac7" }
+rushwind-bootstrap = { git = "https://github.com/tx7do/rushwind", rev = "08fbfcd59eb60acdf381794041e09bfbd18cbac7" }
+rushwind-authn-jwt = { git = "https://github.com/tx7do/rushwind", rev = "08fbfcd59eb60acdf381794041e09bfbd18cbac7" }
+rushwind-http-binding = { git = "https://github.com/tx7do/rushwind", rev = "08fbfcd59eb60acdf381794041e09bfbd18cbac7" }
 tonic = { version = "0.14", default-features = false, features = ["codegen", "channel", "router", "server", "transport"] }
 tonic-prost = "0.14"
 tokio = { workspace = true }

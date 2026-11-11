@@ -92,7 +92,7 @@ async function applySuccessfulLogin(
   // 保存 Token
   const accessTokenPayload: TokenPayload = {
     value: response.access_token || '',
-    expiresAt: now + (response.expires_in || DEFAULT_ACCESS_EXPIRES_IN) * 1000,
+    expiresAt: now + (Number(response.expires_in) || DEFAULT_ACCESS_EXPIRES_IN) * 1000,
   };
 
   set({
@@ -100,21 +100,12 @@ async function applySuccessfulLogin(
     accessTokenExpireAt: accessTokenPayload.expiresAt,
   });
 
-  console.log('💾 Access token saved:', {
-    value: accessTokenPayload.value ? '***' + accessTokenPayload.value.slice(-8) : 'empty',
-    expiresAt: accessTokenPayload.expiresAt
-      ? new Date(accessTokenPayload.expiresAt).toISOString()
-      : 'N/A',
-  });
-
   // refresh token 通过 HttpOnly Cookie 传输，前端不可读也不存内存。
   // 页面刷新后由 bootstrap 静默恢复（凭 cookie 调 /refresh-token 换新 access token）。
 
   // 获取用户信息（交给 React Query 处理缓存，这里只更新 Zustand）
-  console.log('👤 Fetching user info...');
   const userInfo = (await fetchUserProfile()) as unknown as UserInfo;
   set({ userInfo });
-  console.log('✅ User info fetched:', userInfo);
 
   // 启动定时刷新 token
   startRefreshTimer();
@@ -162,11 +153,6 @@ export const useAuthStore = create<AuthState>()(
           const response = await loginMutation.execute({
             ...params,
             password: encryptPassword(params.password || ''),
-          });
-
-          console.log('🔐 Login response:', {
-            hasAccessToken: !!response.access_token,
-            expiresIn: response.expires_in,
           });
 
           // ===== MFA 闸门：后端在密码校验通过、需二次验证时返回 mfa_operation_id，=====
@@ -225,7 +211,6 @@ export const useAuthStore = create<AuthState>()(
         }
       },
 
-
       // 登出（主动，调后端接口）
       // 清除状态后由 React 组件响应状态变化自然重定向
       logout: async (_redirect = true) => {
@@ -275,14 +260,17 @@ export const useAuthStore = create<AuthState>()(
           // token payload 中。从持久化的 access token 解出后随请求回传
           // （uid/jti 非机密，出现在每个 bearer 里；真正的凭证是 HttpOnly cookie
           // 中的 refresh token 值）。
-          let binding: { userId?: number; jti?: string } | undefined;
+          let binding: { userId?: string; jti?: string } | undefined;
           const at = get().accessToken;
           if (at) {
             try {
               const payload = JSON.parse(
                 atob(at.split('.')[1].replace(/-/g, '+').replace(/_/g, '/')),
               );
-              binding = { userId: payload.uid, jti: payload.jti };
+              binding = {
+                userId: payload.uid != null ? String(payload.uid) : undefined,
+                jti: payload.jti,
+              };
             } catch {
               /* 解码失败则空绑定键，由服务端判定 */
             }
@@ -292,7 +280,7 @@ export const useAuthStore = create<AuthState>()(
           const now = Date.now();
           set({
             accessToken: response.access_token,
-            accessTokenExpireAt: now + (response.expires_in || DEFAULT_ACCESS_EXPIRES_IN) * 1000,
+            accessTokenExpireAt: now + (Number(response.expires_in) || DEFAULT_ACCESS_EXPIRES_IN) * 1000,
           });
 
           return response.access_token || '';

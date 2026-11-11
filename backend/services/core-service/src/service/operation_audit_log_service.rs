@@ -15,9 +15,9 @@ fn operation_audit_proto(
     r: store::entities::sys_operation_audit_logs::Model,
 ) -> auditv1::OperationAuditLog {
     auditv1::OperationAuditLog {
-        id: Some(r.id as u32),
-        tenant_id: r.tenant_id.map(|v| v as u32),
-        user_id: r.user_id.map(|v| v as u32),
+        id: Some(r.id),
+        tenant_id: r.tenant_id,
+        user_id: r.user_id,
         username: r.username,
         resource_type: r.resource_type,
         resource_id: r.resource_id,
@@ -39,8 +39,8 @@ pub async fn insert_operation_audit(
 ) -> Result<(), Status> {
     use sea_orm::ActiveModelTrait;
     store::entities::sys_operation_audit_logs::ActiveModel {
-        tenant_id: Set(d.tenant_id.map(|v| v as i64)),
-        user_id: Set(d.user_id.map(|v| v as i64)),
+        tenant_id: Set(d.tenant_id),
+        user_id: Set(d.user_id),
         username: Set(d.username),
         resource_type: Set(d.resource_type),
         resource_id: Set(d.resource_id),
@@ -81,7 +81,7 @@ impl auditv1::operation_audit_log_service_server::OperationAuditLogService
         .map_err(|e| Status::internal(e.message))?;
         Ok(Response::new(auditv1::ListOperationAuditLogResponse {
             items: rows.into_iter().map(operation_audit_proto).collect(),
-            total,
+            total: total as i64,
         }))
     }
 
@@ -93,7 +93,7 @@ impl auditv1::operation_audit_log_service_server::OperationAuditLogService
         let Some(auditv1::get_operation_audit_log_request::QueryBy::Id(id)) = req.query_by else {
             return Err(bad("query_by required"));
         };
-        let row = store::entities::sys_operation_audit_logs::Entity::find_by_id(id as i64)
+        let row = store::entities::sys_operation_audit_logs::Entity::find_by_id(id)
             .one(&self.state.db)
             .await
             .map_err(db_status)?

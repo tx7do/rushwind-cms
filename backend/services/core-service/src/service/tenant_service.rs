@@ -24,13 +24,13 @@ const TENANT_ADMIN_ROLE_NAME: &str = "租户管理员";
 
 pub(crate) fn tenant_proto(r: sys_tenants::Model) -> identityv1::Tenant {
     identityv1::Tenant {
-        id: Some(r.id as u32),
+        id: Some(r.id),
         name: r.name,
         code: r.code,
         logo_url: r.logo_url,
         domain: r.domain,
         industry: r.industry,
-        admin_user_id: r.admin_user_id.map(|v| v as u32),
+        admin_user_id: r.admin_user_id,
         status: Some(1),
         r#type: Some(1),
         audit_status: r.audit_status.as_deref().map(|_| 1),
@@ -62,7 +62,7 @@ impl identityv1::tenant_service_server::TenantService for TenantService {
         .map_err(|e| Status::internal(e.message))?;
         Ok(Response::new(identityv1::ListTenantResponse {
             items: rows.into_iter().map(tenant_proto).collect(),
-            total,
+            total: total as i64,
         }))
     }
 
@@ -76,7 +76,7 @@ impl identityv1::tenant_service_server::TenantService for TenantService {
             .await
             .map_err(db_status)?;
         Ok(Response::new(identityv1::CountTenantResponse {
-            count: total,
+            count: total as i64,
         }))
     }
 
@@ -88,7 +88,7 @@ impl identityv1::tenant_service_server::TenantService for TenantService {
         use identityv1::get_tenant_request::QueryBy;
         let row = match req.query_by {
             Some(QueryBy::Id(id)) => {
-                sys_tenants::Entity::find_by_id(id as i64)
+                sys_tenants::Entity::find_by_id(id)
                     .one(&self.state.db)
                     .await
             }
@@ -140,7 +140,7 @@ impl identityv1::tenant_service_server::TenantService for TenantService {
         request: Request<identityv1::UpdateTenantRequest>,
     ) -> Result<Response<pbjson_types::Empty>, Status> {
         let req = request.into_inner();
-        let row = sys_tenants::Entity::find_by_id(req.id as i64)
+        let row = sys_tenants::Entity::find_by_id(req.id)
             .one(&self.state.db)
             .await
             .map_err(db_status)?
@@ -170,7 +170,7 @@ impl identityv1::tenant_service_server::TenantService for TenantService {
         let Some(identityv1::delete_tenant_request::QueryBy::Id(id)) = req.query_by else {
             return Err(bad("query_by required"));
         };
-        tenant_repo::delete_tenants(&self.state.db, id as i64).await?;
+        tenant_repo::delete_tenants(&self.state.db, id).await?;
         Ok(Response::new(pbjson_types::Empty {}))
     }
 
@@ -239,7 +239,7 @@ impl identityv1::tenant_service_server::TenantService for TenantService {
             remark: Set(tenant.remark.clone()),
             subscription_plan: Set(tenant.subscription_plan.clone()),
             status: Set(Some("ON".to_string())),
-            created_by: Set(tenant.created_by.map(|v| v as i64)),
+            created_by: Set(tenant.created_by),
             created_at: Set(Some(now)),
             updated_at: Set(Some(now)),
             ..Default::default()
@@ -334,7 +334,7 @@ impl identityv1::tenant_service_server::TenantService for TenantService {
             mobile: Set(user.mobile.clone()),
             avatar: Set(user.avatar.clone()),
             status: Set(Some("NORMAL".to_string())),
-            created_by: Set(user.created_by.map(|v| v as i64)),
+            created_by: Set(user.created_by),
             created_at: Set(Some(now)),
             updated_at: Set(Some(now)),
             ..Default::default()
@@ -345,9 +345,9 @@ impl identityv1::tenant_service_server::TenantService for TenantService {
 
         let mut role_ids: Vec<i64> = Vec::new();
         if let Some(role_id) = user.role_id {
-            role_ids.push(role_id as i64);
+            role_ids.push(role_id);
         }
-        for role_id in user.role_ids.iter().map(|v| *v as i64) {
+        for role_id in user.role_ids.iter().copied() {
             if !role_ids.contains(&role_id) {
                 role_ids.push(role_id);
             }
@@ -414,7 +414,7 @@ impl identityv1::tenant_service_server::TenantService for TenantService {
             }
         }
         Ok(Response::new(identityv1::ResolveTenantByDomainResponse {
-            tenant_id: row.map(|r| r.id as u32).unwrap_or(0),
+            tenant_id: row.map(|r| r.id).unwrap_or(0),
         }))
     }
 }

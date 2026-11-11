@@ -62,16 +62,16 @@ fn message_type_name(v: i32) -> Option<&'static str> {
 }
 fn message_proto(r: internal_messages::Model) -> imv1::InternalMessage {
     imv1::InternalMessage {
-        id: Some(r.id as u32),
+        id: Some(r.id),
         title: r.title,
         content: r.content,
-        sender_id: Some(r.sender_id as u32),
-        category_id: r.category_id.map(|v| v as u32),
+        sender_id: Some(r.sender_id),
+        category_id: r.category_id,
         status: r.status.as_deref().and_then(message_status_num),
         r#type: r.r#type.as_deref().and_then(message_type_num),
-        tenant_id: r.tenant_id.map(|v| v as u32),
-        created_by: r.created_by.map(|v| v as u32),
-        updated_by: r.updated_by.map(|v| v as u32),
+        tenant_id: r.tenant_id,
+        created_by: r.created_by,
+        updated_by: r.updated_by,
         created_at: r.created_at.and_then(ts_to_proto),
         updated_at: r.updated_at.and_then(ts_to_proto),
         ..Default::default()
@@ -92,11 +92,11 @@ fn internal_message_insert_model(
     now: chrono::DateTime<chrono::FixedOffset>,
 ) -> internal_messages::ActiveModel {
     let mut m = internal_messages::ActiveModel {
-        tenant_id: Set(data.tenant_id.map(|v| v as i64)),
+        tenant_id: Set(data.tenant_id),
         title: Set(data.title),
         content: Set(data.content),
-        sender_id: Set(data.sender_id.unwrap_or(0) as i64),
-        category_id: Set(data.category_id.map(|v| v as i64)),
+        sender_id: Set(data.sender_id.unwrap_or(0)),
+        category_id: Set(data.category_id),
         status: Set(data
             .status
             .and_then(message_status_name)
@@ -107,7 +107,7 @@ fn internal_message_insert_model(
         ..Default::default()
     };
     if let Some(id) = data.id {
-        m.id = Set(id as i64);
+        m.id = Set(id);
     }
     m
 }
@@ -127,7 +127,7 @@ impl imv1::internal_message_service_server::InternalMessageService for InternalM
         .map_err(|e| Status::internal(e.message))?;
         Ok(Response::new(imv1::ListInternalMessageResponse {
             items: rows.into_iter().map(message_proto).collect(),
-            total,
+            total: total as i64,
         }))
     }
 
@@ -139,7 +139,7 @@ impl imv1::internal_message_service_server::InternalMessageService for InternalM
         let Some(imv1::get_internal_message_request::QueryBy::Id(id)) = req.query_by else {
             return Err(bad("query_by required"));
         };
-        let row = internal_message_repo::internal_messages_by_id(&self.state.db, id as i64).await?;
+        let row = internal_message_repo::internal_messages_by_id(&self.state.db, id).await?;
         Ok(Response::new(message_proto(row)))
     }
 
@@ -151,7 +151,7 @@ impl imv1::internal_message_service_server::InternalMessageService for InternalM
         let Some(data) = req.data else {
             return Err(bad("invalid parameter"));
         };
-        let created_by = data.created_by.map(|v| v as i64);
+        let created_by = data.created_by;
         let row = internal_message_insert_model(data, created_by, store::now())
             .insert(&self.state.db)
             .await
@@ -169,9 +169,7 @@ impl imv1::internal_message_service_server::InternalMessageService for InternalM
         let Some(data) = req.data else {
             return Err(bad("invalid parameter"));
         };
-        let id = req.id as i64;
-
-        let existing = internal_messages::Entity::find_by_id(id)
+        let existing = internal_messages::Entity::find_by_id(req.id)
             .one(&self.state.db)
             .await
             .map_err(db_status)?;
@@ -181,7 +179,7 @@ impl imv1::internal_message_service_server::InternalMessageService for InternalM
             // reference's swap). Without allow_missing the reference's
             // bulk update simply affects no rows — a silent success.
             if req.allow_missing.unwrap_or(false) {
-                let created_by = data.updated_by.map(|v| v as i64);
+                let created_by = data.updated_by;
                 internal_message_insert_model(data, created_by, store::now())
                     .insert(&self.state.db)
                     .await
@@ -205,10 +203,10 @@ impl imv1::internal_message_service_server::InternalMessageService for InternalM
             a.content = Set(Some(v));
         }
         if let Some(v) = data.sender_id {
-            a.sender_id = Set(v as i64);
+            a.sender_id = Set(v);
         }
         if let Some(v) = data.category_id {
-            a.category_id = Set(Some(v as i64));
+            a.category_id = Set(Some(v));
         }
         if let Some(v) = data.status.and_then(message_status_name) {
             a.status = Set(Some(v.to_string()));
@@ -235,7 +233,6 @@ impl imv1::internal_message_service_server::InternalMessageService for InternalM
         let Some(imv1::delete_internal_message_request::QueryBy::Id(id)) = req.query_by else {
             return Err(bad("query_by required"));
         };
-        let id = id as i64;
         if id == 0 {
             return Err(bad("invalid parameter"));
         }
@@ -275,7 +272,7 @@ impl imv1::internal_message_service_server::InternalMessageService for InternalM
             title: Set(Some(req.title.clone().unwrap_or_default())),
             content: Set(Some(req.content.clone())),
             sender_id: Set(sender_id),
-            category_id: Set(req.category_id.map(|v| v as i64)),
+            category_id: Set(req.category_id),
             status: Set(Some("SENT".to_string())),
             r#type: Set(Some("NOTIFICATION".to_string())),
             tenant_id: Set(Some(0)),
@@ -299,7 +296,7 @@ impl imv1::internal_message_service_server::InternalMessageService for InternalM
                 .map(|u| u.id)
                 .collect()
         } else {
-            req.target_user_ids.iter().map(|v| *v as i64).collect()
+            req.target_user_ids.clone()
         };
         // The recipient rows + the SSE payload list (returned via the
         // response metadata so the BFF hub can fan out without a
@@ -341,9 +338,7 @@ impl imv1::internal_message_service_server::InternalMessageService for InternalM
         let wire =
             serde_json::to_string(&events).map_err(|_| Status::internal("sse payload encode"))?;
         use base64::Engine as _;
-        let mut resp = Response::new(imv1::SendMessageResponse {
-            message_id: msg.id as u32,
-        });
+        let mut resp = Response::new(imv1::SendMessageResponse { message_id: msg.id });
         resp.metadata_mut().insert(
             "x-sse-payload",
             base64::engine::general_purpose::STANDARD
@@ -371,7 +366,7 @@ impl imv1::internal_message_service_server::InternalMessageService for InternalM
         let req = request.into_inner();
 
         let txn = self.state.db.begin().await.map_err(db_status)?;
-        let msg = internal_messages::Entity::find_by_id(req.message_id as i64)
+        let msg = internal_messages::Entity::find_by_id(req.message_id)
             .one(&txn)
             .await
             .map_err(db_status)?
@@ -387,7 +382,7 @@ impl imv1::internal_message_service_server::InternalMessageService for InternalM
             .await
             .map_err(db_status)?;
         internal_message_recipients::Entity::delete_many()
-            .filter(internal_message_recipients::Column::MessageId.eq(req.message_id as i64))
+            .filter(internal_message_recipients::Column::MessageId.eq(req.message_id))
             .exec(&txn)
             .await
             .map_err(db_status)?;

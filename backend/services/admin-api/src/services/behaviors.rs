@@ -136,14 +136,14 @@ fn route_table() -> proto::proto::permission::service::v1::ListApiResponse {
             continue;
         }
         items.push(proto::proto::permission::service::v1::Api {
-            id: Some((i as u32) + 1),
+            id: Some(i as i64 + 1),
             path: Some(r.path.to_string()),
             method: Some(r.method.to_string()),
             status: Some(api::Status::On as i32),
             ..Default::default()
         });
     }
-    let total = items.len() as u64;
+    let total = items.len() as i64;
     proto::proto::permission::service::v1::ListApiResponse { items, total }
 }
 

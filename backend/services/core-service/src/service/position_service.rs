@@ -31,7 +31,7 @@ macro_rules! enum_name {
 
 fn position_proto(r: sys_positions::Model) -> identityv1::Position {
     identityv1::Position {
-        id: Some(r.id as u32),
+        id: Some(r.id),
         name: Some(r.name),
         code: Some(r.code),
         headcount: Some(r.headcount as u32),
@@ -43,7 +43,7 @@ fn position_proto(r: sys_positions::Model) -> identityv1::Position {
         job_grade: r.job_grade,
         level: r.level,
         is_key_position: Some(r.is_key_position),
-        tenant_id: r.tenant_id.map(|v| v as u32),
+        tenant_id: r.tenant_id,
         ..Default::default()
     }
 }
@@ -67,7 +67,7 @@ impl identityv1::position_service_server::PositionService for PositionService {
         .map_err(|e| Status::internal(e.message))?;
         Ok(Response::new(identityv1::ListPositionResponse {
             items: rows.into_iter().map(position_proto).collect(),
-            total,
+            total: total as i64,
         }))
     }
 
@@ -80,7 +80,7 @@ impl identityv1::position_service_server::PositionService for PositionService {
             .await
             .map_err(db_status)?;
         Ok(Response::new(identityv1::CountPositionResponse {
-            count: total,
+            count: total as i64,
         }))
     }
 
@@ -92,7 +92,7 @@ impl identityv1::position_service_server::PositionService for PositionService {
         let Some(identityv1::get_position_request::QueryBy::Id(id)) = req.query_by else {
             return Err(bad("query_by required"));
         };
-        let row = position_repo::positions_by_id(&self.state.db, id as i64).await?;
+        let row = position_repo::positions_by_id(&self.state.db, id).await?;
         Ok(Response::new(position_proto(row)))
     }
 
@@ -105,12 +105,12 @@ impl identityv1::position_service_server::PositionService for PositionService {
             return Err(bad("data required"));
         };
         let mut a = sys_positions::ActiveModel {
-            tenant_id: Set(data.tenant_id.map(|v| v as i64)),
+            tenant_id: Set(data.tenant_id),
             name: Set(data.name.unwrap_or_default()),
             code: Set(data.code.unwrap_or_default()),
-            org_unit_id: Set(data.org_unit_id.unwrap_or(0) as i64),
+            org_unit_id: Set(data.org_unit_id.unwrap_or(0)),
             // 非空设置：缺失时落 0（GetReportsToPositionId 语义）
-            reports_to_position_id: Set(Some(data.reports_to_position_id.unwrap_or(0) as i64)),
+            reports_to_position_id: Set(Some(data.reports_to_position_id.unwrap_or(0))),
             // headcount 恒置 0（对位 SetHeadcount(0)）
             headcount: Set(0),
             sort_order: Set(data.sort_order.map(|v| v as i64)),
@@ -121,12 +121,12 @@ impl identityv1::position_service_server::PositionService for PositionService {
             remark: Set(data.remark),
             start_at: Set(ts_to_column(data.start_at)),
             end_at: Set(ts_to_column(data.end_at)),
-            created_by: Set(data.created_by.map(|v| v as i64)),
+            created_by: Set(data.created_by),
             created_at: Set(Some(store::now())),
             ..Default::default()
         };
         if let Some(id) = data.id {
-            a.id = Set(id as i64);
+            a.id = Set(id);
         }
         if let Some(name) = data
             .status
@@ -154,7 +154,7 @@ impl identityv1::position_service_server::PositionService for PositionService {
         };
         // 不存在则创建
         if req.allow_missing.unwrap_or(false)
-            && position_repo::positions_by_id(&self.state.db, req.id as i64)
+            && position_repo::positions_by_id(&self.state.db, req.id)
                 .await
                 .is_err()
         {
@@ -178,10 +178,10 @@ impl identityv1::position_service_server::PositionService for PositionService {
             a.code = Set(v);
         }
         if let Some(v) = data.org_unit_id {
-            a.org_unit_id = Set(v as i64);
+            a.org_unit_id = Set(v);
         }
         if let Some(v) = data.reports_to_position_id {
-            a.reports_to_position_id = Set(Some(v as i64));
+            a.reports_to_position_id = Set(Some(v));
         }
         if let Some(v) = data.sort_order {
             a.sort_order = Set(Some(v as i64));
@@ -222,7 +222,7 @@ impl identityv1::position_service_server::PositionService for PositionService {
         a.updated_at = Set(Some(store::now()));
         sys_positions::Entity::update_many()
             .set(a)
-            .filter(sys_positions::Column::Id.eq(req.id as i64))
+            .filter(sys_positions::Column::Id.eq(req.id))
             .exec(&self.state.db)
             .await
             .map_err(db_status)?;
@@ -237,7 +237,7 @@ impl identityv1::position_service_server::PositionService for PositionService {
         let Some(identityv1::delete_position_request::QueryBy::Id(id)) = req.query_by else {
             return Err(bad("query_by required"));
         };
-        position_repo::delete_positions(&self.state.db, id as i64).await?;
+        position_repo::delete_positions(&self.state.db, id).await?;
         Ok(Response::new(pbjson_types::Empty {}))
     }
 }

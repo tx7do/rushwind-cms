@@ -142,8 +142,8 @@ pub async fn layer(
 /// login verdict — success or failure alike).
 pub struct LoginAudit<'a> {
     pub username: &'a str,
-    pub user_id: u32,
-    pub tenant_id: u32,
+    pub user_id: i64,
+    pub tenant_id: i64,
     pub success: bool,
     pub failure_reason: &'a str,
     pub ip: &'a str,

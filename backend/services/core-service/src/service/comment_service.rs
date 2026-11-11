@@ -97,11 +97,11 @@ async fn bool_setting(db: &sea_orm::DatabaseConnection, key: &str) -> bool {
 
 fn comment_proto(r: comments::Model) -> commentv1::Comment {
     commentv1::Comment {
-        id: Some(r.id as u32),
+        id: Some(r.id),
         content_type: r.content_type.as_deref().and_then(content_type_num),
-        object_id: r.object_id.map(|v| v as u32),
+        object_id: r.object_id,
         content: r.content,
-        author_id: r.author_id.map(|v| v as u32),
+        author_id: r.author_id,
         author_name: r.author_name,
         author_email: r.author_email,
         author_url: r.author_url,
@@ -113,8 +113,8 @@ fn comment_proto(r: comments::Model) -> commentv1::Comment {
         detected_language: r.detected_language,
         is_spam: r.is_spam,
         is_sticky: r.is_sticky,
-        reply_to_id: r.reply_to_id.map(|v| v as u32),
-        parent_id: r.parent_id.map(|v| v as u32),
+        reply_to_id: r.reply_to_id,
+        parent_id: r.parent_id,
         created_at: r.created_at.and_then(ts_to_proto),
         updated_at: r.updated_at.and_then(ts_to_proto),
         ..Default::default()
@@ -140,7 +140,7 @@ impl commentv1::comment_service_server::CommentService for CommentService {
         .map_err(|e| Status::internal(e.message))?;
         Ok(Response::new(commentv1::ListCommentResponse {
             items: rows.into_iter().map(comment_proto).collect(),
-            total,
+            total: total as i64,
         }))
     }
 
@@ -153,7 +153,7 @@ impl commentv1::comment_service_server::CommentService for CommentService {
             .await
             .map_err(db_status)?;
         Ok(Response::new(commentv1::CountCommentResponse {
-            count: total,
+            count: total as i64,
         }))
     }
 
@@ -163,7 +163,7 @@ impl commentv1::comment_service_server::CommentService for CommentService {
     ) -> Result<Response<commentv1::Comment>, Status> {
         let req = request.into_inner();
         let id = req.id;
-        let row = comment_repo::comments_by_id(&self.state.db, id as i64).await?;
+        let row = comment_repo::comments_by_id(&self.state.db, id).await?;
         Ok(Response::new(comment_proto(row)))
     }
 
@@ -193,9 +193,9 @@ impl commentv1::comment_service_server::CommentService for CommentService {
         let row = comments::ActiveModel {
             tenant_id: Set(Some(tenant_id)),
             content_type: Set(data.content_type.and_then(content_type_name)),
-            object_id: Set(data.object_id.map(|v| v as i64)),
+            object_id: Set(data.object_id),
             content: Set(Some(data.content.unwrap_or_default())),
-            author_id: Set(data.author_id.map(|v| v as i64)),
+            author_id: Set(data.author_id),
             author_name: Set(data.author_name),
             author_email: Set(data.author_email),
             author_url: Set(data.author_url),
@@ -207,9 +207,9 @@ impl commentv1::comment_service_server::CommentService for CommentService {
             )),
             ip_address: Set(data.ip_address),
             user_agent: Set(data.user_agent),
-            reply_to_id: Set(data.reply_to_id.map(|v| v as i64)),
-            parent_id: Set(data.parent_id.map(|v| v as i64)),
-            created_by: Set(data.created_by.map(|v| v as i64)),
+            reply_to_id: Set(data.reply_to_id),
+            parent_id: Set(data.parent_id),
+            created_by: Set(data.created_by),
             created_at: Set(Some(store::now())),
             updated_at: Set(Some(store::now())),
             ..Default::default()
@@ -225,7 +225,7 @@ impl commentv1::comment_service_server::CommentService for CommentService {
         request: Request<commentv1::UpdateCommentRequest>,
     ) -> Result<Response<commentv1::Comment>, Status> {
         let req = request.into_inner();
-        let row = comments::Entity::find_by_id(req.id as i64)
+        let row = comments::Entity::find_by_id(req.id)
             .one(&self.state.db)
             .await
             .map_err(db_status)?
@@ -252,7 +252,7 @@ impl commentv1::comment_service_server::CommentService for CommentService {
         let Some(commentv1::delete_comment_request::QueryBy::Id(id)) = req.query_by else {
             return Err(bad("query_by required"));
         };
-        comment_repo::delete_comments(&self.state.db, id as i64).await?;
+        comment_repo::delete_comments(&self.state.db, id).await?;
         Ok(Response::new(pbjson_types::Empty {}))
     }
 }

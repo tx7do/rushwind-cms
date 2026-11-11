@@ -29,7 +29,7 @@ prost-reflect = { version = "0.16", features = ["serde"] }
 # 生成器产物中的服务 trait 用 async-trait 保证 dyn 兼容。
 async-trait = "0.1"
 # 服务侧直用的工具链。
-rust-utils = { git = "https://github.com/tx7do/rust-utils", rev = "7ff37eb18be284f7b69eb501238a5d829905d116", features = ["json"] }
+rust-utils = { git = "https://github.com/tx7do/rust-utils", rev = "8f3e9916f519cf6beb977814300b0f60cb966c09", features = ["json"] }
 chrono = { version = "0.4", default-features = false, features = ["std", "clock"] }
 sea-orm = { version = "2.0", default-features = false, features = [
     "runtime-tokio-rustls",

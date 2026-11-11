@@ -11,15 +11,15 @@ use store::paging::fetch_paged;
 
 fn language_proto(r: sys_languages::Model) -> proto::proto::dict::service::v1::Language {
     proto::proto::dict::service::v1::Language {
-        id: Some(r.id as u32),
+        id: Some(r.id),
         language_code: r.language_code,
         language_name: r.language_name,
         native_name: r.native_name,
         is_default: r.is_default,
         is_enabled: r.is_enabled,
         sort_order: r.sort_order.map(|v| v as u32),
-        created_by: r.created_by.map(|v| v as u32),
-        updated_by: r.updated_by.map(|v| v as u32),
+        created_by: r.created_by,
+        updated_by: r.updated_by,
         created_at: r.created_at.and_then(crate::state::ts_to_proto),
         updated_at: r.updated_at.and_then(crate::state::ts_to_proto),
         ..Default::default()
@@ -46,7 +46,7 @@ impl proto::proto::dict::service::v1::language_service_server::LanguageService f
         Ok(Response::new(
             proto::proto::dict::service::v1::ListLanguageResponse {
                 items: rows.into_iter().map(language_proto).collect(),
-                total,
+                total: total as i64,
             },
         ))
     }
@@ -61,7 +61,9 @@ impl proto::proto::dict::service::v1::language_service_server::LanguageService f
             .map_err(db_status)?;
         let _ = request;
         Ok(Response::new(
-            proto::proto::dict::service::v1::CountLanguageResponse { count: total },
+            proto::proto::dict::service::v1::CountLanguageResponse {
+                count: total as i64,
+            },
         ))
     }
 
@@ -73,7 +75,7 @@ impl proto::proto::dict::service::v1::language_service_server::LanguageService f
         use proto::proto::dict::service::v1::get_language_request::QueryBy;
         let row = match req.query_by {
             Some(QueryBy::Id(id)) => {
-                sys_languages::Entity::find_by_id(id as i64)
+                sys_languages::Entity::find_by_id(id)
                     .one(&self.state.db)
                     .await
             }
@@ -144,7 +146,7 @@ impl proto::proto::dict::service::v1::language_service_server::LanguageService f
         request: Request<proto::proto::dict::service::v1::UpdateLanguageRequest>,
     ) -> Result<Response<pbjson_types::Empty>, Status> {
         let req = request.into_inner();
-        let row = sys_languages::Entity::find_by_id(req.id as i64)
+        let row = sys_languages::Entity::find_by_id(req.id)
             .one(&self.state.db)
             .await
             .map_err(db_status)?
@@ -185,7 +187,6 @@ impl proto::proto::dict::service::v1::language_service_server::LanguageService f
         else {
             return Err(bad("query_by required"));
         };
-        let id = id as i64;
         language_repo::delete_languages(&self.state.db, id).await?;
         Ok(Response::new(pbjson_types::Empty {}))
     }

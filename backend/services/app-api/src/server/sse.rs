@@ -23,7 +23,7 @@ struct CoreGate {
 }
 
 impl Gate for CoreGate {
-    async fn authorize(&self, token: &str) -> Result<u32, Failure> {
+    async fn authorize(&self, token: &str) -> Result<i64, Failure> {
         let Ok(claims) = self.authenticator.authenticate_token(token) else {
             return Err(Failure::new("UNAUTHORIZED", "invalid token"));
         };
@@ -31,7 +31,7 @@ impl Gate for CoreGate {
             .0
             .get("uid")
             .and_then(|v| v.as_u64())
-            .map(|v| v as u32)
+            .map(|v| v as i64)
         else {
             return Err(Failure::new("UNAUTHORIZED", "invalid token"));
         };

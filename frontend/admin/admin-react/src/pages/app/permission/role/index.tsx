@@ -83,6 +83,12 @@ const RoleManagement = () => {
       width: 150,
     },
     {
+      title: t('parentName'),
+      dataIndex: 'parentName',
+      width: 130,
+      hideInSearch: true,
+    },
+    {
       title: t('tenantName'),
       dataIndex: 'tenantName',
       width: 150,
@@ -186,7 +192,7 @@ const RoleManagement = () => {
 
               return {
                 data: response.items || [],
-                total: response.total || 0,
+                total: Number(response.total ?? 0),
                 success: true,
               };
             

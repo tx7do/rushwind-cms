@@ -36,3 +36,20 @@ pub async fn assign_permission_menus(
     }
     Ok(())
 }
+
+/// AssignSyncBindings' menu leg — the whole-set replacement of the sync
+/// MERGE's update segment: clear the permission's rows first, then
+/// re-insert the derived set (an empty derivation = clear the bindings).
+pub async fn replace_permission_menus(
+    db: &DatabaseConnection,
+    permission_id: i64,
+    menu_ids: &[i64],
+) -> StatusResult<()> {
+    use sea_orm::{ColumnTrait as _, QueryFilter as _};
+    sys_permission_menus::Entity::delete_many()
+        .filter(sys_permission_menus::Column::PermissionId.eq(permission_id))
+        .exec(db)
+        .await
+        .map_err(db_status)?;
+    assign_permission_menus(db, permission_id, menu_ids).await
+}

@@ -11,9 +11,9 @@ use proto::proto::audit::service::v1 as auditv1;
 
 fn api_audit_proto(r: store::entities::sys_api_audit_logs::Model) -> auditv1::ApiAuditLog {
     auditv1::ApiAuditLog {
-        id: Some(r.id as u32),
-        tenant_id: r.tenant_id.map(|v| v as u32),
-        user_id: r.user_id.map(|v| v as u32),
+        id: Some(r.id),
+        tenant_id: r.tenant_id,
+        user_id: r.user_id,
         username: r.username,
         ip_address: r.ip_address,
         referer: r.referer,
@@ -41,8 +41,8 @@ pub async fn insert_api_audit(
 ) -> Result<(), Status> {
     use sea_orm::ActiveModelTrait;
     store::entities::sys_api_audit_logs::ActiveModel {
-        tenant_id: Set(d.tenant_id.map(|v| v as i64)),
-        user_id: Set(d.user_id.map(|v| v as i64)),
+        tenant_id: Set(d.tenant_id),
+        user_id: Set(d.user_id),
         username: Set(d.username),
         ip_address: Set(d.ip_address),
         referer: Set(d.referer),
@@ -95,7 +95,7 @@ impl auditv1::api_audit_log_service_server::ApiAuditLogService for ApiAuditLogSe
         .map_err(|e| Status::internal(e.message))?;
         Ok(Response::new(auditv1::ListApiAuditLogResponse {
             items: rows.into_iter().map(api_audit_proto).collect(),
-            total,
+            total: total as i64,
         }))
     }
 
@@ -107,7 +107,7 @@ impl auditv1::api_audit_log_service_server::ApiAuditLogService for ApiAuditLogSe
         let Some(auditv1::get_api_audit_log_request::QueryBy::Id(id)) = req.query_by else {
             return Err(bad("query_by required"));
         };
-        let row = store::entities::sys_api_audit_logs::Entity::find_by_id(id as i64)
+        let row = store::entities::sys_api_audit_logs::Entity::find_by_id(id)
             .one(&self.state.db)
             .await
             .map_err(db_status)?

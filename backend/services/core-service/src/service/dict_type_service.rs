@@ -13,13 +13,13 @@ use store::paging::fetch_paged;
 
 fn dict_type_proto(r: sys_dict_types::Model) -> proto::proto::dict::service::v1::DictType {
     proto::proto::dict::service::v1::DictType {
-        id: Some(r.id as u32),
+        id: Some(r.id),
         type_code: r.type_code,
         type_name: r.type_name,
         is_enabled: r.is_enabled,
         sort_order: r.sort_order.map(|v| v as u32),
-        created_by: r.created_by.map(|v| v as u32),
-        updated_by: r.updated_by.map(|v| v as u32),
+        created_by: r.created_by,
+        updated_by: r.updated_by,
         created_at: r.created_at.and_then(crate::state::ts_to_proto),
         updated_at: r.updated_at.and_then(crate::state::ts_to_proto),
         ..Default::default()
@@ -48,7 +48,7 @@ impl proto::proto::dict::service::v1::dict_type_service_server::DictTypeService
         Ok(Response::new(
             proto::proto::dict::service::v1::ListDictTypeResponse {
                 items: rows.into_iter().map(dict_type_proto).collect(),
-                total,
+                total: total as i64,
             },
         ))
     }
@@ -62,7 +62,9 @@ impl proto::proto::dict::service::v1::dict_type_service_server::DictTypeService
             .await
             .map_err(db_status)?;
         Ok(Response::new(
-            proto::proto::dict::service::v1::CountDictTypeResponse { count: total },
+            proto::proto::dict::service::v1::CountDictTypeResponse {
+                count: total as i64,
+            },
         ))
     }
 
@@ -73,7 +75,7 @@ impl proto::proto::dict::service::v1::dict_type_service_server::DictTypeService
         let req = request.into_inner();
         let row = match req.query_by {
             Some(proto::proto::dict::service::v1::get_dict_type_request::QueryBy::Id(id)) => {
-                sys_dict_types::Entity::find_by_id(id as i64)
+                sys_dict_types::Entity::find_by_id(id)
                     .one(&self.state.db)
                     .await
             }
@@ -118,7 +120,7 @@ impl proto::proto::dict::service::v1::dict_type_service_server::DictTypeService
         request: Request<proto::proto::dict::service::v1::UpdateDictTypeRequest>,
     ) -> Result<Response<pbjson_types::Empty>, Status> {
         let req = request.into_inner();
-        let row = sys_dict_types::Entity::find_by_id(req.id as i64)
+        let row = sys_dict_types::Entity::find_by_id(req.id)
             .one(&self.state.db)
             .await
             .map_err(db_status)?
@@ -149,7 +151,7 @@ impl proto::proto::dict::service::v1::dict_type_service_server::DictTypeService
     ) -> Result<Response<pbjson_types::Empty>, Status> {
         let req = request.into_inner();
         sys_dict_types::Entity::delete_many()
-            .filter(sys_dict_types::Column::Id.is_in(req.ids.into_iter().map(|v| v as i64)))
+            .filter(sys_dict_types::Column::Id.is_in(req.ids))
             .exec(&self.state.db)
             .await
             .map_err(db_status)?;

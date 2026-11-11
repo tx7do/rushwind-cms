@@ -18,8 +18,8 @@ use crate::service::content_support::{seo_of, seo_to_json, status_from_i32, stat
 
 pub(crate) fn page_translation_proto(r: page_translations::Model) -> contentv1::PageTranslation {
     contentv1::PageTranslation {
-        id: Some(r.id as u32),
-        page_id: r.page_id.map(|v| v as u32),
+        id: Some(r.id),
+        page_id: r.page_id,
         language_code: r.language_code,
         title: r.title,
         slug: r.slug,
@@ -41,10 +41,10 @@ pub(crate) fn page_proto(
         .filter_map(|t| t.language_code.clone())
         .collect();
     contentv1::Page {
-        id: Some(r.id as u32),
+        id: Some(r.id),
         status: status_to_i32("page", r.status),
         slug: r.slug,
-        author_id: r.author_id.map(|v| v as u32),
+        author_id: r.author_id,
         author_name: r.author_name,
         disallow_comment: r.disallow_comment,
         redirect_url: r.redirect_url,
@@ -57,8 +57,8 @@ pub(crate) fn page_proto(
             .custom_fields
             .and_then(|j| serde_json::from_value(j).ok())
             .unwrap_or_default(),
-        content_model_id: r.content_model_id.map(|v| v as u32),
-        parent_id: r.parent_id.map(|v| v as u32),
+        content_model_id: r.content_model_id,
+        parent_id: r.parent_id,
         depth: r.depth,
         path: r.path,
         translations: translations
@@ -95,7 +95,10 @@ impl contentv1::page_service_server::PageService for PageService {
                 .map_err(db_status)?;
             items.push(page_proto(r, translations));
         }
-        Ok(Response::new(contentv1::ListPageResponse { items, total }))
+        Ok(Response::new(contentv1::ListPageResponse {
+            items,
+            total: total as i64,
+        }))
     }
 
     async fn get(
@@ -106,7 +109,7 @@ impl contentv1::page_service_server::PageService for PageService {
         let Some(contentv1::get_page_request::QueryBy::Id(id)) = req.query_by else {
             return Err(bad("query_by required"));
         };
-        let row = page_repo::page_by_id(&self.state.db, id as i64).await?;
+        let row = page_repo::page_by_id(&self.state.db, id).await?;
         let translations = page_translations::Entity::find()
             .filter(page_translations::Column::PageId.eq(row.id))
             .all(&self.state.db)
@@ -127,7 +130,7 @@ impl contentv1::page_service_server::PageService for PageService {
         let row = pages::ActiveModel {
             status: Set(status_from_i32("page", data.status.unwrap_or(1))),
             slug: Set(data.slug),
-            author_id: Set(data.author_id.map(|v| v as i64)),
+            author_id: Set(data.author_id),
             author_name: Set(data.author_name),
             disallow_comment: Set(data.disallow_comment),
             redirect_url: Set(data.redirect_url),
@@ -172,7 +175,7 @@ impl contentv1::page_service_server::PageService for PageService {
         request: Request<contentv1::UpdatePageRequest>,
     ) -> Result<Response<contentv1::Page>, Status> {
         let req = request.into_inner();
-        let row = page_repo::page_by_id(&self.state.db, req.id as i64).await?;
+        let row = page_repo::page_by_id(&self.state.db, req.id).await?;
         let mut a: pages::ActiveModel = row.into();
         let embedded = req.data.as_ref().map(|d| d.translations.clone());
         if let Some(data) = req.data {
@@ -216,7 +219,7 @@ impl contentv1::page_service_server::PageService for PageService {
         let Some(contentv1::delete_page_request::QueryBy::Id(id)) = req.query_by else {
             return Err(bad("query_by required"));
         };
-        page_repo::delete_page(&self.state.db, id as i64).await?;
+        page_repo::delete_page(&self.state.db, id).await?;
         Ok(Response::new(pbjson_types::Empty {}))
     }
 
@@ -226,7 +229,7 @@ impl contentv1::page_service_server::PageService for PageService {
     ) -> Result<Response<contentv1::PageTranslationExistsResponse>, Status> {
         let req = request.into_inner();
         let exists =
-            repo::page_translation_exists(&self.state.db, req.page_id as i64, &req.language_code)
+            repo::page_translation_exists(&self.state.db, req.page_id, &req.language_code)
                 .await?;
         Ok(Response::new(contentv1::PageTranslationExistsResponse {
             exists,
@@ -242,7 +245,7 @@ impl contentv1::page_service_server::PageService for PageService {
         // and thus the zero translation (a missing translation is not an
         // error — the response is simply the empty message).
         let id = match req.query_by {
-            Some(contentv1::get_page_request::QueryBy::Id(id)) => id as i64,
+            Some(contentv1::get_page_request::QueryBy::Id(id)) => id,
             _ => 0,
         };
         let row = page_translation_repo::get_page_translation(
@@ -266,7 +269,7 @@ impl contentv1::page_service_server::PageService for PageService {
         };
         let row = repo::create_page_translation(
             &self.state.db,
-            req.page_id as i64,
+            req.page_id,
             repo::PageTranslationFields {
                 language_code: data.language_code,
                 title: data.title,
@@ -274,7 +277,7 @@ impl contentv1::page_service_server::PageService for PageService {
                 cover_image: data.cover_image,
                 full_path: data.full_path,
                 seo: seo_to_json(data.seo),
-                created_by: data.created_by.map(|v| v as i64),
+                created_by: data.created_by,
             },
         )
         .await?;
@@ -291,8 +294,8 @@ impl contentv1::page_service_server::PageService for PageService {
         };
         let row = page_translation_repo::update_page_translation(
             &self.state.db,
-            req.id as i64,
-            data.page_id.map(|v| v as i64).unwrap_or(0),
+            req.id,
+            data.page_id.unwrap_or(0),
             // update_mask is accepted but not applied, like the other
             // update faces of this port; the repo writes only the fields
             // the reference's page-translation update writes.
@@ -303,7 +306,7 @@ impl contentv1::page_service_server::PageService for PageService {
                 cover_image: data.cover_image,
                 full_path: data.full_path,
                 seo: seo_to_json(data.seo),
-                created_by: data.created_by.map(|v| v as i64),
+                created_by: data.created_by,
             },
             req.allow_missing.unwrap_or(false),
         )
@@ -318,11 +321,11 @@ impl contentv1::page_service_server::PageService for PageService {
         let req = request.into_inner();
         let query = match req.query_by {
             Some(contentv1::delete_page_translation_request::QueryBy::Id(id)) => {
-                repo::PageTranslationQuery::Id(id as i64)
+                repo::PageTranslationQuery::Id(id)
             }
             Some(contentv1::delete_page_translation_request::QueryBy::Identifier(identifier)) => {
                 repo::PageTranslationQuery::Identifier {
-                    page_id: identifier.page_id as i64,
+                    page_id: identifier.page_id,
                     language_code: identifier.language_code,
                 }
             }

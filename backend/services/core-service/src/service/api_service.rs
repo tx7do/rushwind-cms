@@ -14,7 +14,7 @@ use proto::proto::permission::service::v1 as permissionv1;
 
 fn api_proto(r: sys_apis::Model) -> permissionv1::Api {
     permissionv1::Api {
-        id: Some(r.id as u32),
+        id: Some(r.id),
         operation: r.operation,
         path: r.path,
         method: r.method,
@@ -48,7 +48,7 @@ impl permissionv1::api_service_server::ApiService for ApiService {
         .map_err(|e| Status::internal(e.message))?;
         Ok(Response::new(permissionv1::ListApiResponse {
             items: rows.into_iter().map(api_proto).collect(),
-            total,
+            total: total as i64,
         }))
     }
 
@@ -61,7 +61,7 @@ impl permissionv1::api_service_server::ApiService for ApiService {
             .await
             .map_err(db_status)?;
         Ok(Response::new(permissionv1::CountApiResponse {
-            count: total,
+            count: total as i64,
         }))
     }
 
@@ -73,7 +73,7 @@ impl permissionv1::api_service_server::ApiService for ApiService {
         let Some(permissionv1::get_api_request::QueryBy::Id(id)) = req.query_by else {
             return Err(bad("query_by required"));
         };
-        let row = api_repo::apis_by_id(&self.state.db, id as i64).await?;
+        let row = api_repo::apis_by_id(&self.state.db, id).await?;
         Ok(Response::new(api_proto(row)))
     }
 
@@ -109,7 +109,7 @@ impl permissionv1::api_service_server::ApiService for ApiService {
         request: Request<permissionv1::UpdateApiRequest>,
     ) -> Result<Response<pbjson_types::Empty>, Status> {
         let req = request.into_inner();
-        let row = sys_apis::Entity::find_by_id(req.id as i64)
+        let row = sys_apis::Entity::find_by_id(req.id)
             .one(&self.state.db)
             .await
             .map_err(db_status)?
@@ -136,7 +136,7 @@ impl permissionv1::api_service_server::ApiService for ApiService {
         let Some(permissionv1::delete_api_request::QueryBy::Id(id)) = req.query_by else {
             return Err(bad("query_by required"));
         };
-        api_repo::delete_apis(&self.state.db, id as i64).await?;
+        api_repo::delete_apis(&self.state.db, id).await?;
         Ok(Response::new(pbjson_types::Empty {}))
     }
     async fn sync_apis(

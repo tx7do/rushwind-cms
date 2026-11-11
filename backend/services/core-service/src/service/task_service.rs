@@ -48,7 +48,7 @@ const REGISTERED_TASK_TYPES: [&str; 2] = ["backup", "search.reindex"];
 
 fn task_proto(r: sys_tasks::Model) -> taskv1::Task {
     taskv1::Task {
-        id: Some(r.id as u32),
+        id: Some(r.id),
         r#type: r.r#type.as_deref().and_then(task_type_num),
         type_name: r.type_name,
         task_payload: r.task_payload.map(|v| v.to_string()),
@@ -56,9 +56,9 @@ fn task_proto(r: sys_tasks::Model) -> taskv1::Task {
         task_options: r.task_options.and_then(task_option_from_json),
         enable: r.enable,
         remark: r.remark,
-        tenant_id: r.tenant_id.map(|v| v as u32),
-        created_by: r.created_by.map(|v| v as u32),
-        updated_by: r.updated_by.map(|v| v as u32),
+        tenant_id: r.tenant_id,
+        created_by: r.created_by,
+        updated_by: r.updated_by,
         created_at: r.created_at.and_then(ts_to_proto),
         updated_at: r.updated_at.and_then(ts_to_proto),
         ..Default::default()
@@ -173,7 +173,7 @@ fn task_insert_model(
     now: chrono::DateTime<chrono::FixedOffset>,
 ) -> sys_tasks::ActiveModel {
     let mut m = sys_tasks::ActiveModel {
-        tenant_id: Set(data.tenant_id.map(|v| v as i64)),
+        tenant_id: Set(data.tenant_id),
         r#type: Set(data.r#type.and_then(task_type_name).map(str::to_string)),
         type_name: Set(data.type_name),
         task_payload: Set(data.task_payload.as_deref().map(task_payload_json)),
@@ -186,7 +186,7 @@ fn task_insert_model(
         ..Default::default()
     };
     if let Some(id) = data.id {
-        m.id = Set(id as i64);
+        m.id = Set(id);
     }
     m
 }
@@ -224,7 +224,7 @@ impl taskv1::task_service_server::TaskService for TaskService {
         .map_err(|e| Status::internal(e.message))?;
         Ok(Response::new(taskv1::ListTaskResponse {
             items: rows.into_iter().map(task_proto).collect(),
-            total,
+            total: total as i64,
         }))
     }
 
@@ -237,7 +237,9 @@ impl taskv1::task_service_server::TaskService for TaskService {
             .count(&self.state.db)
             .await
             .map_err(db_status)?;
-        Ok(Response::new(taskv1::CountTaskResponse { count: total }))
+        Ok(Response::new(taskv1::CountTaskResponse {
+            count: total as i64,
+        }))
     }
 
     async fn get(
@@ -254,7 +256,7 @@ impl taskv1::task_service_server::TaskService for TaskService {
         let req = request.into_inner();
         let row = match req.query_by {
             Some(taskv1::get_task_request::QueryBy::Id(id)) => {
-                task_repo::tasks_by_id(&self.state.db, id as i64).await?
+                task_repo::tasks_by_id(&self.state.db, id).await?
             }
             Some(taskv1::get_task_request::QueryBy::TypeName(type_name)) => {
                 if !authed {
@@ -278,7 +280,7 @@ impl taskv1::task_service_server::TaskService for TaskService {
             return Err(bad("invalid parameter"));
         };
         validate_task_fields(&data)?;
-        let created_by = data.created_by.map(|v| v as i64);
+        let created_by = data.created_by;
         task_repo::insert_tasks(
             &self.state.db,
             task_insert_model(data, created_by, store::now()),
@@ -300,9 +302,7 @@ impl taskv1::task_service_server::TaskService for TaskService {
             return Err(bad("invalid parameter"));
         };
         validate_task_fields(&data)?;
-        let id = req.id as i64;
-
-        let existing = sys_tasks::Entity::find_by_id(id)
+        let existing = sys_tasks::Entity::find_by_id(req.id)
             .one(&self.state.db)
             .await
             .map_err(db_status)?;
@@ -311,7 +311,7 @@ impl taskv1::task_service_server::TaskService for TaskService {
             // data with created_by taking updated_by's value (the
             // reference's swap).
             if req.allow_missing.unwrap_or(false) {
-                let created_by = data.updated_by.map(|v| v as i64);
+                let created_by = data.updated_by;
                 task_repo::insert_tasks(
                     &self.state.db,
                     task_insert_model(data, created_by, store::now()),
@@ -374,7 +374,6 @@ impl taskv1::task_service_server::TaskService for TaskService {
         let Some(taskv1::delete_task_request::QueryBy::Id(id)) = req.query_by else {
             return Err(bad("query_by required"));
         };
-        let id = id as i64;
         // The reference gets the row first (a missing id 404s there),
         // then deletes, then stops the scheduler registration.
         task_repo::tasks_by_id(&self.state.db, id).await?;

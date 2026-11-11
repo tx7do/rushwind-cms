@@ -13,9 +13,9 @@ use crate::service::audit_support::{audit_action_name, enum_num};
 
 fn login_audit_proto(r: store::entities::sys_login_audit_logs::Model) -> auditv1::LoginAuditLog {
     auditv1::LoginAuditLog {
-        id: Some(r.id as u32),
-        tenant_id: r.tenant_id.map(|v| v as u32),
-        user_id: r.user_id.map(|v| v as u32),
+        id: Some(r.id),
+        tenant_id: r.tenant_id,
+        user_id: r.user_id,
         username: r.username,
         ip_address: r.ip_address,
         session_id: r.session_id,
@@ -48,8 +48,8 @@ pub async fn insert_login_audit(
 ) -> Result<(), Status> {
     use sea_orm::ActiveModelTrait;
     store::entities::sys_login_audit_logs::ActiveModel {
-        tenant_id: Set(d.tenant_id.map(|v| v as i64)),
-        user_id: Set(d.user_id.map(|v| v as i64)),
+        tenant_id: Set(d.tenant_id),
+        user_id: Set(d.user_id),
         username: Set(d.username),
         ip_address: Set(d.ip_address),
         session_id: Set(d.session_id),
@@ -94,7 +94,7 @@ impl auditv1::login_audit_log_service_server::LoginAuditLogService for LoginAudi
         .map_err(|e| Status::internal(e.message))?;
         Ok(Response::new(auditv1::ListLoginAuditLogResponse {
             items: rows.into_iter().map(login_audit_proto).collect(),
-            total,
+            total: total as i64,
         }))
     }
 
@@ -106,7 +106,7 @@ impl auditv1::login_audit_log_service_server::LoginAuditLogService for LoginAudi
         let Some(auditv1::get_login_audit_log_request::QueryBy::Id(id)) = req.query_by else {
             return Err(bad("query_by required"));
         };
-        let row = store::entities::sys_login_audit_logs::Entity::find_by_id(id as i64)
+        let row = store::entities::sys_login_audit_logs::Entity::find_by_id(id)
             .one(&self.state.db)
             .await
             .map_err(db_status)?

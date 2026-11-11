@@ -17,18 +17,18 @@ use proto::proto::site::service::v1 as sitev1;
 
 pub(crate) fn navigation_item_proto(r: navigation_items::Model) -> sitev1::NavigationItem {
     sitev1::NavigationItem {
-        id: Some(r.id as u32),
-        navigation_id: r.navigation_id.map(|v| v as u32),
+        id: Some(r.id),
+        navigation_id: r.navigation_id,
         title: r.title,
         description: r.description,
         icon: r.icon,
         url: r.url,
         link_type: r.link_type.as_deref().and_then(link_type_num),
-        object_id: r.object_id.map(|v| v as u32),
+        object_id: r.object_id,
         sort_order: r.sort_order.map(|v| v as u32),
         is_open_new_tab: r.is_open_new_tab,
         is_invalid: r.is_invalid,
-        parent_id: r.parent_id.map(|v| v as u32),
+        parent_id: r.parent_id,
         created_at: r.created_at.and_then(ts_to_proto),
         updated_at: r.updated_at.and_then(ts_to_proto),
         ..Default::default()
@@ -40,7 +40,7 @@ fn navigation_proto(
     items: Vec<navigation_items::Model>,
 ) -> sitev1::Navigation {
     sitev1::Navigation {
-        id: Some(r.id as u32),
+        id: Some(r.id),
         name: r.name,
         location: r.location.as_deref().and_then(location_num),
         locale: r.locale,
@@ -87,7 +87,7 @@ impl sitev1::navigation_service_server::NavigationService for NavigationService 
         }
         Ok(Response::new(sitev1::ListNavigationResponse {
             items,
-            total,
+            total: total as i64,
         }))
     }
 
@@ -99,7 +99,7 @@ impl sitev1::navigation_service_server::NavigationService for NavigationService 
         let Some(sitev1::get_navigation_request::QueryBy::Id(id)) = req.query_by else {
             return Err(bad("query_by required"));
         };
-        let row = navigation_repo::navigations_by_id(&self.state.db, id as i64).await?;
+        let row = navigation_repo::navigations_by_id(&self.state.db, id).await?;
         let children = navigation_items_of(&self.state.db, row.id).await?;
         Ok(Response::new(navigation_proto(row, children)))
     }
@@ -133,7 +133,7 @@ impl sitev1::navigation_service_server::NavigationService for NavigationService 
                 icon: Set(item.icon),
                 url: Set(item.url),
                 link_type: Set(item.link_type.and_then(link_type_name)),
-                object_id: Set(item.object_id.map(|v| v as i64)),
+                object_id: Set(item.object_id),
                 sort_order: Set(item.sort_order.map(|v| v as i64)),
                 is_open_new_tab: Set(item.is_open_new_tab),
                 created_at: Set(Some(now)),
@@ -152,7 +152,7 @@ impl sitev1::navigation_service_server::NavigationService for NavigationService 
         request: Request<sitev1::UpdateNavigationRequest>,
     ) -> Result<Response<sitev1::Navigation>, Status> {
         let req = request.into_inner();
-        let row = navigations::Entity::find_by_id(req.id as i64)
+        let row = navigations::Entity::find_by_id(req.id)
             .one(&self.state.db)
             .await
             .map_err(db_status)?
@@ -180,7 +180,7 @@ impl sitev1::navigation_service_server::NavigationService for NavigationService 
         let Some(sitev1::delete_navigation_request::QueryBy::Id(id)) = req.query_by else {
             return Err(bad("query_by required"));
         };
-        navigation_repo::delete_navigations(&self.state.db, id as i64).await?;
+        navigation_repo::delete_navigations(&self.state.db, id).await?;
         Ok(Response::new(pbjson_types::Empty {}))
     }
 }

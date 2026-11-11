@@ -37,6 +37,7 @@ interface TreeNode {
  * 根据权限组和权限列表构建权限树。
  * 权限组 API 返回嵌套结构（children 含子组），需递归处理。
  * 每个组节点下附加匹配的权限（通过 groupId 关联）。
+ * 权限 ID 已是 uint64 字符串，叶子 key 直接用字符串 ID。
  */
 export function buildPermissionTree(
   groups: Array<{ id?: number | string; title?: string; name?: string; code?: string; children?: any[] }>,
@@ -57,7 +58,7 @@ export function buildPermissionTree(
     const matchedPerms = (permissions || [])
       .filter((p) => String(p.groupId) === String(group.id))
       .map((p) => ({
-        key: Number(p.id),
+        key: String(p.id),
         title: p.title || p.name || p.code || String(p.id),
       }));
 
@@ -71,27 +72,26 @@ export function buildPermissionTree(
 }
 
 /**
- * 从权限树勾选值中提取所有数字 ID（过滤掉非数字值）
+ * 从权限树勾选值中提取所有权限 ID（过滤掉权限组 g_xxx 等非 ID key）
  */
-export function filterNumbers(values: any[]): number[] {
+export function filterIds(values: any[]): string[] {
   if (!Array.isArray(values)) return [];
   return values
     .flat(Infinity)
-    .filter((v) => typeof v === 'number' && !isNaN(v))
-    .map((v) => Number(v));
+    .filter((v): v is string => typeof v === 'string' && v !== '' && !v.startsWith('g_'));
 }
 
 /**
  * 递归收集树中所有「叶子节点」（无 children）的 key。
  * 用于提交勾选值时剥离父节点 key：
  * 这些 Tree 默认开启父子联动，勾选某父节点下全部子节点时父节点会被自动勾选，
- * 其 key（权限组/父菜单的 ID）会混入 checkedKeys。若直接 filterNumbers 提交，
+ * 其 key（权限组/父菜单的 ID）会混入 checkedKeys。若直接 filterIds 提交，
  * 组/父菜单 ID 会被后端当作权限/菜单 ID 处理，可能造成越权绑定。
  * 这里用叶子集合对 checkedKeys 求交集，只保留真正的叶子 ID。
  */
-export function extractLeafIds(checkedKeys: any[], treeData: any[]): number[] {
+export function extractLeafIds(checkedKeys: any[], treeData: any[]): string[] {
   if (!Array.isArray(checkedKeys) || !Array.isArray(treeData)) return [];
-  const leafIds = new Set<string | number>();
+  const leafIds = new Set<string>();
   const collect = (nodes: any[]) => {
     for (const node of nodes) {
       if (node.children?.length > 0) {
@@ -102,11 +102,101 @@ export function extractLeafIds(checkedKeys: any[], treeData: any[]): number[] {
     }
   };
   collect(treeData);
-  // 只返回数字 key（权限 ID），过滤字符串 key（权限组 g_xxx）
+  // 只返回权限 ID key，过滤权限组 key（g_xxx）
   return checkedKeys
     .flat(Infinity)
-    .filter((v) => leafIds.has(v) && typeof v === 'number')
-    .map((v) => Number(v));
+    .filter((v): v is string => leafIds.has(v) && typeof v === 'string' && !v.startsWith('g_'));
+}
+
+// ========== 权限继承（父子角色） ==========
+
+/**
+ * 按父角色权限上限集（cap）过滤权限树数据源——在 buildPermissionTree 之前调用。
+ * 只保留 cap 内的权限点，以及（递归）仍含至少一个保留权限点的权限组。
+ * cap 为 null/undefined/空数组表示无父角色（根角色），原样返回全量。
+ */
+export function filterPermissionsByCap(
+  groups: any[],
+  permissions: any[],
+  capIds: string[] | null | undefined,
+): { groups: any[]; permissions: any[] } {
+  if (!capIds || capIds.length === 0) return { groups, permissions };
+  const cap = new Set(capIds.map(String));
+  const kept = (permissions || []).filter((p) => cap.has(String(p.id)));
+  const filterGroups = (list: any[]): any[] =>
+    (list || [])
+      .map((g) => ({ ...g, children: filterGroups(g.children || []) }))
+      .filter(
+        (g) => g.children.length > 0 || kept.some((p) => String(p.groupId) === String(g.id)),
+      );
+  return { groups: filterGroups(groups), permissions: kept };
+}
+
+/**
+ * 收集自身及其全部后代角色 ID（按 parentId 嵌套关系）。
+ * 父角色候选下拉用它排除自身与后代，防止在前端就构造出环（后端另有兜底校验）。
+ */
+export function collectSelfAndDescendantIds(items: any[], selfId?: string): string[] {
+  if (!selfId) return [];
+  const byParent = new Map<string, string[]>();
+  for (const it of items || []) {
+    const pid = String(it.parentId || '0');
+    if (!byParent.has(pid)) byParent.set(pid, []);
+    byParent.get(pid)!.push(String(it.id));
+  }
+  const result = new Set<string>([String(selfId)]);
+  const stack = [String(selfId)];
+  while (stack.length > 0) {
+    const cur = stack.pop()!;
+    for (const child of byParent.get(cur) || []) {
+      if (!result.has(child)) {
+        result.add(child);
+        stack.push(child);
+      }
+    }
+  }
+  return [...result];
+}
+
+/**
+ * 把角色列表按 parentId 嵌套为 TreeSelect 数据（森林，缺父的孤行落为根节点），
+ * 排除 excludeIds（自身及后代）。
+ */
+export function buildRoleTreeOptions(
+  items: any[],
+  excludeIds: string[],
+): { value: string; title: string; children?: any[] }[] {
+  const excluded = new Set(excludeIds.map(String));
+  const nodes = new Map<string, { value: string; title: string; children?: any[]; pid: string }>();
+  for (const it of items || []) {
+    const id = String(it.id);
+    if (excluded.has(id)) continue;
+    nodes.set(id, {
+      value: id,
+      title: it.name || it.code || id,
+      pid: String(it.parentId || '0'),
+    });
+  }
+  const roots: { value: string; title: string; children?: any[] }[] = [];
+  for (const node of nodes.values()) {
+    const parent = node.pid !== '0' ? nodes.get(node.pid) : undefined;
+    if (parent) {
+      (parent.children ??= []).push(node);
+    } else {
+      roots.push(node);
+    }
+  }
+  const strip = (list: any[]): any[] =>
+    list.map((n) => {
+      const { pid: _pid, ...rest } = n;
+      if (rest.children?.length > 0) {
+        rest.children = strip(rest.children);
+      } else {
+        delete rest.children;
+      }
+      return rest;
+    });
+  return strip(roots) as { value: string; title: string; children?: any[] }[];
 }
 
 // ========== 数据权限范围（角色级，五档） ==========
@@ -169,7 +259,7 @@ export function buildOrgUnitTree(items: any[]): OrgTreeNode[] {
   const result: OrgTreeNode[] = [];
   for (const item of items || []) {
     const node: OrgTreeNode = {
-      key: Number(item.id),
+      key: String(item.id),
       title: item.name || String(item.id),
     };
     const children = buildOrgUnitTree(item.children || []);
