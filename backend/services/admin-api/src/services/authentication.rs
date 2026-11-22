@@ -30,6 +30,12 @@ type Ctx = rushwind_http_binding::ctx::RequestContext;
 const HEADER_CAPTCHA_ID: &str = "x-captcha-id";
 const HEADER_CAPTCHA_VALUE: &str = "x-captcha-value";
 
+/// The forwarded failure reasons that count as credential misses — the
+/// rate limiter's increment trigger. Captcha errors (`CAPTCHA_INVALID` /
+/// `CAPTCHA_REQUIRED`) are not brute-force evidence and infrastructure
+/// failures must not lock anybody out.
+const CREDENTIAL_FAIL_REASONS: [&str; 3] = ["INVALID_PASSWORD", "USER_NOT_FOUND", "INVALID_TENANT"];
+
 /// The refresh-expiry fallback when the core answer carries none (the
 /// reference's defaultRefreshTTL — 30 days).
 const REFRESH_TTL_FALLBACK_SECS: i64 = 30 * 24 * 3600;
@@ -66,30 +72,66 @@ impl AuthenticationService {
             _ => REFRESH_TTL_FALLBACK_SECS,
         }
     }
+
+    /// The username dimension of the failure counters — the oneof's
+    /// username case only (an email/mobile identifier counts on the IP
+    /// dimension alone, matching the reference's `GetUsername`).
+    fn username_of(req: &LoginRequest) -> String {
+        match req.identifier.as_ref() {
+            Some(
+                proto::proto::authentication::service::v1::login_request::Identifier::Username(u),
+            ) => u.clone(),
+            _ => String::new(),
+        }
+    }
+
+    /// The progressive captcha gate: the challenge becomes mandatory
+    /// once the ip+username failure count reaches
+    /// [`crate::login_rate_limiter::CAPTCHA_REQUIRED_THRESHOLD`]. Below
+    /// it nothing is verified or consumed; at it a missing pair answers
+    /// `CAPTCHA_REQUIRED` and a failed verify `CAPTCHA_INVALID` — the
+    /// failing challenge is always destroyed (verify-and-delete) so a
+    /// mismatched captcha cannot be retried within its TTL.
+    async fn verify_login_captcha(
+        &self,
+        client_ip: &str,
+        username: &str,
+        ctx: &Ctx,
+    ) -> Result<(), StatusError> {
+        let attempts =
+            crate::login_rate_limiter::failure_attempts(&self.state.redis, client_ip, username)
+                .await;
+        if attempts < crate::login_rate_limiter::CAPTCHA_REQUIRED_THRESHOLD {
+            return Ok(());
+        }
+        let captcha_id = ctx
+            .headers
+            .get(HEADER_CAPTCHA_ID)
+            .cloned()
+            .unwrap_or_default();
+        let captcha_value = ctx
+            .headers
+            .get(HEADER_CAPTCHA_VALUE)
+            .cloned()
+            .unwrap_or_default();
+        if captcha_id.is_empty() || captcha_value.is_empty() {
+            return Err(status_error("CAPTCHA_REQUIRED", "captcha required"));
+        }
+        if !crate::captcha::verify(&self.state.redis, &captcha_id, &captcha_value).await {
+            // A mismatch consumed nothing (verify-and-delete only fires on
+            // match) — destroy the challenge explicitly so the failed
+            // captcha cannot be retried inside its TTL.
+            crate::captcha::destroy(&self.state.redis, &captcha_id).await;
+            return Err(status_error("CAPTCHA_INVALID", "invalid captcha"));
+        }
+        Ok(())
+    }
 }
 
 #[async_trait::async_trait]
 impl proto::gen_admin::services::AuthenticationServiceHandlers for AuthenticationService {
     async fn login(&self, ctx: Ctx, req: LoginRequest) -> Result<LoginResponse, StatusError> {
         use proto::proto::authentication::service::v1::GrantType;
-        // The captcha gate — password grant only.
-        if GrantType::try_from(req.grant_type) == Ok(GrantType::Password) {
-            let ok = crate::captcha::verify(
-                &self.state.redis,
-                &ctx.headers
-                    .get(HEADER_CAPTCHA_ID)
-                    .cloned()
-                    .unwrap_or_default(),
-                &ctx.headers
-                    .get(HEADER_CAPTCHA_VALUE)
-                    .cloned()
-                    .unwrap_or_default(),
-            )
-            .await;
-            if !ok {
-                return Err(status_error("BAD_REQUEST", "invalid or missing captcha"));
-            }
-        }
 
         // Pin the client type (admin) and forward to core. An in-flight
         // refresh answered through the login route binds to the
@@ -102,6 +144,16 @@ impl proto::gen_admin::services::AuthenticationServiceHandlers for Authenticatio
             req.jti = Some(op.jti);
             req.user_id = Some(op.user_id);
         }
+
+        // Session metadata: the BFF injects the HTTP-layer facts core
+        // cannot see (the online-session list's ip/ua read off these).
+        if req.client_ip.as_deref().unwrap_or("").is_empty() && !ctx.ip.is_empty() {
+            req.client_ip = Some(ctx.ip.clone());
+        }
+        if req.user_agent.as_deref().unwrap_or("").is_empty() && !ctx.user_agent.is_empty() {
+            req.user_agent = Some(ctx.user_agent.clone());
+        }
+
         let login_username = req
             .identifier
             .as_ref()
@@ -117,6 +169,26 @@ impl proto::gen_admin::services::AuthenticationServiceHandlers for Authenticatio
                 }
             })
             .unwrap_or_default();
+
+        if GrantType::try_from(req.grant_type) == Ok(GrantType::Password) {
+            let client_ip = ctx.ip.as_str();
+            // ── Gate 1: the brute-force lockout (ip + username, 5 failures
+            //    → 15 min). Counters increment on the credential-failure
+            //    branch below, reset on success.
+            if crate::login_rate_limiter::is_locked(&self.state.redis, client_ip, &login_username)
+                .await
+            {
+                return Err(status_error(
+                    "BAD_REQUEST",
+                    "too many login failures, please try again later",
+                ));
+            }
+            // ── Gate 2: the progressive captcha — required only once the
+            //    failure count reaches the threshold.
+            self.verify_login_captcha(client_ip, &Self::username_of(&req), &ctx)
+                .await?;
+        }
+
         let audit_ip = ctx
             .headers
             .get("x-forwarded-for")
@@ -171,7 +243,33 @@ impl proto::gen_admin::services::AuthenticationServiceHandlers for Authenticatio
             )
             .await;
         }
-        let mut resp = login_result.map_err(map_status)?.into_inner();
+        let mut resp = match login_result {
+            Ok(r) => r,
+            Err(e) => {
+                // A credential-family miss records against both failure
+                // counters (captcha errors and infrastructure failures
+                // do not count). The reason rides the status details.
+                let mapped = map_status(e);
+                if GrantType::try_from(grant) == Ok(GrantType::Password)
+                    && CREDENTIAL_FAIL_REASONS.contains(&mapped.reason)
+                {
+                    crate::login_rate_limiter::check_and_incr(
+                        &self.state.redis,
+                        &ctx.ip,
+                        &login_username,
+                    )
+                    .await;
+                }
+                return Err(mapped);
+            }
+        }
+        .into_inner();
+
+        // A successful password login clears the counters (back to the
+        // captcha-free state).
+        if GrantType::try_from(grant) == Ok(GrantType::Password) {
+            crate::login_rate_limiter::reset(&self.state.redis, &ctx.ip, &login_username).await;
+        }
 
         // The refresh token rides the HttpOnly cookie pair instead of
         // the body, with the core's own expiry stamp.

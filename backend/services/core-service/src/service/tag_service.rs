@@ -219,8 +219,7 @@ impl contentv1::tag_service_server::TagService for TagService {
     ) -> Result<Response<contentv1::TagTranslationExistsResponse>, Status> {
         let req = request.into_inner();
         let exists =
-            repo::tag_translation_exists(&self.state.db, req.tag_id, &req.language_code)
-                .await?;
+            repo::tag_translation_exists(&self.state.db, req.tag_id, &req.language_code).await?;
         Ok(Response::new(contentv1::TagTranslationExistsResponse {
             exists,
         }))

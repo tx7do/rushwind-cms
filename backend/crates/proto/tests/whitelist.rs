@@ -66,6 +66,7 @@ const APP_EXPECTED: &[(&str, &str)] = &[
         "app.service.v1.AuthenticationService",
         "GetOidcAuthorizeUrl",
     ),
+    ("app.service.v1.AuthenticationService", "GenerateCaptcha"),
     ("app.service.v1.PostService", "SearchPostsSuggest"),
     ("app.service.v1.PostService", "GetBySlug"),
     ("app.service.v1.PageService", "GetBySlug"),

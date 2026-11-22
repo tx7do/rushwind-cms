@@ -55,6 +55,17 @@ pub async fn verify(redis: &ConnectionManager, id: &str, value: &str) -> bool {
     }
 }
 
+/// Destroys a challenge without verifying — the failed-gate companion of
+/// [`verify`]: a mismatch (or a Redis hiccup during verify) must not leave
+/// the captcha retryable within its TTL, so the gate deletes it outright.
+pub async fn destroy(redis: &ConnectionManager, id: &str) {
+    if id.is_empty() {
+        return;
+    }
+    let mut conn = redis.clone();
+    let _: Result<i64, _> = conn.del(captcha_key(id)).await;
+}
+
 /// Cropper-safe glyph-run envelope, in pixels across. The renderer packs
 /// its six glyphs into a run and centers the crop window on that run; the
 /// window is 240 px wide on a 400 px canvas, so a run wider than the

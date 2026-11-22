@@ -229,8 +229,7 @@ impl contentv1::page_service_server::PageService for PageService {
     ) -> Result<Response<contentv1::PageTranslationExistsResponse>, Status> {
         let req = request.into_inner();
         let exists =
-            repo::page_translation_exists(&self.state.db, req.page_id, &req.language_code)
-                .await?;
+            repo::page_translation_exists(&self.state.db, req.page_id, &req.language_code).await?;
         Ok(Response::new(contentv1::PageTranslationExistsResponse {
             exists,
         }))

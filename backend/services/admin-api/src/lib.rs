@@ -5,6 +5,7 @@
 pub mod audit;
 pub mod captcha;
 pub mod config;
+pub mod login_rate_limiter;
 pub mod server;
 pub mod services;
 pub mod state;

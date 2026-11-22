@@ -61,10 +61,7 @@ fn relation_config_from_json(v: &sea_orm::JsonValue) -> Option<contentv1::Relati
             .and_then(|x| x.as_str())
             .map(str::to_owned),
         allow_cross_tenant: obj.get("allow_cross_tenant").and_then(|x| x.as_bool()),
-        filter_category_id: obj
-            .get("filter_category_id")
-            .and_then(|x| x.as_i64())
-            ,
+        filter_category_id: obj.get("filter_category_id").and_then(|x| x.as_i64()),
     })
 }
 
@@ -308,8 +305,7 @@ impl contentv1::content_model_service_server::ContentModelService for ContentMod
         a.updated_at = Set(Some(store::now()));
         let row = content_model_repo::update_content_models(&txn, a).await?;
         // 字段定义与翻译整体替换（对位 replace-fields / replace-translations）
-        let old_field_ids =
-            content_model_repo::content_model_field_ids(&txn, req.id).await?;
+        let old_field_ids = content_model_repo::content_model_field_ids(&txn, req.id).await?;
         content_model_repo::delete_field_definition_translations_of(&txn, &old_field_ids).await?;
         content_model_repo::delete_field_definitions_of(&txn, req.id).await?;
         batch_create_fields(&txn, req.id, &data.fields).await?;
@@ -352,8 +348,7 @@ impl contentv1::content_model_service_server::ContentModelService for ContentMod
             return Err(bad("invalid parameter"));
         }
         let rows =
-            content_model_repo::field_definitions_of(&self.state.db, req.content_model_id)
-                .await?;
+            content_model_repo::field_definitions_of(&self.state.db, req.content_model_id).await?;
         let mut items = Vec::with_capacity(rows.len());
         for r in rows {
             let translations =

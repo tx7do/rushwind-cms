@@ -38,6 +38,9 @@ pub const AUTH_FREE: &[(&str, &str)] = &[
     ("app.service.v1.AuthenticationService", "RefreshToken"),
     // GetOidcAuthorizeUrl：OIDC 登录的前置步骤（登录页尚无 token）。
     ("app.service.v1.AuthenticationService", "GetOidcAuthorizeUrl"),
+    // AuthenticationService.GenerateCaptcha：渐进式登录验证码的取图端点
+    //（登录页尚无 token），与 Login 同列免鉴权。
+    ("app.service.v1.AuthenticationService", "GenerateCaptcha"),
     ("app.service.v1.NavigationService", "List"),
     // CommentService.Create：游客评论策略在操作内自行执行（可选认证 +
     // enable_comments/allow_guest_comments 开关），白名单仅放行游客请求。

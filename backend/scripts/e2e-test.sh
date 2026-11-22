@@ -29,32 +29,64 @@ print(cmd(s, *sys.argv[1:]).split('\r\n')[1] if len(sys.argv) > 1 else '')
 EOF
 }
 
-echo "── 1. 验证码与登录链 ──────────────────────"
+echo "── 1. 验证码与登录链（渐进式 + 防爆破锁定） ──────────────────────"
 CAP=$(curl -s "$ADMIN/admin/v1/captcha")
 CID=$(echo "$CAP" | python3 -c "import json,sys; print(json.load(sys.stdin)['captchaId'])")
 ANS=$(redis_cmd GET "cms:captcha:$CID")
 check "captcha generates (id+png)" '"imageBase64":"data:image/png;base64,' "$CAP"
 
+# 渐进式闸门：失败计数为 0，正确密码直登（无 captcha 头）不被拦截
 RESP=$(curl -s -X POST -H "Content-Type: application/json" \
-  -H "X-Captcha-Id: $CID" -H "X-Captcha-Value: $ANS" \
   -d "{\"grant_type\":0,\"username\":\"admin\",\"password\":\"$PASS_ENC\"}" \
   "$ADMIN/admin/v1/login")
 TOKEN=$(echo "$RESP" | python3 -c "import json,sys; print(json.load(sys.stdin).get('access_token',''))" 2>/dev/null)
-check "login returns bearer token" '"token_type":"bearer"' "$RESP"
+check "progressive: first login needs no captcha" '"token_type":"bearer"' "$RESP"
 AUTH="Authorization: Bearer $TOKEN"
 
-# captcha 单次消费
-RESP2=$(curl -s -X POST -H "Content-Type: application/json" \
-  -H "X-Captcha-Id: $CID" -H "X-Captcha-Value: $ANS" \
-  -d "{\"grant_type\":0,\"username\":\"admin\",\"password\":\"$PASS_ENC\"}" \
-  "$ADMIN/admin/v1/login")
-check "captcha is single-use" 'invalid or missing captcha' "$RESP2"
-
-# 错误密码
-CAP=$(curl -s "$ADMIN/admin/v1/captcha"); CID=$(echo "$CAP" | python3 -c "import json,sys; print(json.load(sys.stdin)['captchaId'])"); ANS=$(redis_cmd GET "cms:captcha:$CID")
-BAD=$(curl -s -X POST -H "Content-Type: application/json" -H "X-Captcha-Id: $CID" -H "X-Captcha-Value: $ANS" \
+# 错误密码：凭据族失败（reason 经 details 跨 gRPC 跳保真）且计数 +1
+BAD=$(curl -s -X POST -H "Content-Type: application/json" \
   -d '{"grant_type":0,"username":"admin","password":"AAAAAAAAAAAAAAAAAAAAAA=="}' "$ADMIN/admin/v1/login")
-check "wrong password → USER_NOT_FOUND/INVALID_PASSWORD" '"reason":"' "$BAD"
+check "wrong password → INVALID_PASSWORD reason" '"reason":"INVALID_PASSWORD"' "$BAD"
+
+# 失败计数 ≥1 后：无验证码 → CAPTCHA_REQUIRED
+NEED=$(curl -s -X POST -H "Content-Type: application/json" \
+  -d "{\"grant_type\":0,\"username\":\"admin\",\"password\":\"$PASS_ENC\"}" "$ADMIN/admin/v1/login")
+check "progressive: captcha required after failure" '"reason":"CAPTCHA_REQUIRED"' "$NEED"
+
+# 错验证码值 → CAPTCHA_INVALID（不计数，但闸门不放行）
+BADCAP=$(curl -s -X POST -H "Content-Type: application/json" \
+  -H "X-Captcha-Id: $CID" -H "X-Captcha-Value: 000000" \
+  -d "{\"grant_type\":0,\"username\":\"admin\",\"password\":\"$PASS_ENC\"}" "$ADMIN/admin/v1/login")
+check "wrong captcha value → CAPTCHA_INVALID" '"reason":"CAPTCHA_INVALID"' "$BADCAP"
+
+# 正确验证码 → 登录成功（单次消费 + 计数清零）
+CAP=$(curl -s "$ADMIN/admin/v1/captcha"); CID=$(echo "$CAP" | python3 -c "import json,sys; print(json.load(sys.stdin)['captchaId'])"); ANS=$(redis_cmd GET "cms:captcha:$CID")
+RESP=$(curl -s -X POST -H "Content-Type: application/json" \
+  -H "X-Captcha-Id: $CID" -H "X-Captcha-Value: $ANS" \
+  -d "{\"grant_type\":0,\"username\":\"admin\",\"password\":\"$PASS_ENC\"}" "$ADMIN/admin/v1/login")
+check "login with captcha succeeds" '"token_type":"bearer"' "$RESP"
+
+# 错误密码再入 captcha 态后重放已消费的验证码 → 单次有效
+BAD=$(curl -s -X POST -H "Content-Type: application/json" \
+  -d '{"grant_type":0,"username":"admin","password":"AAAAAAAAAAAAAAAAAAAAAA=="}' "$ADMIN/admin/v1/login")
+REPLAY=$(curl -s -X POST -H "Content-Type: application/json" \
+  -H "X-Captcha-Id: $CID" -H "X-Captcha-Value: $ANS" \
+  -d "{\"grant_type\":0,\"username\":\"admin\",\"password\":\"$PASS_ENC\"}" "$ADMIN/admin/v1/login")
+check "captcha is single-use (replay → CAPTCHA_INVALID)" '"reason":"CAPTCHA_INVALID"' "$REPLAY"
+
+# 带验证码的凭据错误持续计数至阈值 5 → 防爆破锁定
+for i in 2 3 4 5; do
+  CAP=$(curl -s "$ADMIN/admin/v1/captcha"); CID=$(echo "$CAP" | python3 -c "import json,sys; print(json.load(sys.stdin)['captchaId'])"); ANS=$(redis_cmd GET "cms:captcha:$CID")
+  curl -s -X POST -H "Content-Type: application/json" -H "X-Captcha-Id: $CID" -H "X-Captcha-Value: $ANS" \
+    -d '{"grant_type":0,"username":"admin","password":"AAAAAAAAAAAAAAAAAAAAAA=="}' "$ADMIN/admin/v1/login" >/dev/null
+done
+LOCKED=$(curl -s -X POST -H "Content-Type: application/json" \
+  -d "{\"grant_type\":0,\"username\":\"admin\",\"password\":\"$PASS_ENC\"}" "$ADMIN/admin/v1/login")
+check "brute-force lockout after 5 failures" 'too many login failures' "$LOCKED"
+
+# 清失败计数解锁，供后续段落继续（锁定键与 app BFF 共享同一 keyspace）
+redis_cmd DEL "cms:login:fail:ip:127.0.0.1" >/dev/null
+redis_cmd DEL "cms:login:fail:user:admin" >/dev/null
 
 echo "── 2. 门控路由 ──────────────────────"
 R=$(curl -s -o /dev/null -w "%{http_code}" "$ADMIN/admin/v1/posts")
@@ -152,6 +184,22 @@ R=$(curl -s -X POST -H "Content-Type: application/json" -d "{\"grant_type\":0,\"
 APPTOKEN=$(echo "$R" | python3 -c "import json,sys; print(json.load(sys.stdin).get('access_token',''))" 2>/dev/null)
 check "app login (client=1, no captcha)" '"token_type":"bearer"' "$R"
 check "app token has 900s expiry" '"expires_in":"900"' "$R"
+
+# C 端渐进式验证码：取图端点免鉴权；声明 X-Captcha-Supported 的端失败一次即入 captcha 态
+R=$(curl -s "$APP/app/v1/captcha")
+check "app captcha generates (whitelist)" '"imageBase64":"data:image/png;base64,' "$R"
+R=$(curl -s -X POST -H "Content-Type: application/json" -d "{\"grant_type\":0,\"username\":\"e2e_app_$$\",\"password\":\"AAAAAAAAAAAAAAAAAAAAAA==\"}" "$APP/app/v1/login")
+check "app wrong password counts" '"reason":"INVALID_PASSWORD"' "$R"
+R=$(curl -s -X POST -H "Content-Type: application/json" -H "X-Captcha-Supported: 1" -d "{\"grant_type\":0,\"username\":\"e2e_app_$$\",\"password\":\"$APP_PW_ENC\"}" "$APP/app/v1/login")
+check "app progressive: captcha required after failure" '"reason":"CAPTCHA_REQUIRED"' "$R"
+ACAP=$(curl -s "$APP/app/v1/captcha"); ACID=$(echo "$ACAP" | python3 -c "import json,sys; print(json.load(sys.stdin)['captchaId'])"); AANS=$(redis_cmd GET "cms:captcha:$ACID")
+R=$(curl -s -X POST -H "Content-Type: application/json" -H "X-Captcha-Supported: 1" -H "X-Captcha-Id: $ACID" -H "X-Captcha-Value: $AANS" -d "{\"grant_type\":0,\"username\":\"e2e_app_$$\",\"password\":\"$APP_PW_ENC\"}" "$APP/app/v1/login")
+check "app login with captcha succeeds" '"token_type":"bearer"' "$R"
+# 未声明支持的端不受 captcha 闸门（锁定仍生效）
+R=$(curl -s -X POST -H "Content-Type: application/json" -d "{\"grant_type\":0,\"username\":\"e2e_app_$$\",\"password\":\"AAAAAAAAAAAAAAAAAAAAAA==\"}" "$APP/app/v1/login")
+check "app wrong password counts again" '"reason":"INVALID_PASSWORD"' "$R"
+R=$(curl -s -X POST -H "Content-Type: application/json" -d "{\"grant_type\":0,\"username\":\"e2e_app_$$\",\"password\":\"$APP_PW_ENC\"}" "$APP/app/v1/login")
+check "app undeclared client skips captcha gate" '"token_type":"bearer"' "$R"
 R=$(curl -s "$APP/app/v1/posts?page=1&pageSize=2")
 check "app posts list (public)" '"items"' "$R"
 R=$(curl -s "$APP/app/v1/categories?page=1&pageSize=2")

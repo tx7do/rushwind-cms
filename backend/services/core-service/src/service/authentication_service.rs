@@ -209,7 +209,7 @@ impl AuthenticationServiceImpl {
                     .map_err(db_status)?
                 {
                     Some(t) if t.status.as_deref() == Some("ON") => t.id,
-                    _ => return Err(bad("invalid tenant")),
+                    _ => return Err(invalid_tenant()),
                 }
             }
             _ => 0,
@@ -242,7 +242,7 @@ impl AuthenticationServiceImpl {
 
         let user = self.user_row(user_id).await?;
         if user.tenant_id.unwrap_or(0) != tenant_id {
-            return Err(bad("invalid tenant"));
+            return Err(invalid_tenant());
         }
         if user.status.as_deref() != Some("NORMAL") {
             return Err(forbidden("user is disabled"));
@@ -532,6 +532,13 @@ pub type ResponseResult<T> = Result<Response<T>, Status>;
 /// The envelope StatusError → the tonic Status (HTTP-ish status → gRPC
 /// code: 400 → InvalidArgument, 401/403 → Unauthenticated/PermissionDenied,
 /// 404 → NotFound, 409 → AlreadyExists, else Internal).
+///
+/// The resolved envelope rides the status details as JSON — the BFF face
+/// recovers the (status, reason) pair off it, so the error-table reasons
+/// (INVALID_PASSWORD / USER_NOT_FOUND / INVALID_TENANT …) survive the
+/// gRPC hop the same way the reference's kratos reasons do. Statuses
+/// built without the envelope (`Status::new`) carry no details and the
+/// BFF falls back to its coarse code mapping.
 fn to_tonic(e: rushwind_http_binding::envelope::StatusError) -> Status {
     let code = match e.status {
         400 => tonic::Code::InvalidArgument,
@@ -541,7 +548,23 @@ fn to_tonic(e: rushwind_http_binding::envelope::StatusError) -> Status {
         409 => tonic::Code::AlreadyExists,
         _ => tonic::Code::Internal,
     };
-    Status::new(code, e.message)
+    let details = serde_json::json!({
+        "status": e.status,
+        "reason": e.reason,
+        "message": e.message,
+    });
+    Status::with_details(code, e.message, details.to_string().into())
+}
+
+/// The tenant resolution failure with its error-table reason — the BFF's
+/// credential-failure classification reads the reason off the details
+/// (INVALID_TENANT counts as a credential miss, not infrastructure).
+fn invalid_tenant() -> Status {
+    to_tonic(rushwind_http_binding::envelope::StatusError::new(
+        400,
+        "INVALID_TENANT",
+        "invalid tenant",
+    ))
 }
 
 /// The DataScope enum name → value (`identity.service.v1.DataScope`).
@@ -555,4 +578,36 @@ fn data_scope_of(name: &str) -> Option<i32> {
         "SELECTED_UNITS" => DataScope::SelectedUnits as i32,
         _ => return None,
     })
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// The envelope rides the status details as JSON — the encode half
+    /// of the BFF's reason recovery (the login-failure classification).
+    #[test]
+    fn to_tonic_carries_the_envelope_in_details() {
+        let status = to_tonic(rushwind_http_binding::envelope::StatusError::new(
+            401,
+            "INVALID_PASSWORD",
+            "incorrect password",
+        ));
+        assert_eq!(status.code(), tonic::Code::Unauthenticated);
+        let v: serde_json::Value = serde_json::from_slice(status.details()).unwrap();
+        assert_eq!(v["status"], 401);
+        assert_eq!(v["reason"], "INVALID_PASSWORD");
+        assert_eq!(v["message"], "incorrect password");
+    }
+
+    /// The tenant miss carries its error-table reason — the BFF counts
+    /// it as a credential failure (not infrastructure).
+    #[test]
+    fn invalid_tenant_matches_the_reference_reason() {
+        let status = invalid_tenant();
+        assert_eq!(status.code(), tonic::Code::InvalidArgument);
+        let v: serde_json::Value = serde_json::from_slice(status.details()).unwrap();
+        assert_eq!(v["reason"], "INVALID_TENANT");
+        assert_eq!(v["status"], 400);
+    }
 }

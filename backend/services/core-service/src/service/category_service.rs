@@ -225,12 +225,9 @@ impl contentv1::category_service_server::CategoryService for CategoryService {
         request: Request<contentv1::CategoryTranslationExistsRequest>,
     ) -> Result<Response<contentv1::CategoryTranslationExistsResponse>, Status> {
         let req = request.into_inner();
-        let exists = repo::category_translation_exists(
-            &self.state.db,
-            req.category_id,
-            &req.language_code,
-        )
-        .await?;
+        let exists =
+            repo::category_translation_exists(&self.state.db, req.category_id, &req.language_code)
+                .await?;
         Ok(Response::new(
             contentv1::CategoryTranslationExistsResponse { exists },
         ))

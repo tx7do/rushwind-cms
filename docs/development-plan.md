@@ -88,6 +88,45 @@
   vs plan-builder 拒绝，本批 88 文件不含 i_user、crates/proto 零触碰，故障
   形态与 2026-11-10 前记录一致：401 错误路径全过、成功响应路径在 redact
   阶段 panic）；全绿仍待上游 redact 决策。
+- **2026-11-23 契约批次刷新**：接受上游 vintage 至 353c55eb（13 提交，纯增量，
+  buf breaking 先绿再同步）。契约面 3 文件：admin/app 两 error enum 各 +3 reason
+  （CAPTCHA_INVALID=5 / INVALID_TENANT=6 / CAPTCHA_REQUIRED=7），app 认证面
+  +1 免鉴权 RPC GenerateCaptcha（GET /app/v1/captcha）。领域行为随批移植
+  （渐进式验证码 + 登录防爆破锁定，镜像上游 6f873ce4/5bb63e11）：双 BFF 各落
+  login_rate_limiter（Redis Lua 原子"锁定判定→自增→首写 TTL"，ip+username 双维
+  键 cms:login:fail:*、5 次失败锁 15 分钟、Redis 故障 fail-open；双 BFF 共享
+  同一 keyspace，任一面爆破锁定双面）+ 渐进式验证码闸门（失败计数 ≥1 才强制，
+  缺头 CAPTCHA_REQUIRED、校验失败 CAPTCHA_INVALID 且显式销毁挑战防止 TTL 窗口
+  内重试；admin 恒受闸门、app 仅对声明 X-Captcha-Supported: 1 的端生效——
+  未适配端不受 captcha 闸但锁定闸无豁免，app 新增 GenerateCaptcha handler 与
+  captcha 模块）；凭据族失败（INVALID_PASSWORD/USER_NOT_FOUND/INVALID_TENANT）
+  才计数、验证码错误与基础设施错误不计、登录成功清零。为让 BFF 识别凭据族
+  失败，core→BFF 的错误 reason 首次跨 tonic 跳保真：core to_tonic 把解析后的
+  envelope（status/reason/message）以 JSON 载入 status details，双 BFF map_status
+  先经生成错误表锚定 'static reason 再回落粗映射；core 登录的租户未命中对齐
+  上游 reason 口径（INVALID_TENANT，原为无 reason 的 BAD_REQUEST）；双 BFF 登录
+  面顺带补齐会话元数据注入（client_ip/user_agent，在线会话列表数据源）。
+  白名单语料守卫双向更新（AUTH_FREE + corpus guard 各 +app GenerateCaptcha），
+  e2e 脚本验证码段重写为渐进式语义（免验证码直登→凭据失败计数→CAPTCHA_REQUIRED
+  →错值 CAPTCHA_INVALID→带码成功→重放单次有效→5 次带码失败锁定→清键解锁）
+  并新增 C 端段（app 取图免鉴权/声明豁免/未声明跳闸）。上游纯 Go 侧改动不
+  镜像：fdd559fe body 封顶（本仓 bind 层限额上批已带）、3e29d04b Go 休眠 bug
+  （ent broker/asynq 前缀对/反射字段名——Rust 无对应面）、d3773a3b 会话扫描
+  键解析（Rust 尚无在线会话扫描面，落实现时须带 ClientType 白名单）、
+  1c29410d/15c4dc8b/04e0be6c/8c93bbe8/a19080de 依赖切换与死代码清理、
+  353c55eb mailer FromName/端口钳位（Rust 尚无邮件发送面）、4a41e9c1 menu_repo
+  点路径掩码消毒（ent 特有，Rust 面不按掩码过滤）。前端五快照整树重同步
+  （admin 711 文件——上游管理后台第十批 + 登录页渐进式验证码；react 259 /
+  vue 299 / taro 189 / flutter 294），双清单重钉；品牌表无新增行（新增面落在
+  已登记豁免内）。验证：buf breaking 绿后同步、proto 门绿、fmt/clippy -D
+  warnings 全仓绿、workspace 116 测试绿（新增 12：限流器活 Redis 门控单测
+  ×4——Lua 锁定弧/空维跳过/无 DSN 自跳、map_status envelope 恢复单测 ×6、
+  core to_tonic 编码单测 ×2）、五快照门绿、core 空库引导过、限流器活 Redis
+  实测锁定弧全绿。E2E 维持既有瘫痪基线：13 PASS / 122 FAIL（脚本新增 10
+  断言）——全部失败仍落在登记在案的 redact REST 瘫痪（故障形态不变：认证
+  门 401 全过、认证门后的一切请求在 redact 阶段 panic 且 handler 未执行——
+  Redis 零痕迹实证）；新闸门的运行期验证由活 Redis 单测承担，e2e 全绿仍待
+  上游 redact 决策。
 
 ## 4. 分阶段计划
 
@@ -110,8 +149,9 @@
 
 ### Phase 1 — 认证与会话内核 ✅（已完成，见 §6）
 
-- [x] 登录链：验证码（rust-utils captcha + Redis）→ AES-CBC 口令解密 → bcrypt +
-      恒时假校验 → 失败归一 INVALID_PASSWORD → 登录限流
+- [x] 登录链：渐进式验证码（rust-utils captcha + Redis，失败计数 ≥1 才强制）→
+      AES-CBC 口令解密 → bcrypt + 恒时假校验 → 失败归一 INVALID_PASSWORD →
+      登录限流（ip+username 双维 5 次/15 分钟防爆破锁定，2026-11-23 批次）
 - [x] HS256 令牌对签发（claims 键名与前端令牌解析约定逐键一致）+ gwc: 键族
       落库 + refresh cookie 三态 + logout 吊销
 - [x] app 面：C 端注册（RegisterUser）+ 短期 token（15min，refresh 禁用语义）
@@ -190,8 +230,8 @@
 - Phase 0 / 1 / 2 ✅；Phase 3 批次 A / C / D 全落，B 缺 section，E 缺 OpenSearch 桥接；
   批次 F（2026-11 契约新增域）为当前最长尾——契约与 BFF 薄代理就位，core 答 UNIMPLEMENTED。
 - 面上规模：core gRPC 注册 42 领域服务；admin BFF 76 服务（薄代理 71 + 手写 5）、
-  app BFF 14 服务（薄代理 12）；白名单 admin 10 / app 27 操作；契约 209 文件 / 29 领域。
-- 门禁基线：cargo fmt / clippy -D warnings / workspace 101 tests / proto 契约门 /
+  app BFF 14 服务（薄代理 12）；白名单 admin 10 / app 28 操作；契约 209 文件 / 29 领域。
+- 门禁基线：cargo fmt / clippy -D warnings / workspace 116 tests / proto 契约门 /
   五前端快照门全绿（ubuntu + windows CI）；core 空库引导（schema + 种子 + 演示 + 菜单）过。
 - 已知问题：① i_user 的 redact.internal_method 与 gen-http plan-builder 的相容性未决
   （上游决策挂起）——BFF REST 面整体 500，e2e 套件在 HEAD 不可复跑（基线为 2026-09-24

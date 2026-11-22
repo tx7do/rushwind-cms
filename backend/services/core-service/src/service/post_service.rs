@@ -382,8 +382,7 @@ impl contentv1::post_service_server::PostService for PostService {
     ) -> Result<Response<contentv1::PostTranslationExistsResponse>, Status> {
         let req = request.into_inner();
         let exists =
-            repo::post_translation_exists(&self.state.db, req.post_id, &req.language_code)
-                .await?;
+            repo::post_translation_exists(&self.state.db, req.post_id, &req.language_code).await?;
         Ok(Response::new(contentv1::PostTranslationExistsResponse {
             exists,
         }))
