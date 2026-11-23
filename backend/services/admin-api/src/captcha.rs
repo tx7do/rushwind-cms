@@ -123,3 +123,100 @@ fn render_png_base64() -> Result<(String, String), String> {
         .ok_or_else(|| "captcha render".to_string())?;
     Ok((b64, answer))
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use base64::Engine as _;
+
+    /// Live-Redis pin for the challenge lifecycle. Skips unless
+    /// `RUSHWIND_TEST_REDIS_URL` carries a DSN — CI runs without one and
+    /// passes vacuously.
+    async fn redis_of() -> Option<ConnectionManager> {
+        let url = std::env::var("RUSHWIND_TEST_REDIS_URL").ok()?;
+        let client = redis::Client::open(url).ok()?;
+        client.get_connection_manager().await.ok()
+    }
+
+    #[test]
+    fn captcha_key_is_namespaced_under_cms() {
+        assert_eq!(captcha_key("abc"), "cms:captcha:abc");
+    }
+
+    #[test]
+    fn render_answers_six_source_glyphs_into_a_240x96_png() {
+        // The draw is random (layout retries, the hue) — a handful of
+        // renders pins the invariants every draw must keep.
+        for _ in 0..8 {
+            let (b64, answer) = render_png_base64().unwrap();
+            assert_eq!(answer.chars().count(), 6, "{answer}");
+            assert!(
+                answer.chars().all(|c| CAPTCHA_SOURCE.contains(c)),
+                "{answer}: a glyph outside the source alphabet"
+            );
+            assert!(b64.starts_with("iVBORw0KGgo"), "not a PNG stream: {b64}");
+            let png = base64::engine::general_purpose::STANDARD
+                .decode(&b64)
+                .unwrap();
+            // IHDR sits right behind the signature: the 240x96 crop the
+            // front-end renders.
+            assert_eq!(&png[12..16], b"IHDR");
+            let width = u32::from_be_bytes(png[16..20].try_into().unwrap());
+            let height = u32::from_be_bytes(png[20..24].try_into().unwrap());
+            assert_eq!((width, height), (240, 96));
+        }
+    }
+
+    #[tokio::test]
+    async fn challenge_is_single_use_case_sensitive_and_explicitly_destroyable() {
+        let Some(redis) = redis_of().await else {
+            eprintln!("skipped: RUSHWIND_TEST_REDIS_URL not set");
+            return;
+        };
+        let mut conn = redis.clone();
+        // Empty inputs never reach the store.
+        assert!(!verify(&redis, "", "").await);
+        assert!(!verify(&redis, "some-id", "").await);
+
+        let (id, image, answer) = generate(&redis).await.unwrap();
+        assert!(
+            image.starts_with("data:image/png;base64,iVBORw0KGgo"),
+            "{image}"
+        );
+        // The row rides under the documented key with the 10-minute TTL.
+        let stored: String = conn.get(captcha_key(&id)).await.unwrap();
+        assert_eq!(stored, answer);
+        let ttl: i64 = conn.ttl(captcha_key(&id)).await.unwrap();
+        assert!(
+            (CAPTCHA_TTL_SECS as i64 - 30..=CAPTCHA_TTL_SECS as i64).contains(&ttl),
+            "ttl {ttl}"
+        );
+        // The comparison is exact — another case of the same answer misses.
+        if answer.chars().any(|c| c.is_ascii_alphabetic()) {
+            assert!(!verify(&redis, &id, &answer.to_lowercase()).await);
+        }
+        // The match consumes the row: a replay fails.
+        assert!(verify(&redis, &id, &answer).await);
+        assert!(!verify(&redis, &id, &answer).await);
+        // Unknown ids fail; an empty or unknown destroy is a no-op.
+        assert!(!verify(&redis, "no-such-challenge", "ABCDEF").await);
+        destroy(&redis, "").await;
+        destroy(&redis, "no-such-challenge").await;
+
+        // A mismatch fails and consumes nothing ...
+        let (id, _, answer) = generate(&redis).await.unwrap();
+        let wrong: String = answer
+            .chars()
+            .map(|c| if c == 'A' { 'B' } else { 'A' })
+            .collect();
+        assert_ne!(wrong, answer);
+        assert!(!verify(&redis, &id, &wrong).await);
+        let present: i64 = conn.exists(captcha_key(&id)).await.unwrap();
+        assert_eq!(present, 1);
+        // ... so the failed gate's companion destroys it outright.
+        destroy(&redis, &id).await;
+        let present: i64 = conn.exists(captcha_key(&id)).await.unwrap();
+        assert_eq!(present, 0);
+        assert!(!verify(&redis, &id, &answer).await);
+    }
+}

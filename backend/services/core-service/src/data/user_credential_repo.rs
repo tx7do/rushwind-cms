@@ -464,3 +464,128 @@ pub async fn delete_user_credentials(db: &DatabaseConnection, id: i64) -> Status
         .map_err(db_status)?;
     Ok(())
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn enum_names_collapse_unknown_numbers_onto_the_safe_defaults() {
+        use proto::proto::authentication::service::v1::user_credential::{
+            CredentialType, IdentityType, Status,
+        };
+        // Every declared number reads back through its own name ...
+        for v in 0..=1000 {
+            if let Ok(e) = IdentityType::try_from(v) {
+                assert_eq!(
+                    identity_type_name(v).as_deref(),
+                    Some(e.as_str_name()),
+                    "{v}"
+                );
+            }
+            if let Ok(e) = CredentialType::try_from(v) {
+                assert_eq!(
+                    credential_type_name(v).as_deref(),
+                    Some(e.as_str_name()),
+                    "{v}"
+                );
+            }
+            if let Ok(e) = Status::try_from(v) {
+                assert_eq!(status_name(v).as_deref(), Some(e.as_str_name()), "{v}");
+            }
+        }
+        // ... and an unknown number never answers None: each family folds
+        // onto its own default (the reference's enum converter).
+        for v in [-100, -1, 7, 999] {
+            assert_eq!(identity_type_name(v).as_deref(), Some("USERNAME"), "{v}");
+            assert_eq!(
+                credential_type_name(v).as_deref(),
+                Some("TYPE_UNSPECIFIED"),
+                "{v}"
+            );
+            assert_eq!(status_name(v).as_deref(), Some("DISABLED"), "{v}");
+        }
+    }
+
+    #[test]
+    fn prepare_credential_hashes_only_the_password_family() {
+        let hashed = prepare_credential(Some("PASSWORD_HASH"), "s3cret").unwrap();
+        assert!(hashed.starts_with("$2"), "{hashed}");
+        assert_ne!(
+            hashed, "s3cret",
+            "the plaintext never rides the stored form"
+        );
+        // Every other type — and an absent one — stores the value verbatim:
+        // the caller's layer owns them (API keys, OAuth tokens).
+        for kind in [None, Some("API_KEY"), Some(""), Some("password_hash")] {
+            assert_eq!(
+                prepare_credential(kind, "raw-value").unwrap(),
+                "raw-value",
+                "{kind:?}"
+            );
+        }
+    }
+
+    #[test]
+    fn verify_credential_splits_hashed_and_verbatim_rows() {
+        // Verbatim rows compare directly — API keys and the like.
+        assert!(verify_credential(Some("API_KEY"), "k-123", "k-123"));
+        assert!(!verify_credential(Some("API_KEY"), "k-123", "k-124"));
+        assert!(verify_credential(None, "k-123", "k-123"));
+        // An empty presentation never verifies — not even against an empty
+        // row, in either branch.
+        assert!(!verify_credential(Some("API_KEY"), "", ""));
+        assert!(!verify_credential(None, "", ""));
+        assert!(!verify_credential(Some("PASSWORD_HASH"), "", "not-a-hash"));
+        // The hashed branch rides bcrypt (the reference dummy is a live
+        // hash of some other password).
+        assert!(!verify_credential(
+            Some("PASSWORD_HASH"),
+            "definitely-not-the-password",
+            store::crypto::DUMMY_PASSWORD_HASH
+        ));
+    }
+
+    #[test]
+    fn extra_info_keeps_non_json_text_verbatim() {
+        assert_eq!(extra_info_json(&None), None);
+        assert_eq!(
+            extra_info_json(&Some(r#"{"k":"v"}"#.into())),
+            Some(serde_json::json!({"k": "v"}))
+        );
+        assert_eq!(
+            extra_info_json(&Some("plain text".into())),
+            Some(serde_json::Value::String("plain text".into()))
+        );
+        // The empty string is not JSON — it stays the empty string.
+        assert_eq!(
+            extra_info_json(&Some(String::new())),
+            Some(serde_json::Value::String(String::new()))
+        );
+    }
+
+    #[test]
+    fn in_mask_accepts_the_snake_and_camel_spellings() {
+        let mask = |paths: &[&str]| pbjson_types::FieldMask {
+            paths: paths.iter().map(|p| p.to_string()).collect(),
+        };
+        // An absent mask is the full update.
+        assert!(in_mask(None, "anything"));
+
+        // The field's own spelling and its camelCase path both match.
+        let m = mask(&["identityType", "status"]);
+        assert!(in_mask(Some(&m), "identity_type"));
+        assert!(in_mask(Some(&m), "identityType"));
+        assert!(in_mask(Some(&m), "status"));
+        assert!(!in_mask(Some(&m), "credential"));
+
+        // Segments camel-case one by one — and only that exact casing matches.
+        let m = mask(&["activateTokenExpiresAt"]);
+        assert!(in_mask(Some(&m), "activate_token_expires_at"));
+        let m = mask(&["activateTokenExpiresat"]);
+        assert!(!in_mask(Some(&m), "activate_token_expires_at"));
+
+        // An explicitly empty mask masks everything out.
+        assert!(!in_mask(Some(&mask(&[])), "status"));
+    }
+}

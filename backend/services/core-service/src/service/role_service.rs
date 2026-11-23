@@ -730,3 +730,116 @@ impl permissionv1::role_service_server::RoleService for RoleService {
         }))
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use chrono::TimeZone as _;
+
+    /// A role row under tenant 3, bound to the given parent.
+    fn role(parent_id: Option<i64>) -> sys_roles::Model {
+        sys_roles::Model {
+            id: 11,
+            created_at: None,
+            updated_at: None,
+            deleted_at: None,
+            created_by: None,
+            updated_by: None,
+            deleted_by: None,
+            remark: None,
+            description: Some("d".into()),
+            sort_order: Some(7),
+            tenant_id: Some(3),
+            status: "ON".into(),
+            name: Some("编辑".into()),
+            code: Some("editor".into()),
+            is_protected: true,
+            r#type: "SYSTEM".into(),
+            parent_id,
+        }
+    }
+
+    #[test]
+    fn role_proto_maps_the_row_with_the_parent_backfill() {
+        let p = role_proto(role(Some(4)), Some("父角色".into()));
+        assert_eq!(p.id, Some(11));
+        assert_eq!(p.tenant_id, Some(3));
+        assert_eq!(p.name.as_deref(), Some("编辑"));
+        assert_eq!(p.code.as_deref(), Some("editor"));
+        assert_eq!(p.description.as_deref(), Some("d"));
+        assert_eq!(p.sort_order, Some(7));
+        assert_eq!(p.is_protected, Some(true));
+        assert_eq!(p.parent_id, Some(4));
+        assert_eq!(p.parent_name.as_deref(), Some("父角色"));
+        assert!(p.created_at.is_none());
+        // The discriminants every role reads as, whatever the columns carry.
+        assert_eq!(p.r#type, Some(1));
+        assert_eq!(p.status, Some(1));
+
+        // A root role: no parent, and the name backfill is simply absent.
+        let p = role_proto(role(None), None);
+        assert_eq!(p.parent_id, None);
+        assert_eq!(p.parent_name, None);
+    }
+
+    #[test]
+    fn user_role_proto_maps_the_status_names_onto_the_proto_ordinals() {
+        fn binding(status: &str) -> sys_user_roles::Model {
+            sys_user_roles::Model {
+                id: 1,
+                created_at: None,
+                updated_at: None,
+                deleted_at: None,
+                created_by: None,
+                updated_by: None,
+                deleted_by: None,
+                tenant_id: Some(2),
+                user_id: 9,
+                role_id: 4,
+                start_at: None,
+                end_at: None,
+                assigned_at: None,
+                assigned_by: Some(77),
+                is_primary: true,
+                status: status.into(),
+            }
+        }
+        // Each stored label lands on the proto value of the same name.
+        for name in ["PENDING", "ACTIVE", "DISABLED", "EXPIRED"] {
+            let p = user_role_proto(binding(name));
+            assert_eq!(
+                p.status,
+                permissionv1::user_role::Status::from_str_name(name).map(|v| v as i32),
+                "{name}"
+            );
+        }
+        // An unknown label reads as the unspecified ordinal.
+        assert_eq!(user_role_proto(binding("weird")).status, Some(0));
+
+        let p = user_role_proto(binding("ACTIVE"));
+        assert_eq!(p.id, Some(1));
+        assert_eq!(p.user_id, Some(9));
+        assert_eq!(p.role_id, Some(4));
+        assert_eq!(p.tenant_id, Some(2));
+        assert_eq!(p.is_primary, Some(true));
+        assert_eq!(p.assigned_by, Some(77));
+        assert!(p.assigned_at.is_none());
+        assert!(p.start_at.is_none());
+        assert!(p.end_at.is_none());
+
+        // The three time columns ride through the timestamp bridge.
+        let at = chrono::Utc
+            .with_ymd_and_hms(2026, 11, 23, 8, 0, 0)
+            .unwrap()
+            .fixed_offset();
+        let p = user_role_proto(sys_user_roles::Model {
+            start_at: Some(at),
+            end_at: Some(at),
+            assigned_at: Some(at),
+            ..binding("ACTIVE")
+        });
+        assert_eq!(p.assigned_at, ts_to_proto(at));
+        assert_eq!(p.start_at, ts_to_proto(at));
+        assert_eq!(p.end_at, ts_to_proto(at));
+    }
+}

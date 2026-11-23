@@ -210,3 +210,93 @@ impl sitev1::site_service_server::SiteService for SiteService {
     }
 }
 use crate::data::site_repo;
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn link_and_location_bridges_round_trip_the_varchar_names() {
+        for (name, num) in [
+            ("URL", 1),
+            ("PAGE", 2),
+            ("POST", 3),
+            ("CATEGORY", 4),
+            ("TAG", 5),
+        ] {
+            assert_eq!(link_type_num(name), Some(num), "{name}");
+            assert_eq!(link_type_name(num).as_deref(), Some(name), "{num}");
+        }
+        for (name, num) in [("HEADER", 1), ("FOOTER", 2), ("SIDEBAR", 3)] {
+            assert_eq!(location_num(name), Some(num), "{name}");
+            assert_eq!(location_name(num).as_deref(), Some(name), "{num}");
+        }
+        // The names are the enum-value spellings — case-sensitive — and
+        // the unspecified ordinal has no storage name.
+        for unknown in ["url", "Url", ""] {
+            assert_eq!(link_type_num(unknown), None, "{unknown:?}");
+            assert_eq!(location_num(unknown), None, "{unknown:?}");
+        }
+        for v in [-1, 0, 6, 99] {
+            assert_eq!(link_type_name(v), None, "{v}");
+        }
+        for v in [-1, 0, 4, 99] {
+            assert_eq!(location_name(v), None, "{v}");
+        }
+    }
+
+    /// A site row; `status` is the column's raw varchar.
+    fn site(alternate_domains: Option<sea_orm::JsonValue>, status: Option<&str>) -> sites::Model {
+        sites::Model {
+            id: 5,
+            created_at: None,
+            updated_at: None,
+            deleted_at: None,
+            created_by: None,
+            updated_by: None,
+            deleted_by: None,
+            tenant_id: Some(2),
+            name: Some("主站".into()),
+            slug: Some("main".into()),
+            domain: Some("example.com".into()),
+            alternate_domains,
+            is_default: Some(true),
+            status: status.map(str::to_string),
+            default_locale: Some("zh-CN".into()),
+            template: None,
+            theme: None,
+        }
+    }
+
+    #[test]
+    fn site_proto_reads_the_alternate_domain_list() {
+        let p = site_proto(site(
+            Some(serde_json::json!(["a.com", "b.com"])),
+            Some("ON"),
+        ));
+        assert_eq!(p.id, Some(5));
+        assert_eq!(p.tenant_id, Some(2));
+        assert_eq!(p.name.as_deref(), Some("主站"));
+        assert_eq!(p.slug.as_deref(), Some("main"));
+        assert_eq!(p.domain.as_deref(), Some("example.com"));
+        assert_eq!(p.alternate_domains, ["a.com", "b.com"]);
+        assert_eq!(p.is_default, Some(true));
+        assert_eq!(p.default_locale.as_deref(), Some("zh-CN"));
+        // The status is presence-based: a set column reads as the active
+        // ordinal, an absent one as none.
+        assert_eq!(p.status, Some(1));
+
+        // An absent or malformed list reads as empty — never a failure.
+        assert!(site_proto(site(None, None)).alternate_domains.is_empty());
+        assert!(site_proto(site(Some(serde_json::json!("a.com")), None))
+            .alternate_domains
+            .is_empty());
+        assert!(site_proto(site(Some(serde_json::json!([1, 2])), None))
+            .alternate_domains
+            .is_empty());
+        assert!(site_proto(site(Some(serde_json::json!(null)), None))
+            .alternate_domains
+            .is_empty());
+        assert_eq!(site_proto(site(None, None)).status, None);
+    }
+}

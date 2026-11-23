@@ -38,3 +38,6 @@ pbjson-types = { workspace = true }
 async-trait = { workspace = true }
 rand = "0.9"
 captcha = "0.0.9"
+
+[dev-dependencies]
+base64 = "0.22"

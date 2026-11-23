@@ -156,6 +156,7 @@ dependencies = [
  "async-trait",
  "auth",
  "axum",
+ "base64 0.22.1",
  "captcha",
  "chrono",
  "futures-util",

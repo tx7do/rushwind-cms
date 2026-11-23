@@ -494,4 +494,124 @@ mod tests {
             assert_eq!(task_type_num(name), None, "{name}");
         }
     }
+
+    // ── the JSON bridges ─────────────────────────────────────────────
+
+    #[test]
+    fn task_option_round_trips_through_the_golden_json() {
+        let duration = |seconds: i64, nanos: i32| pbjson_types::Duration { seconds, nanos };
+        let stamp = |seconds: i64, nanos: i32| pbjson_types::Timestamp { seconds, nanos };
+        let option = taskv1::TaskOption {
+            max_retry: Some(3),
+            timeout: Some(duration(30, 500_000_000)),
+            deadline: Some(stamp(1_700_000_000, 1)),
+            process_in: Some(duration(5, 0)),
+            process_at: Some(stamp(1_700_000_360, 0)),
+            unique_ttl: Some(duration(60, 0)),
+            retention: Some(duration(3_600, 0)),
+            group: Some("backup".into()),
+            task_id: Some("job-1".into()),
+        };
+        assert_eq!(
+            task_option_to_json(&option),
+            serde_json::json!({
+                "maxRetry": 3,
+                "timeout": {"seconds": 30, "nanos": 500000000},
+                "deadline": {"seconds": 1700000000, "nanos": 1},
+                "processIn": {"seconds": 5, "nanos": 0},
+                "processAt": {"seconds": 1700000360, "nanos": 0},
+                "uniqueTtl": {"seconds": 60, "nanos": 0},
+                "retention": {"seconds": 3600, "nanos": 0},
+                "group": "backup",
+                "taskId": "job-1"
+            })
+        );
+        assert_eq!(
+            task_option_from_json(task_option_to_json(&option)),
+            Some(option)
+        );
+    }
+
+    #[test]
+    fn task_option_omits_absent_members_and_drops_malformed_ones() {
+        assert_eq!(
+            task_option_to_json(&taskv1::TaskOption::default()),
+            serde_json::json!({})
+        );
+        // A non-object column is not an option.
+        for stored in [
+            serde_json::json!("x"),
+            serde_json::json!(null),
+            serde_json::json!([]),
+        ] {
+            assert!(task_option_from_json(stored.clone()).is_none(), "{stored}");
+        }
+        // A nested value without `seconds` drops out whole; `nanos`
+        // defaults to 0.
+        let back = task_option_from_json(serde_json::json!({
+            "timeout": {"nanos": 5},
+            "deadline": {"seconds": 7},
+            "maxRetry": -1,
+            "group": 7
+        }))
+        .unwrap();
+        assert_eq!(back.timeout, None);
+        assert_eq!(
+            back.deadline,
+            Some(pbjson_types::Timestamp {
+                seconds: 7,
+                nanos: 0
+            })
+        );
+        assert_eq!(back.max_retry, None);
+        assert_eq!(back.group, None);
+        // An unknown key is ignored rather than failing the whole option.
+        let back =
+            task_option_from_json(serde_json::json!({"maxRetry": 4, "unknown": true})).unwrap();
+        assert_eq!(back.max_retry, Some(4));
+    }
+
+    #[test]
+    fn task_payload_keeps_non_json_text_verbatim() {
+        assert_eq!(task_payload_json(r#"{"a":1}"#), serde_json::json!({"a": 1}));
+        assert_eq!(task_payload_json("plain"), serde_json::json!("plain"));
+        assert_eq!(task_payload_json(""), serde_json::json!(""));
+        assert_eq!(task_payload_json("{nope"), serde_json::json!("{nope"));
+    }
+
+    // ── validation ───────────────────────────────────────────────────
+
+    #[test]
+    fn validation_requires_a_type_name_and_a_cron_for_periodic_tasks() {
+        let periodic = taskv1::task::Type::Periodic as i32;
+        let task = |r#type: Option<i32>, type_name: &str, cron_spec: &str| taskv1::Task {
+            r#type,
+            type_name: Some(type_name.into()),
+            cron_spec: Some(cron_spec.into()),
+            ..Default::default()
+        };
+        assert!(validate_task_fields(&task(Some(periodic), "backup", "0 0 * * *")).is_ok());
+        // A delay task needs no cron.
+        let delay = taskv1::task::Type::Delay as i32;
+        assert!(validate_task_fields(&task(Some(delay), "cleanup", "")).is_ok());
+        // A periodic task without a cron is refused ...
+        let err = validate_task_fields(&task(Some(periodic), "backup", "")).unwrap_err();
+        assert_eq!(err.code(), tonic::Code::InvalidArgument);
+        assert_eq!(err.message(), "cron_spec is required for periodic task");
+        // ... and an absent type reads as PERIODIC (the zero ordinal), so
+        // it needs one too.
+        assert!(validate_task_fields(&task(None, "backup", "")).is_err());
+        assert!(validate_task_fields(&task(None, "backup", "0 0 * * *")).is_ok());
+        // The type name is required for every type, and the check leads.
+        let wait_result = taskv1::task::Type::WaitResult as i32;
+        let err = validate_task_fields(&task(Some(wait_result), "", "")).unwrap_err();
+        assert_eq!(err.message(), "type_name is required");
+        let err = validate_task_fields(&task(Some(periodic), "", "")).unwrap_err();
+        assert_eq!(err.message(), "type_name is required");
+        let err = validate_task_fields(&taskv1::Task::default()).unwrap_err();
+        assert_eq!(
+            (err.code(), err.message()),
+            (tonic::Code::InvalidArgument, "type_name is required")
+        );
+    }
 }

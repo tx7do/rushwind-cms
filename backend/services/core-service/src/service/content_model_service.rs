@@ -363,3 +363,236 @@ impl contentv1::content_model_service_server::ContentModelService for ContentMod
     }
 }
 use crate::data::content_model_repo;
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::collections::HashMap;
+
+    // ── the enum / JSON bridges ───────────────────────────────────────
+
+    #[test]
+    fn field_type_bridges_the_varchar_column() {
+        // Every declared member round-trips through its storage name.
+        for v in 0..=7 {
+            let name = field_type_name(v).unwrap_or_else(|| panic!("{v} is a declared member"));
+            assert_eq!(field_type_enum(&name), Some(v), "{name}");
+        }
+        // The zero ordinal is a real member (TEXT), not "absent".
+        assert_eq!(field_type_name(0).as_deref(), Some("FIELD_TYPE_TEXT"));
+        // Undeclared ordinals and foreign names answer None — the names
+        // are case-sensitive.
+        for v in [-1, 8, 99] {
+            assert_eq!(field_type_name(v), None, "{v}");
+        }
+        for name in ["TEXT", "field_type_text", ""] {
+            assert_eq!(field_type_enum(name), None, "{name:?}");
+        }
+    }
+
+    #[test]
+    fn options_keep_the_string_values_only() {
+        let stored = serde_json::json!({
+            "a": "1", "b": 2, "c": true, "d": null, "e": ["x"], "f": {"g": "h"}
+        });
+        assert_eq!(
+            json_to_options(&stored),
+            HashMap::from([("a".to_string(), "1".to_string())])
+        );
+        // A non-object column reads as no options.
+        for stored in [
+            serde_json::json!(["a"]),
+            serde_json::json!("x"),
+            serde_json::json!(null),
+        ] {
+            assert!(json_to_options(&stored).is_empty(), "{stored}");
+        }
+    }
+
+    #[test]
+    fn relation_config_round_trips_the_golden_json() {
+        let stored = serde_json::json!({
+            "target_entity_type": "post",
+            "allow_cross_tenant": true,
+            "filter_category_id": 12
+        });
+        let config = relation_config_from_json(&stored).unwrap();
+        assert_eq!(config.target_entity_type.as_deref(), Some("post"));
+        assert_eq!(config.allow_cross_tenant, Some(true));
+        assert_eq!(config.filter_category_id, Some(12));
+        assert_eq!(relation_config_to_json(&config), stored);
+
+        // filter_category_id carries the omitempty: a zero is not written
+        // back, and so reads back as absent.
+        let zeroed = contentv1::RelationConfig {
+            target_entity_type: Some("page".into()),
+            allow_cross_tenant: Some(false),
+            filter_category_id: Some(0),
+        };
+        assert_eq!(
+            relation_config_to_json(&zeroed),
+            serde_json::json!({"target_entity_type": "page", "allow_cross_tenant": false})
+        );
+        assert_eq!(
+            relation_config_from_json(&relation_config_to_json(&zeroed)).unwrap(),
+            contentv1::RelationConfig {
+                filter_category_id: None,
+                ..zeroed
+            }
+        );
+        // The other two keys always serialize — absent ones as their zero
+        // values.
+        assert_eq!(
+            relation_config_to_json(&contentv1::RelationConfig::default()),
+            serde_json::json!({"target_entity_type": "", "allow_cross_tenant": false})
+        );
+    }
+
+    #[test]
+    fn relation_config_reads_its_members_defensively() {
+        // Not an object → not a config.
+        for stored in [
+            serde_json::json!("post"),
+            serde_json::json!(["post"]),
+            serde_json::json!(null),
+        ] {
+            assert!(relation_config_from_json(&stored).is_none(), "{stored}");
+        }
+        // A member of the wrong JSON type reads as absent.
+        let config = relation_config_from_json(&serde_json::json!({
+            "target_entity_type": 7,
+            "allow_cross_tenant": "yes",
+            "filter_category_id": "12"
+        }))
+        .unwrap();
+        assert_eq!(config, contentv1::RelationConfig::default());
+    }
+
+    // ── the row → proto mapping ──────────────────────────────────────
+
+    /// A field-definition row with every optional column absent.
+    fn empty_row() -> field_definitions::Model {
+        field_definitions::Model {
+            id: 0,
+            created_at: None,
+            updated_at: None,
+            deleted_at: None,
+            created_by: None,
+            updated_by: None,
+            deleted_by: None,
+            sort_order: None,
+            tenant_id: None,
+            content_model_id: None,
+            name: None,
+            r#type: None,
+            label: None,
+            description: None,
+            placeholder: None,
+            is_required: None,
+            validation_regex: None,
+            options: None,
+            relation_config: None,
+        }
+    }
+
+    #[test]
+    fn field_definition_proto_maps_the_row() {
+        let row = field_definitions::Model {
+            id: 3,
+            created_by: Some(1),
+            sort_order: Some(4),
+            tenant_id: Some(2),
+            content_model_id: Some(7),
+            name: Some("title".into()),
+            r#type: Some("FIELD_TYPE_TEXT".into()),
+            label: Some("Title".into()),
+            placeholder: Some("Title…".into()),
+            is_required: Some(true),
+            validation_regex: Some("^.{1,80}$".into()),
+            options: Some(serde_json::json!({"max": "80"})),
+            relation_config: Some(serde_json::json!({
+                "target_entity_type": "post",
+                "allow_cross_tenant": true
+            })),
+            ..empty_row()
+        };
+        let translation = field_definition_translations::Model {
+            id: 31,
+            created_at: None,
+            updated_at: None,
+            deleted_at: None,
+            created_by: None,
+            updated_by: None,
+            deleted_by: None,
+            field_definition_id: Some(3),
+            language_code: Some("zh-CN".into()),
+            label: Some("标题".into()),
+            description: Some("d".into()),
+            placeholder: Some("p".into()),
+        };
+        let p = field_definition_proto(row, vec![translation]);
+        assert_eq!(p.id, Some(3));
+        assert_eq!(p.content_model_id, Some(7));
+        assert_eq!(p.name.as_deref(), Some("title"));
+        assert_eq!(p.r#type, field_type_enum("FIELD_TYPE_TEXT"));
+        assert_eq!(p.label.as_deref(), Some("Title"));
+        assert_eq!(p.description, None);
+        assert_eq!(p.placeholder.as_deref(), Some("Title…"));
+        assert_eq!(p.is_required, Some(true));
+        assert_eq!(p.validation_regex.as_deref(), Some("^.{1,80}$"));
+        assert_eq!(
+            p.options,
+            HashMap::from([("max".to_string(), "80".to_string())])
+        );
+        let relation = p.relation_config.unwrap();
+        assert_eq!(relation.target_entity_type.as_deref(), Some("post"));
+        assert_eq!(relation.allow_cross_tenant, Some(true));
+        assert_eq!(p.sort_order, Some(4));
+        assert_eq!(p.created_by, Some(1));
+        assert_eq!(p.translations.len(), 1);
+        assert_eq!(p.translations[0].id, Some(31));
+        assert_eq!(p.translations[0].language_code.as_deref(), Some("zh-CN"));
+        assert_eq!(p.translations[0].label.as_deref(), Some("标题"));
+
+        // An unknown stored type and absent JSON columns read as absent —
+        // never as the zero member or an empty object.
+        let p = field_definition_proto(
+            field_definitions::Model {
+                id: 4,
+                r#type: Some("WAT".into()),
+                ..empty_row()
+            },
+            Vec::new(),
+        );
+        assert_eq!(p.r#type, None);
+        assert!(p.options.is_empty());
+        assert!(p.relation_config.is_none());
+        assert!(p.translations.is_empty());
+        assert_eq!(p.sort_order, None);
+        assert_eq!(p.is_required, None);
+    }
+
+    #[test]
+    fn content_model_proto_maps_the_row() {
+        let p = content_model_proto(content_models::Model {
+            id: 7,
+            created_at: None,
+            updated_at: None,
+            deleted_at: None,
+            created_by: Some(1),
+            updated_by: None,
+            deleted_by: None,
+            sort_order: Some(3),
+            tenant_id: Some(2),
+            name: Some("文章".into()),
+            code: Some("post".into()),
+            description: Some("d".into()),
+        });
+        assert_eq!(p.id, Some(7));
+        assert_eq!(p.name.as_deref(), Some("文章"));
+        assert_eq!(p.code.as_deref(), Some("post"));
+        assert_eq!(p.description.as_deref(), Some("d"));
+        assert_eq!(p.sort_order, Some(3));
+        assert!(p.created_at.is_none());
+    }
+}

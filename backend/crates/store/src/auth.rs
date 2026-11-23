@@ -488,3 +488,178 @@ pub async fn authority_of(
         role_codes,
     })
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use serde_json::json;
+
+    fn claims_of(value: &serde_json::Value) -> serde_json::Map<String, serde_json::Value> {
+        value.as_object().cloned().expect("an object")
+    }
+
+    /// The full claim bag the core mints (the access-token claim set).
+    fn full_claims() -> serde_json::Map<String, serde_json::Value> {
+        claims_of(&json!({
+            "sub": "admin",
+            "uid": 7,
+            "tid": 3,
+            "iat": 1_700_000_000,
+            "exp": 1_700_000_900,
+            "jti": "0193a1b2-jti",
+            "roc": ["platform:admin", "editor"],
+            "did": "device-1",
+            "cid": "web-admin",
+            "ds": "ALL",
+            "ouid": 42,
+        }))
+    }
+
+    // ── from_claims ──────────────────────────────────────────────────
+
+    #[test]
+    fn from_claims_reads_the_full_bag() {
+        let payload = UserTokenPayload::from_claims(&full_claims()).unwrap();
+        assert_eq!(payload.user_id, 7);
+        assert_eq!(payload.tenant_id, 3);
+        assert_eq!(payload.username, "admin");
+        assert_eq!(payload.jti, "0193a1b2-jti");
+        assert_eq!(payload.roles, ["platform:admin", "editor"]);
+        assert_eq!(payload.org_unit_id, Some(42));
+        assert_eq!(payload.data_scope.as_deref(), Some("ALL"));
+        assert_eq!(payload.client_id.as_deref(), Some("web-admin"));
+        assert_eq!(payload.device_id.as_deref(), Some("device-1"));
+    }
+
+    #[test]
+    fn from_claims_defaults_everything_but_the_identity() {
+        // iat/exp are the envelope's business — the payload never reads them.
+        let payload = UserTokenPayload::from_claims(&claims_of(&json!({ "uid": 1 }))).unwrap();
+        assert_eq!(payload.tenant_id, 0);
+        assert!(payload.username.is_empty());
+        assert!(payload.jti.is_empty());
+        assert!(payload.roles.is_empty());
+        assert_eq!(payload.org_unit_id, None);
+        assert_eq!(payload.data_scope, None);
+        assert_eq!(payload.client_id, None);
+        assert_eq!(payload.device_id, None);
+    }
+
+    #[test]
+    fn from_claims_requires_a_positive_integral_uid() {
+        // Absent, zero, negative, or a type the signed-only ids never ride
+        // as (a protojson-style string, a float, null) — all refuse.
+        for value in [
+            json!({}),
+            json!({ "sub": "admin", "tid": 3 }),
+            json!({ "uid": 0 }),
+            json!({ "uid": -7 }),
+            json!({ "uid": "7" }),
+            json!({ "uid": 7.5 }),
+            json!({ "uid": null }),
+            // Above the i64 range: the claim_u32-style saturation is NOT
+            // applied here — an out-of-range id refuses instead of aliasing.
+            json!({ "uid": u64::MAX }),
+        ] {
+            assert!(
+                UserTokenPayload::from_claims(&claims_of(&value)).is_none(),
+                "{value}"
+            );
+        }
+        // The full i64 range of a signed id reads through.
+        let payload =
+            UserTokenPayload::from_claims(&claims_of(&json!({ "uid": i64::MAX }))).unwrap();
+        assert_eq!(payload.user_id, i64::MAX);
+    }
+
+    #[test]
+    fn from_claims_reads_the_optional_members_defensively() {
+        // A role list keeps its string entries only; a non-list reads empty.
+        let payload = UserTokenPayload::from_claims(&claims_of(
+            &json!({ "uid": 1, "roc": ["editor", 7, null, "tenant:user"] }),
+        ))
+        .unwrap();
+        assert_eq!(payload.roles, ["editor", "tenant:user"]);
+        let payload =
+            UserTokenPayload::from_claims(&claims_of(&json!({ "uid": 1, "roc": "editor" })))
+                .unwrap();
+        assert!(payload.roles.is_empty());
+
+        // The tenant and the org unit are i64-or-default / i64-or-absent.
+        let payload = UserTokenPayload::from_claims(&claims_of(
+            &json!({ "uid": 1, "tid": "3", "ouid": "42" }),
+        ))
+        .unwrap();
+        assert_eq!(payload.tenant_id, 0);
+        assert_eq!(payload.org_unit_id, None);
+        let payload =
+            UserTokenPayload::from_claims(&claims_of(&json!({ "uid": 1, "ouid": 0 }))).unwrap();
+        assert_eq!(payload.org_unit_id, Some(0));
+    }
+
+    // ── to_access_claims ─────────────────────────────────────────────
+
+    #[test]
+    fn access_claims_carry_the_core_set_and_omit_absent_optionals() {
+        let payload = UserTokenPayload {
+            user_id: 7,
+            tenant_id: 3,
+            username: "admin".into(),
+            jti: "jti-1".into(),
+            ..Default::default()
+        };
+        let claims = payload.to_access_claims(1_000, 1_900);
+        assert_eq!(claims["sub"], "admin");
+        assert_eq!(claims["uid"], 7);
+        assert_eq!(claims["tid"], 3);
+        assert_eq!(claims["iat"], 1_000);
+        assert_eq!(claims["exp"], 1_900);
+        assert_eq!(claims["jti"], "jti-1");
+        // An empty role list and absent optionals leave no key at all.
+        assert_eq!(claims.len(), 6);
+        for absent in ["roc", "did", "cid", "ds", "ouid"] {
+            assert!(claims.get(absent).is_none(), "{absent}");
+        }
+    }
+
+    #[test]
+    fn access_claims_round_trip_through_from_claims() {
+        let payload = UserTokenPayload {
+            user_id: 9_007_199_254_740_993,
+            tenant_id: 3,
+            username: "alice".into(),
+            jti: "jti-2".into(),
+            roles: vec!["editor".into(), "tenant:user".into()],
+            org_unit_id: Some(0),
+            data_scope: Some("UNIT_AND_CHILD".into()),
+            client_id: Some("mobile".into()),
+            device_id: Some("device-9".into()),
+        };
+        let claims = payload.to_access_claims(5, 6);
+        assert_eq!(claims["roc"], json!(["editor", "tenant:user"]));
+        assert_eq!(claims["ouid"], 0);
+        let back = UserTokenPayload::from_claims(&claims).unwrap();
+        assert_eq!(back.user_id, payload.user_id);
+        assert_eq!(back.tenant_id, payload.tenant_id);
+        assert_eq!(back.username, payload.username);
+        assert_eq!(back.jti, payload.jti);
+        assert_eq!(back.roles, payload.roles);
+        assert_eq!(back.org_unit_id, payload.org_unit_id);
+        assert_eq!(back.data_scope, payload.data_scope);
+        assert_eq!(back.client_id, payload.client_id);
+        assert_eq!(back.device_id, payload.device_id);
+    }
+
+    #[test]
+    fn access_claims_serialize_as_numbers_not_protojson_strings() {
+        // The JWT payload is plain JSON: the ids ride as JSON numbers (the
+        // engine and the gate read them back with as_i64 / as_u64).
+        let claims = UserTokenPayload::from_claims(&full_claims())
+            .unwrap()
+            .to_access_claims(1, 2);
+        let text = serde_json::to_string(&claims).unwrap();
+        assert!(text.contains("\"uid\":7"), "{text}");
+        assert!(text.contains("\"tid\":3"), "{text}");
+        assert!(text.contains("\"ouid\":42"), "{text}");
+    }
+}

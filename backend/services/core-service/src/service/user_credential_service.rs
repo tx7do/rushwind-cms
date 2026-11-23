@@ -206,3 +206,131 @@ impl UserCredentialService for UserCredentialServiceImpl {
         Ok(Response::new(pbjson_types::Empty {}))
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn request_with(headers: &[(&'static str, &'static str)]) -> Request<()> {
+        let mut request = Request::new(());
+        for (name, value) in headers {
+            request.metadata_mut().insert(*name, value.parse().unwrap());
+        }
+        request
+    }
+
+    #[test]
+    fn tenant_scope_reads_the_trusted_stamp_then_the_operator_bag() {
+        // The anonymous chain's trusted stamp leads ...
+        assert_eq!(
+            scoped_tenant_of(&request_with(&[
+                ("x-md-global-tenant-id", "5"),
+                ("x-tenant-id", "7")
+            ])),
+            Some(5)
+        );
+        // ... else the operator bag.
+        assert_eq!(
+            scoped_tenant_of(&request_with(&[("x-tenant-id", "7")])),
+            Some(7)
+        );
+        // The platform scope (0) is "no scope": a stamp must be positive to lead.
+        assert_eq!(
+            scoped_tenant_of(&request_with(&[
+                ("x-md-global-tenant-id", "0"),
+                ("x-tenant-id", "7")
+            ])),
+            Some(7)
+        );
+        // Nothing named: unscoped (the platform caller) — never negative.
+        let unscoped: [&[(&str, &str)]; 4] = [
+            &[],
+            &[("x-tenant-id", "0")],
+            &[("x-tenant-id", "-3")],
+            &[("x-md-global-tenant-id", "abc"), ("x-tenant-id", "")],
+        ];
+        for headers in unscoped {
+            assert_eq!(
+                scoped_tenant_of(&request_with(headers)),
+                None,
+                "{headers:?}"
+            );
+        }
+    }
+
+    /// A full credential row (the golden schema's 21 columns).
+    fn row() -> store::entities::sys_user_credentials::Model {
+        store::entities::sys_user_credentials::Model {
+            id: 9,
+            created_at: None,
+            updated_at: None,
+            deleted_at: None,
+            tenant_id: Some(3),
+            user_id: Some(42),
+            identity_type: Some("EMAIL".into()),
+            identifier: Some("alice@example.com".into()),
+            credential_type: Some("PASSWORD_HASH".into()),
+            credential: Some("hash".into()),
+            is_primary: Some(true),
+            status: Some("ENABLED".into()),
+            extra_info: Some(serde_json::json!({"k": "v"})),
+            provider: Some("local".into()),
+            provider_account_id: Some("acc-1".into()),
+            activate_token_hash: None,
+            activate_token_expires_at: None,
+            activate_token_used_at: None,
+            reset_token_hash: None,
+            reset_token_expires_at: None,
+            reset_token_used_at: None,
+        }
+    }
+
+    #[test]
+    fn credential_proto_reads_the_varchar_enums_back_through_their_names() {
+        let p = credential_proto(row());
+        // The id is a plain int64 (never optional in the proto).
+        assert_eq!(p.id, 9);
+        assert_eq!(p.tenant_id, Some(3));
+        assert_eq!(p.user_id, Some(42));
+        assert_eq!(
+            p.identity_type,
+            IdentityType::from_str_name("EMAIL").map(|e| e as i32)
+        );
+        assert_eq!(
+            p.credential_type,
+            CredentialType::from_str_name("PASSWORD_HASH").map(|e| e as i32)
+        );
+        assert_eq!(
+            p.status,
+            CredentialStatus::from_str_name("ENABLED").map(|e| e as i32)
+        );
+        assert_eq!(p.identifier.as_deref(), Some("alice@example.com"));
+        assert_eq!(p.credential.as_deref(), Some("hash"));
+        assert_eq!(p.is_primary, Some(true));
+        // The JSON column rides as its text form.
+        assert_eq!(p.extra_info.as_deref(), Some(r#"{"k":"v"}"#));
+        assert_eq!(p.provider.as_deref(), Some("local"));
+        assert_eq!(p.provider_account_id.as_deref(), Some("acc-1"));
+
+        // A varchar value outside the enum reads as absent — never a
+        // guessed ordinal.
+        let p = credential_proto(store::entities::sys_user_credentials::Model {
+            status: Some("FROZEN".into()),
+            identity_type: None,
+            ..row()
+        });
+        assert_eq!(p.status, None);
+        assert_eq!(p.identity_type, None);
+
+        // Every declared status name lands on its own ordinal.
+        for v in 0..=20 {
+            if let Ok(e) = CredentialStatus::try_from(v) {
+                let p = credential_proto(store::entities::sys_user_credentials::Model {
+                    status: Some(e.as_str_name().into()),
+                    ..row()
+                });
+                assert_eq!(p.status, Some(v), "{e:?}");
+            }
+        }
+    }
+}

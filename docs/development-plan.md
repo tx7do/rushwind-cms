@@ -231,7 +231,7 @@
   批次 F（2026-11 契约新增域）为当前最长尾——契约与 BFF 薄代理就位，core 答 UNIMPLEMENTED。
 - 面上规模：core gRPC 注册 42 领域服务；admin BFF 76 服务（薄代理 71 + 手写 5）、
   app BFF 14 服务（薄代理 12）；白名单 admin 10 / app 28 操作；契约 209 文件 / 29 领域。
-- 门禁基线：cargo fmt / clippy -D warnings / workspace 116 tests / proto 契约门 /
+- 门禁基线：cargo fmt / clippy -D warnings / workspace 222 tests / proto 契约门 /
   五前端快照门全绿（ubuntu + windows CI）；core 空库引导（schema + 种子 + 演示 + 菜单）过。
 - 已知问题：① i_user 的 redact.internal_method 与 gen-http plan-builder 的相容性未决
   （上游决策挂起）——BFF REST 面整体 500，e2e 套件在 HEAD 不可复跑（基线为 2026-09-24

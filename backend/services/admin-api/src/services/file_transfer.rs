@@ -651,4 +651,87 @@ mod tests {
         let q: DownloadQuery = serde_urlencoded::from_str("").unwrap();
         assert_eq!(q.file_id.or(q.file_id_alias), None);
     }
+
+    #[test]
+    fn asset_type_classification_follows_the_mime_family() {
+        use mediav1::media_asset::AssetType as T;
+        // No mime at all is the only "unspecified" — everything else
+        // classifies, unknown families included.
+        assert_eq!(asset_type_of(""), T::Unspecified as i32);
+        assert_eq!(asset_type_of("image/png"), T::Image as i32);
+        assert_eq!(asset_type_of("video/mp4"), T::Video as i32);
+        assert_eq!(asset_type_of("audio/mpeg"), T::Audio as i32);
+        assert_eq!(asset_type_of("application/pdf"), T::Document as i32);
+        assert_eq!(asset_type_of("application/zip"), T::Archive as i32);
+        assert_eq!(asset_type_of("text/plain"), T::Other as i32);
+        assert_eq!(asset_type_of("application/octet-stream"), T::Other as i32);
+        assert_eq!(asset_type_of("font/woff2"), T::Other as i32);
+
+        // Case, parameters, and surrounding blanks never change the family.
+        assert_eq!(asset_type_of("IMAGE/SVG+XML"), T::Image as i32);
+        assert_eq!(asset_type_of("audio/ogg; codecs=opus"), T::Audio as i32);
+        assert_eq!(
+            asset_type_of("application/pdf; name=a.pdf"),
+            T::Document as i32
+        );
+        assert_eq!(asset_type_of("  application/zip "), T::Archive as i32);
+
+        // The archive family, alias by alias.
+        for mime in [
+            "application/x-zip-compressed",
+            "multipart/x-zip",
+            "application/x-7z-compressed",
+            "application/x-tar",
+            "application/gzip",
+            "application/x-gzip",
+            "application/x-bzip2",
+            "application/x-bzip",
+            "application/x-xz",
+            "application/vnd.rar",
+            "application/x-rar-compressed",
+            "application/java-archive",
+            "application/zstd",
+            "application/x-zstd",
+        ] {
+            assert_eq!(asset_type_of(mime), T::Archive as i32, "{mime}");
+        }
+
+        // The document family: the office suites and PDF.
+        for mime in [
+            "application/msword",
+            "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+            "application/vnd.ms-excel",
+            "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+            "application/vnd.ms-powerpoint",
+            "application/vnd.openxmlformats-officedocument.presentationml.presentation",
+        ] {
+            assert_eq!(asset_type_of(mime), T::Document as i32, "{mime}");
+        }
+    }
+
+    #[test]
+    fn claims_come_off_the_gate_injected_extension_only() {
+        let bare = axum::extract::Request::builder()
+            .body(axum::body::Body::empty())
+            .unwrap();
+        assert!(claims_of(&bare).is_none());
+
+        // A bearer header by itself is not identity — only the extension
+        // the auth gate injects after verifying.
+        let bearer = axum::extract::Request::builder()
+            .header("authorization", "Bearer a.b.c")
+            .body(axum::body::Body::empty())
+            .unwrap();
+        assert!(claims_of(&bearer).is_none());
+
+        let claims = serde_json::json!({"uid": 7, "tid": 3})
+            .as_object()
+            .cloned()
+            .unwrap();
+        let req = axum::extract::Request::builder()
+            .extension(auth::AuthClaims(claims.clone()))
+            .body(axum::body::Body::empty())
+            .unwrap();
+        assert_eq!(claims_of(&req), Some(claims));
+    }
 }

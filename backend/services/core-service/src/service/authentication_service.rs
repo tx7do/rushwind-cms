@@ -610,4 +610,119 @@ mod tests {
         assert_eq!(v["reason"], "INVALID_TENANT");
         assert_eq!(v["status"], 400);
     }
+
+    /// Every envelope status lands on its gRPC code — the unclassified
+    /// rest folds onto Internal.
+    #[test]
+    fn to_tonic_maps_every_envelope_status_family() {
+        let cases = [
+            (400, tonic::Code::InvalidArgument),
+            (401, tonic::Code::Unauthenticated),
+            (403, tonic::Code::PermissionDenied),
+            (404, tonic::Code::NotFound),
+            (409, tonic::Code::AlreadyExists),
+            (402, tonic::Code::Internal),
+            (429, tonic::Code::Internal),
+            (500, tonic::Code::Internal),
+            (503, tonic::Code::Internal),
+        ];
+        for (status, code) in cases {
+            let mapped = to_tonic(rushwind_http_binding::envelope::StatusError::new(
+                status, "REASON", "m",
+            ));
+            assert_eq!(mapped.code(), code, "{status}");
+            // The envelope text is the status message; the reason rides the
+            // details only.
+            assert_eq!(mapped.message(), "m");
+            let v: serde_json::Value = serde_json::from_slice(mapped.details()).unwrap();
+            assert_eq!(
+                (v["status"].as_i64(), v["reason"].as_str()),
+                (Some(i64::from(status)), Some("REASON"))
+            );
+        }
+    }
+
+    // ── login chain discriminants ────────────────────────────────────
+
+    #[test]
+    fn client_type_folds_an_unknown_or_absent_login_onto_admin() {
+        let client_of = |client_type: Option<i32>| {
+            AuthenticationServiceImpl::client_of(&LoginRequest {
+                client_type,
+                ..Default::default()
+            })
+        };
+        assert!(matches!(client_of(None), ClientType::Admin));
+        assert!(matches!(client_of(Some(0)), ClientType::Admin));
+        assert!(matches!(client_of(Some(1)), ClientType::App));
+        // The password-grant read is lenient — only the session-list face
+        // refuses unknown families.
+        for v in [-1, 2, 99] {
+            assert!(matches!(client_of(Some(v)), ClientType::Admin), "{v}");
+        }
+    }
+
+    #[test]
+    fn login_permission_gate_splits_per_client() {
+        use crate::service::constants::{
+            is_reserved_permission_code, SYSTEM_ACCESS_APP_PERMISSION_CODE,
+            SYSTEM_ACCESS_BACKEND_PERMISSION_CODE,
+        };
+        assert_eq!(
+            AuthenticationServiceImpl::required_permission(ClientType::Admin),
+            SYSTEM_ACCESS_BACKEND_PERMISSION_CODE
+        );
+        assert_eq!(
+            AuthenticationServiceImpl::required_permission(ClientType::App),
+            SYSTEM_ACCESS_APP_PERMISSION_CODE
+        );
+        // Both gate codes sit in the reserved namespace the permission
+        // CRUD refuses — a self-made permission cannot mint a login grant.
+        assert!(is_reserved_permission_code(
+            SYSTEM_ACCESS_BACKEND_PERMISSION_CODE
+        ));
+        assert!(is_reserved_permission_code(
+            SYSTEM_ACCESS_APP_PERMISSION_CODE
+        ));
+    }
+
+    #[test]
+    fn data_scope_reads_the_stored_enum_names() {
+        use proto::proto::identity::service::v1::DataScope;
+        for name in [
+            "ALL",
+            "SELF",
+            "UNIT_ONLY",
+            "UNIT_AND_CHILD",
+            "SELECTED_UNITS",
+        ] {
+            assert_eq!(
+                data_scope_of(name),
+                DataScope::from_str_name(name).map(|v| v as i32),
+                "{name}"
+            );
+        }
+        // Case-sensitive, and the unspecified ordinal has no storage name.
+        assert_eq!(data_scope_of("all"), None);
+        assert_eq!(data_scope_of(""), None);
+    }
+
+    #[test]
+    fn token_targets_unify_the_block_and_unblock_oneofs() {
+        use proto::proto::authentication::service::v1::{
+            block_token_request, unblock_token_request,
+        };
+        for target in [
+            TokenTarget::from(block_token_request::Target::Token("at".into())),
+            TokenTarget::from(unblock_token_request::Target::Token("at".into())),
+        ] {
+            assert!(matches!(target, TokenTarget::Token(s) if s == "at"));
+        }
+        for target in [
+            TokenTarget::from(block_token_request::Target::Jti("j".into())),
+            TokenTarget::from(unblock_token_request::Target::Jti("j".into())),
+        ] {
+            assert!(matches!(target, TokenTarget::Jti(s) if s == "j"));
+        }
+    }
 }

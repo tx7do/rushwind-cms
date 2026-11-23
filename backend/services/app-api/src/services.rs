@@ -141,4 +141,110 @@ mod tests {
         assert_eq!(mapped.status, 404);
         assert_eq!(mapped.message, "row vanished");
     }
+
+    #[test]
+    fn map_status_coarse_mapping_covers_every_code_family() {
+        // Without the core's envelope details the gRPC code alone picks
+        // the reason, and the error table the status behind it.
+        let cases = [
+            (tonic::Code::InvalidArgument, "BAD_REQUEST", 400),
+            (tonic::Code::Unauthenticated, "UNAUTHORIZED", 401),
+            (tonic::Code::PermissionDenied, "FORBIDDEN", 403),
+            (tonic::Code::NotFound, "NOT_FOUND", 404),
+            (tonic::Code::AlreadyExists, "CONFLICT", 409),
+            (tonic::Code::Aborted, "CONFLICT", 409),
+        ];
+        for (code, reason, status) in cases {
+            let mapped = map_status(tonic::Status::new(code, "m"));
+            assert_eq!((mapped.status, mapped.reason), (status, reason), "{code:?}");
+            assert_eq!(mapped.message, "m");
+        }
+        // Everything else is the Unknown branch: 500 with an empty reason.
+        for code in [
+            tonic::Code::Internal,
+            tonic::Code::Unavailable,
+            tonic::Code::Unimplemented,
+            tonic::Code::DeadlineExceeded,
+            tonic::Code::Cancelled,
+            tonic::Code::Unknown,
+            tonic::Code::FailedPrecondition,
+            tonic::Code::ResourceExhausted,
+        ] {
+            let mapped = map_status(tonic::Status::new(code, "boom"));
+            assert_eq!((mapped.status, mapped.reason), (500, ""), "{code:?}");
+            assert_eq!(mapped.message, "boom");
+        }
+    }
+
+    // ── with_operator ────────────────────────────────────────────────
+
+    /// The claim bag in the shape the relay takes: an owned map, optional.
+    fn bag(value: &serde_json::Value) -> Option<serde_json::Map<String, serde_json::Value>> {
+        value.as_object().cloned()
+    }
+
+    #[test]
+    fn operator_relay_stamps_the_verified_ids_as_metadata() {
+        let claims =
+            serde_json::json!({"uid": 5, "tid": 9, "sub": "alice", "roc": ["tenant:user"]});
+        let req = with_operator_claims(&bag(&claims), "payload");
+        assert_eq!(*req.get_ref(), "payload");
+        let md = |name: &str| {
+            req.metadata()
+                .get(name)
+                .and_then(|v| v.to_str().ok())
+                .map(str::to_owned)
+        };
+        assert_eq!(md("x-user-id").as_deref(), Some("5"));
+        assert_eq!(md("x-tenant-id").as_deref(), Some("9"));
+        // Nothing else from the bag rides the wire.
+        assert!(req.metadata().get("sub").is_none());
+        assert!(req.metadata().get("roc").is_none());
+
+        // Without an identity nothing is stamped.
+        let req = with_operator_claims(&None, ());
+        assert!(req.metadata().get("x-user-id").is_none());
+        assert!(req.metadata().get("x-tenant-id").is_none());
+    }
+
+    #[test]
+    fn operator_relay_reads_only_unsigned_integral_ids() {
+        // A negative, a string, a float, or null never stamps.
+        for value in [
+            serde_json::json!(-1),
+            serde_json::json!("5"),
+            serde_json::json!(5.5),
+            serde_json::json!(null),
+        ] {
+            let claims = serde_json::json!({"uid": value, "tid": 1});
+            let req = with_operator_claims(&bag(&claims), ());
+            let user = req
+                .metadata()
+                .get("x-user-id")
+                .and_then(|v| v.to_str().ok());
+            assert_eq!(user, None, "uid {value}");
+            // The tenant stamps independently of the user.
+            let tenant = req
+                .metadata()
+                .get("x-tenant-id")
+                .and_then(|v| v.to_str().ok());
+            assert_eq!(tenant, Some("1"));
+        }
+        // Zero is a legal id (the platform tenant), and the full i64 range
+        // of the int64 finalize rides through.
+        let claims = serde_json::json!({"uid": i64::MAX, "tid": 0});
+        let req = with_operator_claims(&bag(&claims), ());
+        assert_eq!(
+            req.metadata()
+                .get("x-user-id")
+                .and_then(|v| v.to_str().ok()),
+            Some("9223372036854775807")
+        );
+        assert_eq!(
+            req.metadata()
+                .get("x-tenant-id")
+                .and_then(|v| v.to_str().ok()),
+            Some("0")
+        );
+    }
 }

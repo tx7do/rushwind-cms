@@ -52,15 +52,136 @@ pub fn dummy_verify() {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use base64::Engine as _;
 
     #[test]
     fn aes_cbc_reference_vector() {
         // openssl enc -aes-128-cbc of "s3cret" with the reference key/iv —
         // the decrypt direction pins the padding and the key pair.
-        use base64::Engine as _;
-        let ct = base64::engine::general_purpose::STANDARD
-            .decode("h1EAUNtwVm48wiz7iW1sjw==")
-            .unwrap();
+        let ct = unb64("h1EAUNtwVm48wiz7iW1sjw==");
         assert_eq!(decrypt_aes_cbc(&ct).as_deref(), Some("admin"));
+    }
+
+    /// The encrypt direction of the front-end layer — fixtures for the
+    /// decrypt pins (the library only carries the decrypt half).
+    fn encrypt_login_credential(plain: &[u8]) -> Vec<u8> {
+        use aes::cipher::BlockEncryptMut;
+        type Aes128CbcEnc = cbc::Encryptor<aes::Aes128>;
+        let mut out = vec![0u8; plain.len() + 16];
+        let len = Aes128CbcEnc::new(DEFAULT_AES_KEY.into(), DEFAULT_AES_KEY.into())
+            .encrypt_padded_b2b_mut::<Pkcs7>(plain, &mut out)
+            .unwrap()
+            .len();
+        out.truncate(len);
+        out
+    }
+
+    fn b64(bytes: &[u8]) -> String {
+        base64::engine::general_purpose::STANDARD.encode(bytes)
+    }
+
+    fn unb64(text: &str) -> Vec<u8> {
+        base64::engine::general_purpose::STANDARD
+            .decode(text)
+            .unwrap()
+    }
+
+    #[test]
+    fn aes_cbc_round_trips_every_plaintext_shape() {
+        // A partial block, an exact block, an exact block plus one byte
+        // (a whole padding block), and multi-byte UTF-8 across the block
+        // boundary.
+        for plain in [
+            "a",
+            "admin",
+            "0123456789abcdef",
+            "0123456789abcdef0",
+            "pässwörd-密码-🔑",
+        ] {
+            let ct = encrypt_login_credential(plain.as_bytes());
+            assert_eq!(decrypt_aes_cbc(&ct).as_deref(), Some(plain), "{plain}");
+        }
+    }
+
+    #[test]
+    fn aes_cbc_rejects_malformed_ciphertext() {
+        // Not block-aligned, or empty: nothing to decrypt.
+        assert_eq!(decrypt_aes_cbc(&[0u8; 5]), None);
+        assert_eq!(decrypt_aes_cbc(&[]), None);
+
+        // Aligned but the padding byte is out of range: a two-block
+        // message truncated to its data blocks ends in 0x41.
+        let ct = encrypt_login_credential(&[0x41; 32]);
+        assert_eq!(decrypt_aes_cbc(&ct[..32]), None);
+        // ...or zero.
+        let mut msg = vec![0x41; 32];
+        msg[31] = 0;
+        let ct = encrypt_login_credential(&msg);
+        assert_eq!(decrypt_aes_cbc(&ct[..32]), None);
+
+        // Valid padding, but the plaintext is not UTF-8.
+        let ct = encrypt_login_credential(&[0xff; 15]);
+        assert_eq!(decrypt_aes_cbc(&ct), None);
+    }
+
+    #[test]
+    fn login_credential_unwraps_base64_and_tolerates_padding() {
+        // The reference vector, as the wire carries it.
+        assert_eq!(
+            decrypt_login_credential("h1EAUNtwVm48wiz7iW1sjw==").unwrap(),
+            "admin"
+        );
+        // Surrounding whitespace (a form field's stray newline) is trimmed.
+        assert_eq!(
+            decrypt_login_credential("  h1EAUNtwVm48wiz7iW1sjw==\n").unwrap(),
+            "admin"
+        );
+        // A round trip through the front-end's own encryption.
+        let wire = b64(&encrypt_login_credential("s3cret 密码".as_bytes()));
+        assert_eq!(decrypt_login_credential(&wire).unwrap(), "s3cret 密码");
+
+        // Not base64 at all → the base64 stage reports.
+        let err = decrypt_login_credential("not base64!").unwrap_err();
+        assert!(err.starts_with("credential base64:"), "{err}");
+        // Base64 of bytes the cipher refuses → the decrypt stage reports.
+        let err = decrypt_login_credential(&b64(&[0u8; 7])).unwrap_err();
+        assert_eq!(err, "credential decrypt");
+    }
+
+    #[test]
+    fn hash_and_verify_round_trip() {
+        let hash = hash_password("s3cret!").unwrap();
+        assert!(hash.starts_with("$2"), "{hash}");
+        assert_ne!(hash, "s3cret!", "the plaintext never rides the stored form");
+        assert!(verify_password("s3cret!", &hash));
+        assert!(!verify_password("s3cret", &hash));
+        assert!(!verify_password("", &hash));
+        // Every call salts afresh: the same password never stores twice alike.
+        assert_ne!(hash_password("s3cret!").unwrap(), hash);
+    }
+
+    #[test]
+    fn verify_never_panics_on_a_malformed_stored_hash() {
+        for junk in ["", "not-a-hash", "$2a$10$tooshort", "$2z$10$nope"] {
+            assert!(!verify_password("s3cret!", junk), "{junk:?}");
+            assert!(!verify_password("", junk), "{junk:?}");
+        }
+    }
+
+    #[test]
+    fn dummy_verify_is_a_live_hash_that_never_accepts() {
+        // The equalizer must really run a bcrypt verification — a constant
+        // that no longer parses would short-circuit it into a no-op.
+        assert!(
+            !bcrypt::verify("definitely-not-the-password", DUMMY_PASSWORD_HASH).unwrap(),
+            "the dummy constant must stay a parsable bcrypt hash"
+        );
+        assert!(!verify_password(
+            "definitely-not-the-password",
+            DUMMY_PASSWORD_HASH
+        ));
+        assert!(!verify_password("", DUMMY_PASSWORD_HASH));
+        // And the probe itself is infallible.
+        dummy_verify();
     }
 }

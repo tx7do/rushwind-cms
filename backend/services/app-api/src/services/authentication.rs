@@ -266,3 +266,81 @@ impl proto::gen_app::services::AuthenticationServiceHandlers for AuthenticationS
             .into_inner())
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn ctx_with(headers: &[(&'static str, &'static str)]) -> Ctx {
+        let mut ctx = Ctx::default();
+        for (name, value) in headers {
+            ctx.headers.insert((*name).into(), (*value).into());
+        }
+        ctx
+    }
+
+    #[test]
+    fn failure_counter_username_reads_the_username_case_only() {
+        use proto::proto::authentication::service::v1::login_request::Identifier;
+        let req = |identifier: Option<Identifier>| LoginRequest {
+            identifier,
+            ..Default::default()
+        };
+        let username_of = AuthenticationService::username_of;
+        assert_eq!(
+            username_of(&req(Some(Identifier::Username("alice".into())))),
+            "alice"
+        );
+        // An email or mobile identifier counts on the IP dimension alone.
+        assert_eq!(
+            username_of(&req(Some(Identifier::Email("a@b.c".into())))),
+            ""
+        );
+        assert_eq!(
+            username_of(&req(Some(Identifier::Mobile("13800000000".into())))),
+            ""
+        );
+        assert_eq!(username_of(&req(None)), "");
+    }
+
+    #[test]
+    fn bearer_reads_both_prefix_spellings_and_rejects_the_rest() {
+        // The refresh binding's fallback key source (the expired-access-
+        // token path, where no verified operator rides).
+        assert_eq!(
+            bearer_of(&ctx_with(&[("authorization", "Bearer a.b.c")])),
+            Some("a.b.c".to_string())
+        );
+        assert_eq!(
+            bearer_of(&ctx_with(&[("authorization", "bearer a.b.c")])),
+            Some("a.b.c".to_string())
+        );
+        // Another scheme, an empty credential, or no header at all.
+        assert_eq!(
+            bearer_of(&ctx_with(&[("authorization", "Basic abc")])),
+            None
+        );
+        assert_eq!(bearer_of(&ctx_with(&[("authorization", "Bearer ")])), None);
+        assert_eq!(bearer_of(&ctx_with(&[("authorization", "Bearer")])), None);
+        assert_eq!(bearer_of(&Ctx::default()), None);
+    }
+
+    #[test]
+    fn credential_failure_reasons_anchor_onto_the_app_error_table() {
+        // The limiter trigger compares the mapped reason — a table literal
+        // — so every counted reason must resolve against the app table.
+        for reason in CREDENTIAL_FAIL_REASONS {
+            assert!(
+                proto::tables::error_status("app.service.v1", reason).is_some(),
+                "{reason} must be an app error-table reason"
+            );
+        }
+        assert_eq!(CREDENTIAL_FAIL_REASONS.len(), 3);
+        // The progressive-captcha pair and the lockout are not brute-force
+        // evidence — they resolve too, but stay out of the trigger.
+        for reason in ["CAPTCHA_INVALID", "CAPTCHA_REQUIRED", "BAD_REQUEST"] {
+            assert!(proto::tables::error_status("app.service.v1", reason).is_some());
+            assert!(!CREDENTIAL_FAIL_REASONS.contains(&reason), "{reason}");
+        }
+    }
+}

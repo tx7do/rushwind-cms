@@ -222,3 +222,50 @@ impl mediav1::media_asset_service_server::MediaAssetService for MediaAssetServic
     }
 }
 use crate::data::media_asset_repo;
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn asset_type_names_follow_the_proto_numbers_and_reject_the_rest() {
+        for (v, name) in [
+            (1, "ASSET_TYPE_IMAGE"),
+            (2, "ASSET_TYPE_VIDEO"),
+            (3, "ASSET_TYPE_DOCUMENT"),
+            (4, "ASSET_TYPE_AUDIO"),
+            (5, "ASSET_TYPE_ARCHIVE"),
+            (100, "ASSET_TYPE_OTHER"),
+        ] {
+            assert_eq!(asset_type_name(v).as_deref(), Some(name), "{v}");
+            assert_eq!(
+                mediav1::media_asset::AssetType::from_str_name(name).map(|e| e as i32),
+                Some(v)
+            );
+        }
+        // The unspecified ordinal is not a storage name, and neither is
+        // anything undeclared.
+        for v in [-1, 0, 6, 99, 101] {
+            assert_eq!(asset_type_name(v), None, "{v}");
+        }
+    }
+
+    #[test]
+    fn processing_status_names_follow_the_proto_numbers_and_reject_the_rest() {
+        for (v, name) in [
+            (1, "PROCESSING_STATUS_UPLOADING"),
+            (2, "PROCESSING_STATUS_PROCESSING"),
+            (3, "PROCESSING_STATUS_COMPLETED"),
+            (4, "PROCESSING_STATUS_FAILED"),
+        ] {
+            assert_eq!(processing_status_name(v).as_deref(), Some(name), "{v}");
+            assert_eq!(
+                mediav1::media_asset::ProcessingStatus::from_str_name(name).map(|e| e as i32),
+                Some(v)
+            );
+        }
+        for v in [-1, 0, 5, 99] {
+            assert_eq!(processing_status_name(v), None, "{v}");
+        }
+    }
+}

@@ -219,3 +219,60 @@ impl proto::gen_admin::services::AdminPortalServiceHandlers for AdminPortalServi
         Ok(InitialContextResponse { menus, permissions })
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn route_item_keeps_the_route_fields_and_narrows_the_meta() {
+        let menu = Menu {
+            id: Some(3),
+            status: Some(1),
+            path: Some("/system".into()),
+            redirect: Some("/system/user".into()),
+            alias: Some("sys".into()),
+            name: Some("System".into()),
+            component: Some("BasicLayout".into()),
+            parent_id: Some(0),
+            meta: Some(MenuMeta {
+                title: Some("系统管理".into()),
+                icon: Some("settings".into()),
+                link: Some("https://example.com".into()),
+                order: Some(2),
+                ..Default::default()
+            }),
+            ..Default::default()
+        };
+        let item = fill_route_item(&menu);
+        assert!(item.children.is_empty());
+        assert_eq!(item.path.as_deref(), Some("/system"));
+        assert_eq!(item.redirect.as_deref(), Some("/system/user"));
+        assert_eq!(item.alias.as_deref(), Some("sys"));
+        assert_eq!(item.name.as_deref(), Some("System"));
+        assert_eq!(item.component.as_deref(), Some("BasicLayout"));
+        // Only the title + icon pair survives the narrowing.
+        let meta = item.meta.unwrap();
+        assert_eq!(meta.title.as_deref(), Some("系统管理"));
+        assert_eq!(meta.icon.as_deref(), Some("settings"));
+        assert_eq!(meta.link, None);
+        assert_eq!(meta.order, None);
+
+        // The route tree stays flat: children never nest here, and an
+        // absent meta column carries no meta.
+        let nested = Menu {
+            children: vec![Menu {
+                id: Some(4),
+                ..Default::default()
+            }],
+            ..menu
+        };
+        assert!(fill_route_item(&nested).children.is_empty());
+        assert!(fill_route_item(&Menu::default()).meta.is_none());
+    }
+
+    #[test]
+    fn the_aggregation_pages_without_limits() {
+        assert_eq!(paging_all().no_paging, Some(true));
+    }
+}

@@ -394,4 +394,30 @@ mod tests {
         let q: DownloadQuery = serde_urlencoded::from_str("").unwrap();
         assert_eq!(q.file_id.or(q.file_id_alias), None);
     }
+
+    #[test]
+    fn claims_come_off_the_gate_injected_extension_only() {
+        let bare = axum::extract::Request::builder()
+            .body(axum::body::Body::empty())
+            .unwrap();
+        assert!(claims_of(&bare).is_none());
+
+        // A bearer header by itself is not identity — only the extension
+        // the auth gate injects after verifying.
+        let bearer = axum::extract::Request::builder()
+            .header("authorization", "Bearer a.b.c")
+            .body(axum::body::Body::empty())
+            .unwrap();
+        assert!(claims_of(&bearer).is_none());
+
+        let claims = serde_json::json!({"uid": 7, "tid": 3})
+            .as_object()
+            .cloned()
+            .unwrap();
+        let req = axum::extract::Request::builder()
+            .extension(auth::AuthClaims(claims.clone()))
+            .body(axum::body::Body::empty())
+            .unwrap();
+        assert_eq!(claims_of(&req), Some(claims));
+    }
 }

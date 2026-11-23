@@ -440,3 +440,97 @@ impl proto::gen_admin::services::AuthenticationServiceHandlers for Authenticatio
             .map(|r| r.into_inner())
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn ctx_with(headers: &[(&'static str, &'static str)]) -> Ctx {
+        let mut ctx = Ctx::default();
+        for (name, value) in headers {
+            ctx.headers.insert((*name).into(), (*value).into());
+        }
+        ctx
+    }
+
+    #[test]
+    fn cookie_secure_follows_the_forwarded_proto() {
+        let secure = AuthenticationService::cookie_secure;
+        assert!(secure(&ctx_with(&[("x-forwarded-proto", "https")])));
+        // The scheme is matched case-insensitively.
+        assert!(secure(&ctx_with(&[("x-forwarded-proto", "HTTPS")])));
+        // Plain http, a proxy list, or no header at all stays unsecured.
+        assert!(!secure(&ctx_with(&[("x-forwarded-proto", "http")])));
+        assert!(!secure(&ctx_with(&[("x-forwarded-proto", "https, http")])));
+        assert!(!secure(&Ctx::default()));
+    }
+
+    #[test]
+    fn refresh_ttl_reads_the_core_stamp_with_the_30_day_fallback() {
+        let resp = |refresh_expires_in: Option<i64>| LoginResponse {
+            refresh_expires_in,
+            ..Default::default()
+        };
+        assert_eq!(
+            AuthenticationService::refresh_ttl(&resp(Some(43_200))),
+            43_200
+        );
+        // Absent, zero, or negative: the reference's defaultRefreshTTL.
+        for v in [None, Some(0), Some(-5)] {
+            assert_eq!(
+                AuthenticationService::refresh_ttl(&resp(v)),
+                REFRESH_TTL_FALLBACK_SECS,
+                "{v:?}"
+            );
+        }
+        // The fallback itself: the reference's 30 days.
+        let fallback = REFRESH_TTL_FALLBACK_SECS;
+        assert_eq!(fallback, 30 * 24 * 3600);
+    }
+
+    #[test]
+    fn failure_counter_username_reads_the_username_case_only() {
+        use proto::proto::authentication::service::v1::login_request::Identifier;
+        let req = |identifier: Option<Identifier>| LoginRequest {
+            identifier,
+            ..Default::default()
+        };
+        let username_of = AuthenticationService::username_of;
+        assert_eq!(
+            username_of(&req(Some(Identifier::Username("alice".into())))),
+            "alice"
+        );
+        // An email or mobile identifier counts on the IP dimension alone.
+        assert_eq!(
+            username_of(&req(Some(Identifier::Email("a@b.c".into())))),
+            ""
+        );
+        assert_eq!(
+            username_of(&req(Some(Identifier::Mobile("13800000000".into())))),
+            ""
+        );
+        assert_eq!(username_of(&req(None)), "");
+    }
+
+    #[test]
+    fn credential_failure_reasons_anchor_onto_the_error_tables() {
+        // The limiter trigger compares the mapped reason — a table literal
+        // — so every counted reason must resolve against the tables.
+        let anchored = |reason: &str| {
+            proto::gen_admin::error_tables::ERROR_STATUS
+                .iter()
+                .chain(proto::gen_app::error_tables::ERROR_STATUS.iter())
+                .any(|(_, r, _)| *r == reason)
+        };
+        for reason in CREDENTIAL_FAIL_REASONS {
+            assert!(anchored(reason), "{reason} must be an error-table reason");
+        }
+        // The progressive-captcha pair and the lockout are not brute-force
+        // evidence — they resolve too, but stay out of the trigger.
+        assert_eq!(CREDENTIAL_FAIL_REASONS.len(), 3);
+        for reason in ["CAPTCHA_INVALID", "CAPTCHA_REQUIRED", "BAD_REQUEST"] {
+            assert!(anchored(reason), "{reason}");
+            assert!(!CREDENTIAL_FAIL_REASONS.contains(&reason), "{reason}");
+        }
+    }
+}

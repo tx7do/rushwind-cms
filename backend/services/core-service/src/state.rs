@@ -164,3 +164,100 @@ pub type StatusResult<T> = Result<T, tonic::Status>;
 pub fn not_found_status(what: &str) -> tonic::Status {
     tonic::Status::not_found(format!("{what} not found"))
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn at(nanos: u32) -> chrono::DateTime<chrono::FixedOffset> {
+        chrono::NaiveDate::from_ymd_opt(2026, 11, 23)
+            .unwrap()
+            .and_hms_nano_opt(8, 30, 5, nanos)
+            .unwrap()
+            .and_utc()
+            .fixed_offset()
+    }
+
+    // ── timestamp bridge ─────────────────────────────────────────────
+
+    #[test]
+    fn timestamps_round_trip_at_sub_second_precision() {
+        for nanos in [0, 1, 123_456_789, 999_999_999] {
+            let value = at(nanos);
+            let ts = ts_to_proto(value).unwrap();
+            assert_eq!((ts.seconds, ts.nanos), (value.timestamp(), nanos as i32));
+            // The bridge answers UTC; equality is by instant.
+            let back = ts_from_proto(&ts).unwrap();
+            assert_eq!(back, value, "{nanos}");
+            assert_eq!(back.offset().local_minus_utc(), 0);
+        }
+        // The offset of the source does not survive — only the instant.
+        let cst = chrono::FixedOffset::east_opt(8 * 3600).unwrap();
+        let shifted = at(500_000_000).with_timezone(&cst);
+        assert_eq!(shifted.offset().local_minus_utc(), 8 * 3600);
+        assert_eq!(
+            ts_from_proto(&ts_to_proto(shifted).unwrap()).unwrap(),
+            at(500_000_000)
+        );
+    }
+
+    #[test]
+    fn timestamp_bridge_normalizes_the_edges() {
+        // Timestamps before the epoch carry negative nanos in proto — the
+        // bridge clamps them onto the whole second instead of panicking.
+        let before = ts_from_proto(&pbjson_types::Timestamp {
+            seconds: 1_700_000_000,
+            nanos: -5,
+        })
+        .unwrap();
+        assert_eq!(
+            (before.timestamp(), before.timestamp_subsec_nanos()),
+            (1_700_000_000, 0)
+        );
+        // The zero Timestamp is the epoch; the far ends answer None.
+        assert_eq!(
+            ts_from_proto(&pbjson_types::Timestamp::default())
+                .unwrap()
+                .timestamp(),
+            0
+        );
+        assert!(ts_from_proto(&pbjson_types::Timestamp {
+            seconds: i64::MAX,
+            nanos: 0
+        })
+        .is_none());
+        assert!(ts_from_proto(&pbjson_types::Timestamp {
+            seconds: i64::MIN,
+            nanos: 0
+        })
+        .is_none());
+    }
+
+    // ── status helpers ───────────────────────────────────────────────
+
+    #[test]
+    fn status_helpers_carry_their_codes_and_texts() {
+        // The DB error keeps sea-orm's own label inside the message.
+        let db = db_status(sea_orm::DbErr::Custom("boom".into()));
+        assert_eq!(db.code(), tonic::Code::Internal);
+        assert_eq!(db.message(), "db: Custom Error: boom");
+
+        let e = bad("data required");
+        assert_eq!(
+            (e.code(), e.message()),
+            (tonic::Code::InvalidArgument, "data required")
+        );
+        let e = not_found("role");
+        assert_eq!((e.code(), e.message()), (tonic::Code::NotFound, "role"));
+        let e = not_found_status("role");
+        assert_eq!(
+            (e.code(), e.message()),
+            (tonic::Code::NotFound, "role not found")
+        );
+        let e = forbidden("platform admin only");
+        assert_eq!(
+            (e.code(), e.message()),
+            (tonic::Code::PermissionDenied, "platform admin only")
+        );
+    }
+}

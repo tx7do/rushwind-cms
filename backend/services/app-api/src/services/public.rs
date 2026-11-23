@@ -645,3 +645,72 @@ mod host_tests {
         assert_eq!(host_of(&RequestContext::default()), None);
     }
 }
+
+/// The outbound relay's stamping (the operator bag plus the anonymous
+/// chain's trusted tenant).
+#[cfg(test)]
+mod relay_tests {
+    use super::*;
+
+    fn ctx_with(headers: &[(&'static str, &'static str)], claims: serde_json::Value) -> Ctx {
+        let mut ctx = Ctx::default();
+        for (name, value) in headers {
+            ctx.headers.insert((*name).into(), (*value).into());
+        }
+        ctx.claims = claims.as_object().cloned();
+        ctx
+    }
+
+    fn stamped<T>(req: &tonic::Request<T>, name: &str) -> Option<String> {
+        req.metadata()
+            .get(name)
+            .and_then(|v| v.to_str().ok())
+            .map(str::to_owned)
+    }
+
+    #[test]
+    fn bearer_reads_both_prefix_spellings_and_rejects_the_rest() {
+        // The optional-identity upgrade's credential source.
+        let ctx =
+            |value: &'static str| ctx_with(&[("authorization", value)], serde_json::json!({}));
+        assert_eq!(bearer_of(&ctx("Bearer a.b.c")), Some("a.b.c".to_string()));
+        assert_eq!(bearer_of(&ctx("bearer a.b.c")), Some("a.b.c".to_string()));
+        // Another scheme, an empty credential, or no header at all.
+        assert_eq!(bearer_of(&ctx("Basic abc")), None);
+        assert_eq!(bearer_of(&ctx("Bearer ")), None);
+        assert_eq!(bearer_of(&ctx("Bearer")), None);
+        assert_eq!(bearer_of(&Ctx::default()), None);
+    }
+
+    #[test]
+    fn relay_stamps_the_operator_bag_and_the_trusted_tenant() {
+        let ctx = ctx_with(&[], serde_json::json!({"uid": 5, "tid": 9}));
+        let req = request_with_tenant(&ctx, "payload", 3);
+        assert_eq!(*req.get_ref(), "payload");
+        assert_eq!(stamped(&req, "x-user-id").as_deref(), Some("5"));
+        assert_eq!(stamped(&req, "x-tenant-id").as_deref(), Some("9"));
+        // The anonymous chain's resolved tenant rides its own header —
+        // inner-gRPC metadata an external caller cannot forge.
+        assert_eq!(stamped(&req, "x-md-global-tenant-id").as_deref(), Some("3"));
+    }
+
+    #[test]
+    fn relay_stamps_no_tenant_for_the_unresolved_scope() {
+        let ctx = ctx_with(&[], serde_json::json!({"uid": 5}));
+        // Tenant 0 means unresolved: nothing is stamped, and the caller
+        // decides the fail-closed shape.
+        let req = request_with_tenant(&ctx, (), 0);
+        assert!(stamped(&req, "x-md-global-tenant-id").is_none());
+        let req = request_with_tenant(&ctx, (), -1);
+        assert!(stamped(&req, "x-md-global-tenant-id").is_none());
+    }
+
+    #[test]
+    fn relay_without_an_identity_stamps_no_operator_bag() {
+        let req = request_with_tenant(&Ctx::default(), (), 3);
+        assert!(stamped(&req, "x-user-id").is_none());
+        assert!(stamped(&req, "x-tenant-id").is_none());
+        // The trusted tenant rides regardless.
+        assert_eq!(stamped(&req, "x-md-global-tenant-id").as_deref(), Some("3"));
+    }
+}

@@ -175,4 +175,37 @@ mod tests {
         assert!(!is_locked(&redis, "", "").await);
         assert_eq!(failure_attempts(&redis, "", "").await, 0);
     }
+
+    #[test]
+    fn failure_counters_skip_the_empty_dimensions() {
+        assert_eq!(
+            fail_keys("203.0.113.7", "alice"),
+            ["cms:login:fail:ip:203.0.113.7", "cms:login:fail:user:alice"]
+        );
+        // A missing dimension contributes no key — an empty username is
+        // never a counter of its own.
+        assert_eq!(fail_keys("", "alice"), ["cms:login:fail:user:alice"]);
+        assert_eq!(
+            fail_keys("203.0.113.7", ""),
+            ["cms:login:fail:ip:203.0.113.7"]
+        );
+        assert!(fail_keys("", "").is_empty());
+    }
+
+    #[test]
+    fn the_keyspace_and_thresholds_match_the_admin_face() {
+        // Both faces lock the same counters under the same profile: 5
+        // failures lock for 15 minutes, and the captcha is demanded from
+        // the very first failure — so a brute force through either locks
+        // both.
+        let (threshold, lockout, captcha_from) = (
+            LOCK_FAIL_THRESHOLD,
+            LOCKOUT_SECS,
+            CAPTCHA_REQUIRED_THRESHOLD,
+        );
+        assert_eq!((threshold, lockout, captcha_from), (5, 15 * 60, 1));
+        // The demand must come first, or a pair approaching the lockout
+        // could never be answered.
+        assert!(captcha_from < threshold);
+    }
 }

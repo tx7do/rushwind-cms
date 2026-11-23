@@ -270,3 +270,136 @@ pub fn factory(
         })
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn headers(pairs: &[(&'static str, &str)]) -> HeaderMap {
+        let mut map = HeaderMap::new();
+        for (name, value) in pairs {
+            map.insert(*name, HeaderValue::from_str(value).unwrap());
+        }
+        map
+    }
+
+    fn some(token: &str) -> Option<String> {
+        Some(token.to_string())
+    }
+
+    #[test]
+    fn token_extraction_prefers_bearer_then_x_token_then_the_query() {
+        // Authorization leads over both other carriers.
+        let map = headers(&[("authorization", "Bearer a"), ("x-token", "b")]);
+        assert_eq!(
+            extract_token(&map, some("c").as_ref()).as_deref(),
+            Some("a")
+        );
+        // The lower-case scheme spelling reads the same.
+        let map = headers(&[("authorization", "bearer a")]);
+        assert_eq!(extract_token(&map, None).as_deref(), Some("a"));
+        // X-Token stands in when no bearer rides.
+        let map = headers(&[("x-token", "b")]);
+        assert_eq!(
+            extract_token(&map, some("c").as_ref()).as_deref(),
+            Some("b")
+        );
+        // The query is the last carrier.
+        assert_eq!(
+            extract_token(&HeaderMap::new(), some("c").as_ref()).as_deref(),
+            Some("c")
+        );
+        // Another scheme on Authorization falls through to the others.
+        let map = headers(&[("authorization", "Basic zzz"), ("x-token", "b")]);
+        assert_eq!(extract_token(&map, None).as_deref(), Some("b"));
+        // Empty carriers never count.
+        let map = headers(&[("x-token", "")]);
+        assert_eq!(extract_token(&map, some("").as_ref()), None);
+        assert_eq!(extract_token(&map, None), None);
+        assert_eq!(extract_token(&HeaderMap::new(), None), None);
+    }
+
+    #[tokio::test]
+    async fn authorize_failure_renders_the_plain_text_error_line() {
+        let response = sse_error(status_error("UNAUTHORIZED", "invalid token"));
+        // Every authorize failure is 401 on the wire ...
+        assert_eq!(response.status(), StatusCode::UNAUTHORIZED);
+        assert_eq!(
+            response.headers().get(header::CONTENT_TYPE).unwrap(),
+            "text/plain; charset=utf-8"
+        );
+        assert_eq!(
+            response
+                .headers()
+                .get(header::X_CONTENT_TYPE_OPTIONS)
+                .unwrap(),
+            "nosniff"
+        );
+        // ... with no CORS headers ...
+        assert!(response
+            .headers()
+            .get(header::ACCESS_CONTROL_ALLOW_ORIGIN)
+            .is_none());
+        assert!(response
+            .headers()
+            .get(header::ACCESS_CONTROL_ALLOW_HEADERS)
+            .is_none());
+        // ... and the envelope's code / reason / message inside the line.
+        let body = axum::body::to_bytes(response.into_body(), usize::MAX)
+            .await
+            .unwrap();
+        assert_eq!(
+            body.as_ref(),
+            b"error: code = 401 reason = UNAUTHORIZED message = invalid token metadata = map[] cause = <nil>\n"
+                .as_slice()
+        );
+
+        // A forbidden verdict keeps the 401 status; only the line carries 403.
+        let response = sse_error(status_error("FORBIDDEN", "stream user mismatch"));
+        assert_eq!(response.status(), StatusCode::UNAUTHORIZED);
+        let body = axum::body::to_bytes(response.into_body(), usize::MAX)
+            .await
+            .unwrap();
+        assert_eq!(
+            body.as_ref(),
+            b"error: code = 403 reason = FORBIDDEN message = stream user mismatch metadata = map[] cause = <nil>\n"
+                .as_slice()
+        );
+    }
+
+    #[tokio::test]
+    async fn preflight_answers_204_with_the_fixed_cors_set() {
+        let response = events_preflight().await;
+        assert_eq!(response.status(), StatusCode::NO_CONTENT);
+        let headers = response.headers();
+        assert_eq!(
+            headers.get(header::ACCESS_CONTROL_ALLOW_ORIGIN).unwrap(),
+            "*"
+        );
+        assert_eq!(
+            headers.get(header::ACCESS_CONTROL_ALLOW_METHODS).unwrap(),
+            "GET, OPTIONS"
+        );
+        assert_eq!(
+            headers.get(header::ACCESS_CONTROL_ALLOW_HEADERS).unwrap(),
+            "Content-Type, Authorization, X-Token, Last-Event-ID"
+        );
+        assert_eq!(
+            headers.get(header::ACCESS_CONTROL_MAX_AGE).unwrap(),
+            "86400"
+        );
+    }
+
+    #[tokio::test]
+    async fn hub_fans_out_to_every_subscriber() {
+        let hub = Hub::default();
+        let mut a = hub.subscribe();
+        // A clone shares the one channel.
+        let mut b = hub.clone().subscribe();
+        hub.publish(7, "{\"n\":1}".to_string());
+        assert_eq!(a.recv().await.unwrap(), (7, "{\"n\":1}".to_string()));
+        assert_eq!(b.recv().await.unwrap(), (7, "{\"n\":1}".to_string()));
+        // Publishing with nobody listening is a harmless drop.
+        Hub::default().publish(1, "x".to_string());
+    }
+}
