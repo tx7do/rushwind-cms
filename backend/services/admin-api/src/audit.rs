@@ -139,7 +139,10 @@ pub async fn layer(
 }
 
 /// The login-attempt audit (called from the auth service after each
-/// login verdict — success or failure alike).
+/// login verdict — success or failure alike). The `login_method` column
+/// stays unset: the reference's audit middleware never fills it (the
+/// LoginMethod enum has no refresh-grant member, and a GrantType
+/// ordinal is not a LoginMethod value).
 pub struct LoginAudit<'a> {
     pub username: &'a str,
     pub user_id: i64,
@@ -148,10 +151,6 @@ pub struct LoginAudit<'a> {
     pub failure_reason: &'a str,
     pub ip: &'a str,
     pub request_id: &'a str,
-    /// The grant the login rode (PASSWORD / REFRESH_TOKEN / …) — the
-    /// audit mirrors the caller's grant instead of assuming the password
-    /// form.
-    pub login_method: i32,
 }
 
 pub async fn write_login_audit(state: &AppState, a: LoginAudit<'_>) {
@@ -160,9 +159,10 @@ pub async fn write_login_audit(state: &AppState, a: LoginAudit<'_>) {
         user_id: Some(a.user_id),
         username: Some(a.username.to_string()),
         ip_address: Some(a.ip.to_string()),
-        action_type: Some(1), // LOGIN
+        action_type: Some(
+            proto::proto::audit::service::v1::login_audit_log::ActionType::Login as i32,
+        ),
         status: Some(if a.success { STATUS_OK } else { STATUS_FAILED }),
-        login_method: Some(a.login_method),
         failure_reason: if a.success {
             None
         } else {

@@ -9,7 +9,45 @@ use store::paging::fetch_paged;
 
 use proto::proto::audit::service::v1 as auditv1;
 
-use crate::service::audit_support::{audit_action_name, enum_num};
+// The varchar enum columns ride the proto enum value names — the golden
+// schema stores what the reference's ent enums define, and the
+// reference's EnumTypeConverter pairs the two directions. The action
+// column is the OPERATION action family (CREATE / UPDATE / DELETE /
+// …), not the login family the pre-fix writer stored.
+
+fn action_type_name(v: i32) -> Option<String> {
+    // The zero ordinal is the UNSPECIFIED member — the reference's
+    // ent enum never declares it, so it writes NULL like any
+    // unknown value.
+    if v == 0 {
+        return None;
+    }
+    auditv1::operation_audit_log::ActionType::try_from(v)
+        .ok()
+        .map(|e| e.as_str_name().to_string())
+}
+
+fn sensitive_level_name(v: i32) -> Option<String> {
+    // The zero ordinal is the UNSPECIFIED member — the reference's
+    // ent enum never declares it, so it writes NULL like any
+    // unknown value.
+    if v == 0 {
+        return None;
+    }
+    auditv1::SensitiveLevel::try_from(v)
+        .ok()
+        .map(|e| e.as_str_name().to_string())
+}
+
+fn action_type_num(name: Option<&str>) -> Option<i32> {
+    name.and_then(auditv1::operation_audit_log::ActionType::from_str_name)
+        .map(|e| e as i32)
+}
+
+fn sensitive_level_num(name: Option<&str>) -> Option<i32> {
+    name.and_then(auditv1::SensitiveLevel::from_str_name)
+        .map(|e| e as i32)
+}
 
 fn operation_audit_proto(
     r: store::entities::sys_operation_audit_logs::Model,
@@ -21,8 +59,8 @@ fn operation_audit_proto(
         username: r.username,
         resource_type: r.resource_type,
         resource_id: r.resource_id,
-        action: enum_num(r.action),
-        sensitive_level: enum_num(r.sensitive_level),
+        action: action_type_num(r.action.as_deref()),
+        sensitive_level: sensitive_level_num(r.sensitive_level.as_deref()),
         request_id: r.request_id,
         trace_id: r.trace_id,
         success: r.success,
@@ -44,8 +82,8 @@ pub async fn insert_operation_audit(
         username: Set(d.username),
         resource_type: Set(d.resource_type),
         resource_id: Set(d.resource_id),
-        action: Set(d.action.map(audit_action_name)),
-        sensitive_level: Set(d.sensitive_level.map(|v| v.to_string())),
+        action: Set(d.action.and_then(action_type_name)),
+        sensitive_level: Set(d.sensitive_level.and_then(sensitive_level_name)),
         request_id: Set(d.request_id),
         trace_id: Set(d.trace_id),
         success: Set(d.success),
@@ -111,5 +149,55 @@ impl auditv1::operation_audit_log_service_server::OperationAuditLogService
         };
         insert_operation_audit(&self.state.db, data).await?;
         Ok(Response::new(pbjson_types::Empty {}))
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// The action column is the operation family: every declared member
+    /// (including the OTHER=100 outlier) writes its own proto name and
+    /// reads back its own ordinal.
+    #[test]
+    fn the_action_column_round_trips_through_the_operation_names() {
+        for v in [1, 2, 3, 4, 5, 6, 7, 8, 100] {
+            let name = action_type_name(v).unwrap_or_else(|| panic!("action {v}"));
+            assert_eq!(action_type_num(Some(&name)), Some(v), "{name}");
+        }
+        // The names are the proto spellings — a CREATE row never stores
+        // the login family's "LOGIN" the pre-fix writer produced.
+        assert_eq!(action_type_name(1).as_deref(), Some("CREATE"));
+        assert_eq!(action_type_name(2).as_deref(), Some("UPDATE"));
+        assert_eq!(action_type_name(3).as_deref(), Some("DELETE"));
+        assert_eq!(action_type_name(100).as_deref(), Some("OTHER"));
+        // Unknown ordinals write NULL instead of a guessed family's name.
+        for v in [0, -1, 9, 99, 101] {
+            assert_eq!(action_type_name(v), None, "{v}");
+        }
+        // Foreign labels read as absent.
+        for junk in ["", "LOGIN", "LOGOUT", "REFRESH", "login"] {
+            assert_eq!(action_type_num(Some(junk)), None, "{junk}");
+        }
+        assert_eq!(action_type_num(None), None);
+    }
+
+    #[test]
+    fn the_sensitive_level_column_round_trips_through_the_shared_names() {
+        for v in 1..=4 {
+            let name = sensitive_level_name(v).unwrap_or_else(|| panic!("level {v}"));
+            assert_eq!(sensitive_level_num(Some(&name)), Some(v), "{name}");
+        }
+        assert_eq!(sensitive_level_name(1).as_deref(), Some("PUBLIC"));
+        assert_eq!(sensitive_level_name(4).as_deref(), Some("SECRET"));
+        // The pre-fix writer stored ordinal strings — they were never
+        // reference data and read absent now.
+        for junk in ["", "1", "public", "TOP_SECRET"] {
+            assert_eq!(sensitive_level_num(Some(junk)), None, "{junk}");
+        }
+        for v in [0, -1, 5] {
+            assert_eq!(sensitive_level_name(v), None, "{v}");
+        }
+        assert_eq!(sensitive_level_num(None), None);
     }
 }

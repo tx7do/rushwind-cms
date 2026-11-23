@@ -1,13 +1,10 @@
-//! Shared machinery of the five audit-log services: the varchar
-//! enum helper, the impl-stamping macro and the cross-family name
-//! tables (no Go counterpart — the package-level helpers of the
-//! reference's audit service files).
-
-pub(crate) fn enum_num(name: Option<String>) -> Option<i32> {
-    // The varchar enum-value columns → their ordinal (1-based by
-    // convention; UNKNOWN stays unmapped).
-    name.map(|_| 1)
-}
+//! Shared machinery of the five audit-log services: the impl-stamping
+//! macro (no Go counterpart — the package-level helpers of the
+//! reference's audit service files). The varchar enum columns of the
+//! audit tables ride their proto enum value names — the golden schema
+//! stores what the reference's ent enums define — so every family keeps
+//! its own name/ordinal converters beside its mapper (the reference's
+//! EnumTypeConverter pairs).
 
 macro_rules! audit_impl {
     ($svc:ident, $server_mod:ident, $trait_:ident, $entity:ident, $proto:ident,
@@ -70,17 +67,6 @@ macro_rules! audit_impl {
             }
         }
     };
-}
-
-/// golden schema stores (the audit family's own enum tables).
-pub(crate) fn audit_action_name(v: i32) -> String {
-    match v {
-        1 => "LOGIN",
-        2 => "LOGOUT",
-        3 => "REFRESH",
-        _ => "LOGIN",
-    }
-    .to_string()
 }
 
 pub(crate) use audit_impl;

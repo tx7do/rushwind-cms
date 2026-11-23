@@ -60,6 +60,15 @@ pub(crate) fn location_name(v: i32) -> Option<String> {
     )
 }
 
+/// The status column rides the proto enum value names both ways — the
+/// golden schema stores what the reference's ent enum defines
+/// (`SITE_STATUS_ACTIVE` / …), and the reference's EnumTypeConverter
+/// pairs the two directions.
+fn site_status_num(name: Option<&str>) -> Option<i32> {
+    name.and_then(sitev1::site::Status::from_str_name)
+        .map(|e| e as i32)
+}
+
 fn site_proto(r: sites::Model) -> sitev1::Site {
     sitev1::Site {
         id: Some(r.id),
@@ -72,7 +81,7 @@ fn site_proto(r: sites::Model) -> sitev1::Site {
             .and_then(|j| serde_json::from_value::<Vec<String>>(j).ok())
             .unwrap_or_default(),
         is_default: r.is_default,
-        status: r.status.as_deref().map(|_| 1),
+        status: site_status_num(r.status.as_deref()),
         default_locale: r.default_locale,
         template: r.template,
         theme: r.theme,
@@ -144,7 +153,9 @@ impl sitev1::site_service_server::SiteService for SiteService {
                 .then(|| serde_json::to_value(&data.alternate_domains).ok())
                 .flatten()),
             is_default: Set(data.is_default),
-            status: Set(Some("ON".to_string())),
+            // The reference's ent enum default (SITE_STATUS_ACTIVE) — the
+            // proto value name the golden schema stores.
+            status: Set(Some("SITE_STATUS_ACTIVE".to_string())),
             default_locale: Set(data.default_locale),
             template: Set(data.template),
             theme: Set(data.theme),
@@ -272,7 +283,7 @@ mod tests {
     fn site_proto_reads_the_alternate_domain_list() {
         let p = site_proto(site(
             Some(serde_json::json!(["a.com", "b.com"])),
-            Some("ON"),
+            Some("SITE_STATUS_ACTIVE"),
         ));
         assert_eq!(p.id, Some(5));
         assert_eq!(p.tenant_id, Some(2));
@@ -282,8 +293,7 @@ mod tests {
         assert_eq!(p.alternate_domains, ["a.com", "b.com"]);
         assert_eq!(p.is_default, Some(true));
         assert_eq!(p.default_locale.as_deref(), Some("zh-CN"));
-        // The status is presence-based: a set column reads as the active
-        // ordinal, an absent one as none.
+        // The status parses the stored proto enum value name.
         assert_eq!(p.status, Some(1));
 
         // An absent or malformed list reads as empty — never a failure.
@@ -298,5 +308,29 @@ mod tests {
             .alternate_domains
             .is_empty());
         assert_eq!(site_proto(site(None, None)).status, None);
+    }
+
+    #[test]
+    fn the_status_column_parses_the_proto_enum_names() {
+        // Every declared member reads its own ordinal — the demo seed
+        // stores exactly these names.
+        assert_eq!(
+            site_status_num(Some("SITE_STATUS_ACTIVE")),
+            Some(sitev1::site::Status::SiteStatusActive as i32)
+        );
+        assert_eq!(
+            site_status_num(Some("SITE_STATUS_INACTIVE")),
+            Some(sitev1::site::Status::SiteStatusInactive as i32)
+        );
+        assert_eq!(
+            site_status_num(Some("SITE_STATUS_MAINTENANCE")),
+            Some(sitev1::site::Status::SiteStatusMaintenance as i32)
+        );
+        // Foreign labels — including the "ON" the pre-fix writer stored —
+        // read as absent, never as the active ordinal.
+        for junk in ["", "ON", "ACTIVE", "site_status_active"] {
+            assert_eq!(site_status_num(Some(junk)), None, "{junk}");
+        }
+        assert_eq!(site_status_num(None), None);
     }
 }

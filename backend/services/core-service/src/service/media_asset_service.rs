@@ -46,7 +46,13 @@ fn media_asset_proto(r: media_assets::Model) -> mediav1::MediaAsset {
     mediav1::MediaAsset {
         id: Some(r.id),
         filename: r.filename.clone(),
-        r#type: r.r#type.clone().map(|_| 1),
+        // The varchar enum columns ride the proto enum value names — the
+        // same names `asset_type_name` / `processing_status_name` write.
+        r#type: r
+            .r#type
+            .as_deref()
+            .and_then(mediav1::media_asset::AssetType::from_str_name)
+            .map(|e| e as i32),
         mime_type: r.mime_type.clone(),
         size: r.size.map(|v| v as u64),
         storage_path: r.storage_path.clone(),
@@ -57,7 +63,11 @@ fn media_asset_proto(r: media_assets::Model) -> mediav1::MediaAsset {
         alt_text: r.alt_text.clone(),
         title: r.title.clone(),
         caption: r.caption.clone(),
-        processing_status: r.processing_status.clone().map(|_| 1),
+        processing_status: r
+            .processing_status
+            .as_deref()
+            .and_then(mediav1::media_asset::ProcessingStatus::from_str_name)
+            .map(|e| e as i32),
         processing_error: r.processing_error.clone(),
         file_hash: r.file_hash.clone(),
         file_id: r.file_id,
@@ -267,5 +277,71 @@ mod tests {
         for v in [-1, 0, 5, 99] {
             assert_eq!(processing_status_name(v), None, "{v}");
         }
+    }
+
+    /// A media row; `r#type` / `processing_status` are the column's raw
+    /// varchars.
+    fn asset(r#type: Option<&str>, processing_status: Option<&str>) -> media_assets::Model {
+        media_assets::Model {
+            id: 4,
+            created_at: None,
+            updated_at: None,
+            deleted_at: None,
+            created_by: None,
+            updated_by: None,
+            deleted_by: None,
+            tenant_id: Some(1),
+            filename: Some("cover.png".into()),
+            r#type: r#type.map(str::to_string),
+            mime_type: Some("image/png".into()),
+            size: Some(2048),
+            storage_path: Some("/tmp/cover.png".into()),
+            url: None,
+            width: Some(640),
+            height: Some(480),
+            duration: None,
+            alt_text: None,
+            title: None,
+            caption: None,
+            processing_status: processing_status.map(str::to_string),
+            processing_error: None,
+            file_hash: None,
+            folder_id: None,
+            file_id: None,
+            reference_count: Some(3),
+            is_private: Some(false),
+        }
+    }
+
+    #[test]
+    fn media_asset_proto_parses_the_stored_enum_names() {
+        // The demo seed stores exactly these names; each reads its own
+        // ordinal — not the presence-folded IMAGE/UPLOADING pair the
+        // pre-fix reader produced.
+        let p = media_asset_proto(asset(
+            Some("ASSET_TYPE_VIDEO"),
+            Some("PROCESSING_STATUS_FAILED"),
+        ));
+        assert_eq!(p.id, Some(4));
+        assert_eq!(
+            p.r#type,
+            mediav1::media_asset::AssetType::from_str_name("ASSET_TYPE_VIDEO").map(|e| e as i32)
+        );
+        assert_eq!(
+            p.processing_status,
+            mediav1::media_asset::ProcessingStatus::from_str_name("PROCESSING_STATUS_FAILED")
+                .map(|e| e as i32)
+        );
+        assert_eq!(p.size, Some(2048));
+        assert_eq!(p.width, Some(640));
+        assert_eq!(p.reference_count, Some(3));
+
+        // A name outside the table (or an absent column) reads absent.
+        let p = media_asset_proto(asset(Some("IMAGE"), None));
+        assert_eq!(p.r#type, None);
+        assert_eq!(p.processing_status, None);
+        let p = media_asset_proto(asset(None, Some("PROCESSING_STATUS_DONE")));
+        assert_eq!(p.r#type, None);
+        assert_eq!(p.processing_status, None);
     }
 }

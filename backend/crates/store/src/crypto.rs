@@ -1,6 +1,6 @@
 //! Credential crypto primitives: the AES-128-CBC front-end password
 //! layer (key `f51d66a73d8a0927`, IV = the key itself, PKCS#7), bcrypt
-//! hashing (default cost 10), and the timing-equalizer dummy verify.
+//! hashing (default cost 12), and the timing-equalizer dummy verify.
 
 use aes::cipher::{block_padding::Pkcs7, BlockDecryptMut, KeyIvInit};
 
@@ -41,9 +41,13 @@ pub fn verify_password(password: &str, hash: &str) -> bool {
 }
 
 /// The timing-equalizer dummy hash — the user-not-found paths run one
-/// verification against it so response times do not leak existence.
+/// verification against it so response times do not leak existence. It
+/// rides the same cost as `hash_password`'s output: the equalizer only
+/// balances when the dummy verification burns the same work as the real
+/// one. Its plaintext ("rushwind-timing-equalizer-placeholder") is no
+/// real credential, so the probe below never matches.
 pub const DUMMY_PASSWORD_HASH: &str =
-    "$2a$10$1sbpKmhQDpXLHnDnEQ1nLe3oOnYyP2bUJyqHcX2T0Fq1qfyoXOrPm";
+    "$2b$12$pjz1dJ6s0Ix9Q3Dh246ZRu9tHdOssjsiV4H.kgaKUgtSwDGe4JeC2";
 
 pub fn dummy_verify() {
     let _ = bcrypt::verify("definitely-not-the-password", DUMMY_PASSWORD_HASH);
@@ -183,5 +187,24 @@ mod tests {
         assert!(!verify_password("", DUMMY_PASSWORD_HASH));
         // And the probe itself is infallible.
         dummy_verify();
+    }
+
+    /// The bcrypt cost segment off a `$2?$$NN$…` stored string.
+    fn cost_of(hash: &str) -> Option<u32> {
+        hash.split('$').nth(2)?.parse().ok()
+    }
+
+    #[test]
+    fn the_dummy_equalizer_rides_the_real_hashing_cost() {
+        // A cheaper dummy would answer user-not-found faster than a real
+        // password check — the response time would leak existence again.
+        // hash_password rides the crate's DEFAULT_COST; the dummy must too.
+        let real = cost_of(&hash_password("cost probe").unwrap()).unwrap();
+        assert_eq!(real, bcrypt::DEFAULT_COST, "hash_password's cost drifted");
+        assert_eq!(
+            cost_of(DUMMY_PASSWORD_HASH),
+            Some(bcrypt::DEFAULT_COST),
+            "the dummy equalizer must match the real hashing cost"
+        );
     }
 }

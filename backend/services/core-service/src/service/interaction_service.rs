@@ -18,13 +18,11 @@ use proto::proto::interaction::service::v1 as interactionv1;
 
 // ── Interaction ──────────────────────────────────────────────────────
 
-/// The metric column value of a counter row (LIKE=1 / WATCH=2 style,
-/// the interaction proto's enum numbers).
+/// The metric column value of a counter row — the proto CounterMetric
+/// ordinal verbatim (LIKE=1 / WATCH=2 / VIEW=3), the reference's
+/// `uint8(metric)` pass-through over the numeric column.
 pub(crate) fn metric_num(metric: i32) -> i16 {
-    match metric {
-        2 => 2,
-        _ => 1,
-    }
+    metric as i16
 }
 
 #[allow(dead_code)] // the like/unlike/watch write paths land with the interaction phase
@@ -384,5 +382,23 @@ impl interactionv1::interaction_service_server::InteractionService for Interacti
             counts.insert(target_id as u32, map);
         }
         Ok(Response::new(interactionv1::GetCountsResponse { counts }))
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn metric_num_rides_the_proto_ordinals_verbatim() {
+        // The counters table is numeric: LIKE=1 / WATCH=2 / VIEW=3 land
+        // as themselves (the reference's uint8(metric) pass-through) — a
+        // VIEW count never folds onto the LIKE rows the pre-fix reader
+        // queried.
+        assert_eq!(metric_num(1), 1);
+        assert_eq!(metric_num(2), 2);
+        assert_eq!(metric_num(3), 3);
+        // UNSPECIFIED passes through too, mirroring the reference.
+        assert_eq!(metric_num(0), 0);
     }
 }

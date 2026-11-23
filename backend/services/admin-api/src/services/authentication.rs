@@ -238,7 +238,6 @@ impl proto::gen_admin::services::AuthenticationServiceHandlers for Authenticatio
                     failure_reason: &reason,
                     ip: &audit_ip,
                     request_id: &audit_rid,
-                    login_method: grant,
                 },
             )
             .await;
