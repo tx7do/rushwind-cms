@@ -39,6 +39,13 @@ sea-orm = { version = "2.0", default-features = false, features = [
     "with-json",
 ] }
 redis = { version = "1", default-features = false, features = ["tokio-comp", "connection-manager", "script"] }
+# 全流程感知底座：框架各层只发 tracing 事件（access 行 rushwind.http、
+# panic 汇报 rushwind.panic、生命周期终态 rushwind.bootstrap），订阅者是
+# 应用的事——没有它整个部署是盲的。写线非阻塞：fmt 默认同步写 stdout，
+# 部署接了不排水的管道时每一行都可能永久 park 一个 worker。
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["env-filter"] }
+tracing-appender = "0.2"
 tokio = { version = "1", features = ["rt-multi-thread", "macros", "signal", "time", "net"] }
 uuid = { version = "1", features = ["v4", "v7"] }
 serde_yaml = "0.9"

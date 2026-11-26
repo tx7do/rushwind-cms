@@ -18,6 +18,25 @@ const SERVER_YAML: &str = include_str!("../assets/server.yaml");
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
+    // 全流程感知底座，先于一切装配：框架各层只发 tracing 事件——
+    // 每请求 access 行（rushwind.http：method/path/request_id/status/
+    // latency）、panic 汇报（rushwind.panic）、生命周期终态
+    // （rushwind.bootstrap）——订阅者是应用自己的事，不装即全盲。
+    // RUST_LOG 优先，缺省 info；写线非阻塞（fmt 默认同步写 stdout，
+    // 部署接了不排水的管道会把 worker 逐个 park 死成"卡阻"），ANSI
+    // 关闭保证日志文件可 grep。
+    let (log_writer, log_guard) = tracing_appender::non_blocking(std::io::stdout());
+    tracing_subscriber::fmt()
+        .with_ansi(false)
+        .with_writer(log_writer)
+        .with_env_filter(
+            tracing_subscriber::EnvFilter::try_from_default_env()
+                .unwrap_or_else(|_| tracing_subscriber::EnvFilter::new("info")),
+        )
+        .init();
+    // 守卫必须活到进程结束（main 即进程生命周期）。
+    let _log_guard = log_guard;
+
     let cfg = Config::load()?;
     let verifier = rushwind_authn_jwt::JwtAuthenticator::new(
         rushwind_authn_jwt::JwtOptions::new()
@@ -37,6 +56,6 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     // The lifecycle owns the OS-signal shutdown path internally; the
     // external signal here stays unfired.
     let external = StopSignal::new();
-    booted.app.run(external).await?;
+    booted.run_logged(external).await?;
     Ok(())
 }
