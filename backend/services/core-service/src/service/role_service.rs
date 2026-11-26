@@ -15,7 +15,7 @@ use crate::data::{role_metadata_repo, role_permission_repo, role_repo, user_role
 use crate::service::constants::{is_reserved_role_code, PLATFORM_ADMIN_ROLE_CODE};
 use crate::service::context::{operator_of, operator_tenant_id};
 use crate::state::{bad, db_status, forbidden, not_found, ts_to_proto, AppState};
-use store::entities::{sys_role_permissions, sys_roles, sys_user_roles, sys_users};
+use store::entities::{sys_role_permissions, sys_roles, sys_tenants, sys_user_roles, sys_users};
 use store::paging::fetch_paged;
 
 use proto::proto::permission::service::v1 as permissionv1;
@@ -80,6 +80,28 @@ async fn can_assign_role(
 }
 
 /// List/Get 回填 parentName 的批量底表：一次取齐本批角色的父角色。
+/// 租户名批查（响应可读面；best-effort）。
+async fn tenant_names_of(
+    db: &sea_orm::DatabaseConnection,
+    rows: &[sys_roles::Model],
+) -> HashMap<i64, String> {
+    let tenant_ids: Vec<i64> = rows
+        .iter()
+        .filter_map(|r| r.tenant_id.filter(|v| *v > 0))
+        .collect();
+    if tenant_ids.is_empty() {
+        return HashMap::new();
+    }
+    sys_tenants::Entity::find()
+        .filter(sys_tenants::Column::Id.is_in(tenant_ids))
+        .all(db)
+        .await
+        .unwrap_or_default()
+        .into_iter()
+        .filter_map(|t| t.name.map(|n| (t.id, n)))
+        .collect()
+}
+
 async fn parent_names_of(
     db: &sea_orm::DatabaseConnection,
     rows: &[sys_roles::Model],
@@ -100,7 +122,11 @@ async fn parent_names_of(
         .collect()
 }
 
-pub(crate) fn role_proto(r: sys_roles::Model, parent_name: Option<String>) -> permissionv1::Role {
+pub(crate) fn role_proto(
+    r: sys_roles::Model,
+    parent_name: Option<String>,
+    tenant_name: Option<String>,
+) -> permissionv1::Role {
     permissionv1::Role {
         id: Some(r.id),
         tenant_id: r.tenant_id,
@@ -113,6 +139,7 @@ pub(crate) fn role_proto(r: sys_roles::Model, parent_name: Option<String>) -> pe
         status: Some(1),
         parent_id: r.parent_id,
         parent_name,
+        tenant_name,
         created_at: r.created_at.and_then(ts_to_proto),
         updated_at: r.updated_at.and_then(ts_to_proto),
         ..Default::default()
@@ -228,12 +255,14 @@ impl permissionv1::role_service_server::RoleService for RoleService {
         .await
         .map_err(|e| Status::internal(e.message))?;
         let parent_names = parent_names_of(&self.state.db, &rows).await;
+        let tenant_names = tenant_names_of(&self.state.db, &rows).await;
         Ok(Response::new(permissionv1::ListRoleResponse {
             items: rows
                 .into_iter()
                 .map(|r| {
                     let name = r.parent_id.and_then(|pid| parent_names.get(&pid).cloned());
-                    role_proto(r, name)
+                    let tenant = r.tenant_id.and_then(|tid| tenant_names.get(&tid).cloned());
+                    role_proto(r, name, tenant)
                 })
                 .collect(),
             total: total as i64,
@@ -270,7 +299,16 @@ impl permissionv1::role_service_server::RoleService for RoleService {
                 .and_then(|p| p.name),
             None => None,
         };
-        Ok(Response::new(role_proto(row, parent_name)))
+        let tenant_name = match row.tenant_id.filter(|v| *v > 0) {
+            Some(tid) => sys_tenants::Entity::find_by_id(tid)
+                .one(&self.state.db)
+                .await
+                .ok()
+                .flatten()
+                .and_then(|t| t.name),
+            None => None,
+        };
+        Ok(Response::new(role_proto(row, parent_name, tenant_name)))
     }
 
     async fn create(
@@ -761,7 +799,7 @@ mod tests {
 
     #[test]
     fn role_proto_maps_the_row_with_the_parent_backfill() {
-        let p = role_proto(role(Some(4)), Some("父角色".into()));
+        let p = role_proto(role(Some(4)), Some("父角色".into()), None);
         assert_eq!(p.id, Some(11));
         assert_eq!(p.tenant_id, Some(3));
         assert_eq!(p.name.as_deref(), Some("编辑"));
@@ -777,7 +815,7 @@ mod tests {
         assert_eq!(p.status, Some(1));
 
         // A root role: no parent, and the name backfill is simply absent.
-        let p = role_proto(role(None), None);
+        let p = role_proto(role(None), None, None);
         assert_eq!(p.parent_id, None);
         assert_eq!(p.parent_name, None);
     }

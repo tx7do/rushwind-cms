@@ -9,7 +9,7 @@ use tonic::{Request, Response, Status};
 use crate::data::position_repo;
 use crate::service::org_unit_service::ts_to_column;
 use crate::state::{bad, db_status, AppState};
-use store::entities::sys_positions;
+use store::entities::{sys_org_units, sys_positions};
 use store::paging::fetch_paged;
 
 use proto::proto::identity::service::v1 as identityv1;
@@ -48,6 +48,27 @@ fn position_proto(r: sys_positions::Model) -> identityv1::Position {
     }
 }
 
+/// 组织名回填（参照 enrichRelations 的 OrgUnitName 面；best-effort）。
+async fn bind_org_unit_names(state: &AppState, items: &mut [identityv1::Position]) {
+    let ids: std::collections::BTreeSet<i64> = items.iter().filter_map(|p| p.org_unit_id).collect();
+    if ids.is_empty() {
+        return;
+    }
+    let orgs: std::collections::HashMap<i64, String> = sys_org_units::Entity::find()
+        .filter(sys_org_units::Column::Id.is_in(ids))
+        .all(&state.db)
+        .await
+        .unwrap_or_default()
+        .into_iter()
+        .map(|o| (o.id, o.name))
+        .collect();
+    for p in items {
+        if let Some(oid) = p.org_unit_id {
+            p.org_unit_name = orgs.get(&oid).cloned();
+        }
+    }
+}
+
 pub struct PositionService {
     pub state: Arc<AppState>,
 }
@@ -65,8 +86,10 @@ impl identityv1::position_service_server::PositionService for PositionService {
         )
         .await
         .map_err(|e| Status::internal(e.message))?;
+        let mut items: Vec<identityv1::Position> = rows.into_iter().map(position_proto).collect();
+        bind_org_unit_names(&self.state, &mut items).await;
         Ok(Response::new(identityv1::ListPositionResponse {
-            items: rows.into_iter().map(position_proto).collect(),
+            items,
             total: total as i64,
         }))
     }
@@ -93,7 +116,9 @@ impl identityv1::position_service_server::PositionService for PositionService {
             return Err(bad("query_by required"));
         };
         let row = position_repo::positions_by_id(&self.state.db, id).await?;
-        Ok(Response::new(position_proto(row)))
+        let mut position = position_proto(row);
+        bind_org_unit_names(&self.state, std::slice::from_mut(&mut position)).await;
+        Ok(Response::new(position))
     }
 
     async fn create(

@@ -8,7 +8,7 @@ use sea_orm::{ColumnTrait, EntityTrait, PaginatorTrait, QueryFilter, Set, Transa
 use tonic::{Request, Response, Status};
 
 use crate::state::{bad, db_status, ts_from_proto, AppState};
-use store::entities::sys_org_units;
+use store::entities::{sys_org_units, sys_user_org_units, sys_users};
 use store::paging::fetch_paged;
 
 use crate::data::org_unit_repo;
@@ -64,6 +64,42 @@ fn org_unit_proto(r: sys_org_units::Model) -> identityv1::OrgUnit {
     }
 }
 
+/// 响应名面回填（参照 enrichRelations：LeaderName/ContactUserName 按
+/// username 回填，沿 children 递归；best-effort）。
+async fn bind_user_names(state: &AppState, items: &mut [identityv1::OrgUnit]) {
+    let ids: std::collections::BTreeSet<i64> = items
+        .iter()
+        .flat_map(|o| [o.leader_id, o.contact_user_id].into_iter().flatten())
+        .collect();
+    if ids.is_empty() {
+        return;
+    }
+    let users: std::collections::HashMap<i64, String> = sys_users::Entity::find()
+        .filter(sys_users::Column::Id.is_in(ids))
+        .all(&state.db)
+        .await
+        .unwrap_or_default()
+        .into_iter()
+        .filter_map(|u| u.username.map(|n| (u.id, n)))
+        .collect();
+    fill_user_names(items, &users);
+}
+
+fn fill_user_names(
+    items: &mut [identityv1::OrgUnit],
+    users: &std::collections::HashMap<i64, String>,
+) {
+    for o in items {
+        if let Some(lid) = o.leader_id {
+            o.leader_name = users.get(&lid).cloned();
+        }
+        if let Some(cid) = o.contact_user_id {
+            o.contact_user_name = users.get(&cid).cloned();
+        }
+        fill_user_names(&mut o.children, users);
+    }
+}
+
 pub struct OrgUnitService {
     pub state: Arc<AppState>,
 }
@@ -81,8 +117,10 @@ impl identityv1::org_unit_service_server::OrgUnitService for OrgUnitService {
         )
         .await
         .map_err(|e| Status::internal(e.message))?;
+        let mut items: Vec<identityv1::OrgUnit> = rows.into_iter().map(org_unit_proto).collect();
+        bind_user_names(&self.state, &mut items).await;
         Ok(Response::new(identityv1::ListOrgUnitResponse {
-            items: rows.into_iter().map(org_unit_proto).collect(),
+            items,
             total: total as i64,
         }))
     }
@@ -109,7 +147,9 @@ impl identityv1::org_unit_service_server::OrgUnitService for OrgUnitService {
             return Err(bad("query_by required"));
         };
         let row = org_unit_repo::org_units_by_id(&self.state.db, id).await?;
-        Ok(Response::new(org_unit_proto(row)))
+        let mut org = org_unit_proto(row);
+        bind_user_names(&self.state, std::slice::from_mut(&mut org)).await;
+        Ok(Response::new(org))
     }
 
     async fn create(
@@ -302,9 +342,15 @@ impl identityv1::org_unit_service_server::OrgUnitService for OrgUnitService {
         let Some(identityv1::delete_org_unit_request::QueryBy::Id(id)) = req.query_by else {
             return Err(bad("query_by required"));
         };
-        // 级联删除全部子孙节点
+        // 级联删除全部子孙节点，用户-组织绑定随之清除（参照
+        // CleanRelationsByOrgUnitIDs：org_unit_id 键不带租户谓词）。
         let mut ids = org_unit_repo::org_unit_descendant_ids(&self.state.db, id).await?;
         ids.push(id);
+        sys_user_org_units::Entity::delete_many()
+            .filter(sys_user_org_units::Column::OrgUnitId.is_in(&ids))
+            .exec(&self.state.db)
+            .await
+            .map_err(db_status)?;
         sys_org_units::Entity::delete_many()
             .filter(sys_org_units::Column::Id.is_in(ids))
             .exec(&self.state.db)
